@@ -2,4 +2,14 @@
 <name>test usr command</name>
 <type>C Function</type>
 <function>usrTestUsrCommand</function>
+<documentation>
+<remarks>
+<![CDATA[
+    <p>
+    This is a test command
+    </p>
+]]>
+</remarks>
+</documentation>
+
 </command>
