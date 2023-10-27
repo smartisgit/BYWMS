@@ -1,0 +1,63 @@
+<command>
+<name>list ossi app monitor parameters</name>
+<description>List the monitor parameters</description>
+
+<argument name="uc_monitor_id" required="yes" datatype="string"></argument>
+<argument name="uc_monitor_param_id" required="yes" datatype="string"></argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+if (@uc_monitor_param_id is null)
+hide stack variable 
+  where name = 'uc_monitor_param_id' 
+|
+[select x.* 
+   from (select polvar uc_monitor_id, 
+                srtseq, 
+                rtstr1 uc_monitor_param_id, 
+                rtstr2 uc_monitor_param_val_str, 
+                rtnum1 uc_monitor_param_val_num1, 
+                rtnum2 uc_monitor_param_val_num2, 
+                rtflt1 uc_monitor_param_val_flt1, 
+                rtflt2 uc_monitor_param_val_flt2 
+           from poldat 
+          where polcod = 'USR-OSSI-APP-MONITOR' 
+            and polval = 'PARAMETERS' 
+            and wh_id_tmpl = '----' 
+            and polvar = @uc_monitor_id 
+/*#nobind*/
+    and rtstr1 not like  '\_HELP%' escape '\'
+    order by 1,2,3
+    OFFSET 0 ROWS FETCH NEXT 1000000 ROWS ONLY
+    /*#bind*/
+
+        ) x 
+  where 1=1 
+    and @+uc_monitor_param_id 
+    and @* 
+] 
+]]>
+</local-syntax>
+
+<retcol name="uc_monitor_id" type="string">Monitor ID</retcol>
+<retcol name="srtseq" type="string">Sequence</retcol>
+<retcol name="uc_monitor_param_id" type="string">Parameter Value</retcol>
+<retcol name="uc_monitor_param_val_str" type="string">Parameter Str</retcol>
+<retcol name="uc_monitor_param_val_num1" type="string">Parameter Value Num1</retcol>
+<retcol name="uc_monitor_param_val_num2" type="string">Parameter Value Num2</retcol>
+<retcol name="uc_monitor_param_val_flt1" type="string">Parameter Value Flt1</retcol>
+<retcol name="uc_monitor_param_val_flt2" type="string">Parameter Value Flt2</retcol>
+
+<documentation>
+<remarks>
+This command is used to get monitor parameters, which is being get from poldat table when polcod is 'USR-OSSI-APP-MONITOR'.
+</remarks>
+</documentation>
+</command>

@@ -1,0 +1,133 @@
+<command>
+<name>ossi get_csv_for_max_len</name>
+<description>Given a coma separted list, get complete data till a length</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="moca_farg1">Source String</argument>
+<argument datatype="string" name="moca_farg2">separator</argument>
+<argument datatype="string" name="moca_farg3">max length</argument>
+<argument datatype="string" name="moca_farg4">instead of 3rd pass table here </argument>
+<argument datatype="string" name="moca_farg5">And length here</argument>
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+publish data
+where source_string   = @moca_farg1
+and   delim           = nvl(@moca_farg2,',')
+and   i_len           = @moca_farg3
+and   i_len_table_name= @moca_farg4
+and   i_len_column    = @moca_farg5
+and   uc_use_len      = 0
+|
+publish data
+where len_table_name = upper(@i_len_table_name)
+and len_column = upper(@i_len_column)
+|
+publish data
+where uc_cache_name = 'UC_COL_LEN' || @len_table_name || '_' || @len_column_name 
+|
+if (@source_string is not null)
+{
+   if ( @i_len > 0 )
+   {
+      publish data
+      where uc_use_len = @i_len
+   }
+   else
+   {
+      get ossi data from cache
+      where uc_cache_name = @uc_cache_name
+      catch (-1403,510)
+      |
+      if ( @? = 0 )
+         publish data
+         where uc_use_len = int(@uc_cache_value)
+      else
+      {
+         {
+            list table columns
+            where table_name = @len_table_name
+            catch (-1403,510)
+            |
+            if (@? = 0 and upper(@column_name) = @len_column )
+               publish data
+               where uc_use_len = @length
+         }
+         |
+         save ossi data to cache
+         where uc_cache_name = @uc_cache_name
+         and uc_cache_value = string(@uc_use_len)
+         |
+         publish data
+         where uc_use_len = @uc_use_len
+      }
+   }
+   |
+   if ( @uc_use_len is not null and @uc_use_len > 0 )
+   {
+      if ( len(@source_string) <= @uc_use_len )
+         publish data 
+         where ret = @source_string
+      else
+      {
+         [[
+         Integer cur_len = 0;
+         Integer delim_len_overhead;  // When we check if it would fit need to account for delim
+         StringBuffer ret = new StringBuffer( "" );
+         //
+         for ( r_fld in source_string.split ( delim ) )
+         {
+            this_fld_len = r_fld.length();
+            //
+            // When first field, ie cur_len = 0 no delim need to be accouted for.  Afterwards to see
+            // if new field will fit account for the fact that delim will be added as well to add field
+            //
+            if ( cur_len > 0 )
+               delim_len_overhead = delim.length();
+            else
+               delim_len_overhead = 0;
+            //
+            if ( this_fld_len + cur_len + delim_len_overhead > uc_use_len )
+               break;
+            else
+            {
+               if ( cur_len > 0 )
+               {
+                  ret.append ( delim );
+                  cur_len += delim.length();
+               }
+               cur_len += this_fld_len;
+               ret.append ( r_fld );
+            }
+         }
+         [ret:ret.toString()]
+         ]]
+      }
+   } /* have some max */
+   else
+      publish data
+      where ret = @source_string
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+Lets say we have a string like aaa,bbbb,cccc (length of 12) but my target can only have 10.  I dont want to 
+blindly substr for 10 - I want to go till the comma where we get 10
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

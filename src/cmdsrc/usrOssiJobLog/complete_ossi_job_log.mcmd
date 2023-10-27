@@ -1,0 +1,69 @@
+<command>
+<name>complete ossi job log</name>
+<description>Create an entry into the job log</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+publish data
+where uc_ossi_module_seq = nvl ( @uc_ossi_module_seq, 0 )
+and   uc_ossi_action_seq = nvl ( @uc_ossi_action_seq, 0 )
+and   uc_ossi_err_code   = nvl ( @uc_ossi_err_code,   0 )
+|
+{
+    if ( @uc_complete_tran_on_complete = 1 )
+    {
+        if ( @uc_ossi_err_code = 0 )
+            commit
+        else
+            rollback
+    }
+    ; 
+    if ( @uc_ossi_job_seq > 0 )
+        change ossi job log
+}
+
+]]>
+</local-syntax>
+
+<argument name="uc_ossi_job_seq" required="yes" datatype="Integer">Job Number</argument>
+<argument name="uc_ossi_module_seq" required="no" datatype="Integer">Default 0</argument>
+<argument name="uc_ossi_action_seq" required="no" datatype="Integer">Default 0</argument>
+<argument name="uc_ossi_err_code" required="no" datatype="Integer">Default 0</argument>
+<argument name="uc_complete_tran_on_complete" required="no" datatype="Integer">If 1 then based in error code end transaction with commit or rollback</argument>
+
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+Mark a specific job log (module or action) as complete.
+See "usr_ossi register_job" for more details
+
+
+</p>
+]]>
+</remarks>
+
+<retrows>0</retrows>
+
+<exception value="eOK">The command completed successfully.</exception>
+<exception value="510">If variable was not passed and no default was passed.</exception>
+
+<seealso cref="test usr ossi create job log"></seealso>
+<seealso cref="test usr ossi change job log"></seealso>
+<seealso cref="test usr ossi complete job "></seealso>
+<seealso cref="test usr ossi complete job log"></seealso>
+<seealso cref="usr_ossi register_action"></seealso>
+<seealso cref="usr_ossi register_module"></seealso>
+<seealso cref="usr_ossi register_job"></seealso>
+<seealso cref="test usr ossi list job log"></seealso>
+
+</documentation>
+
+</command>

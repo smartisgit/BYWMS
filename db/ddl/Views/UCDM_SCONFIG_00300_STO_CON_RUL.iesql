@@ -1,0 +1,40 @@
+#use $DCSDIR/include
+
+#include <dcsddl.h>
+
+#include <dcscolwid.h>
+
+#include <dcstbldef.h>
+
+#include <sqlDataTypes.h>
+
+
+#use $SALDIR/include
+
+#include <salcolwid.h>
+
+mset command on
+
+[
+DROP_VIEW(UCDM_SCONFIG_00300_STO_CON_RUL)
+] catch (ERR_CANNOT_DROP_TABLE_NOT_FOUND)
+RUN_DDL
+
+mset command off
+
+CREATE_VIEW(UCDM_SCONFIG_00300_STO_CON_RUL)
+select sto_config_rule.*,
+        sto_zone.sto_zone_cod,
+        dscmst.lngdsc,
+		sto_config.wh_id
+   from sto_config_rule
+   join sto_config
+     on sto_config.sto_config_id = sto_config_rule.sto_config_id
+   join sto_zone
+     on sto_config_rule.sto_zone_id = sto_zone.sto_zone_id
+   join dscmst
+     on dscmst.colnam = 'sto_config_id'
+    and dscmst.colval = sto_config.sto_config_id
+RUN_DDL
+
+mset command on

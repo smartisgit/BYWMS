@@ -1,0 +1,294 @@
+<command>
+<name>generate ossi algorithm documentation</name>
+<description>Generate HTML documentation for all custom algoirthms
+</description>
+<type>Local Syntax</type>
+
+<argument name="modify_integration_index" required="yes" datatype="string">if passed in as 1 then modify main integration html as well</argument>
+<argument name="alg_id" required="yes" datatype="string"></argument>
+<argument name="url" required="yes" datatype="string"></argument>
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20191003 saad.ahmad - 10291 - Generate docymentaion
+ */
+publish data
+where alg_id = ''
+and mode = 'w'
+and path = @@LESDIR || '/docs/uc_int_alg'
+and path_alg_index = @@LESDIR || '/docs/integration'
+and alg_index = 'uc_alg_index.html'
+and alg_index_merge = 'uc_alg_index_merge.html'
+and alg_index_sess_var = 'alg_sess_var'
+and main_index_insert_tag = ossi__polval ( 'USR-GENERATED-DOCUMENTATION', 'SETUP', 'INT-DOC-END-TAG', '', 'rtstr1', '----' )
+and main_index_dupl_insert_prevent_tag = "<h2>Algorithms</h2>"
+and map_file_path = '../uc_int_map/'
+and map_file_prefix = 'uc_map_'
+|
+/*
+ * Called here to get some global tags
+ */
+get ossi head for integration documentation
+|
+{
+    create directory 
+    where directory = @path
+    catch(@?)
+    ;
+    if ( @alg_id is null )  
+        hide stack variable where name = 'alg_id'
+    |
+    [
+    select *
+    from sl_alg_def
+    where 1=1
+    and @+alg_id
+    order by alg_grp_id, alg_id
+    ]
+    |
+    {
+        if ( @alg_descr like '%LINK-MAP:%' )
+        {
+            publish data
+            where uc_has_map_link = 1
+            and uc_link_ref = ossi__get_fld_from_list ( @alg_descr, 2, 'LINK-MAP:' )
+            |
+            publish data
+            where map_grp = ossi__get_fld_from_list ( @uc_link_ref, 1, '\|' )
+            and map_id = ossi__get_fld_from_list ( @uc_link_ref, 2, '\|' )
+            and uc_has_map_link = @uc_has_map_link
+            and uc_link_ref = @uc_link_ref
+        }
+        |
+        /*
+         * To get specific title for this alg
+         */
+        get ossi head for integration documentation
+        where doc_title = 'Algorithm:' || @alg_id
+        |
+        publish data
+        where filnam = 'uc_alg_' || ossi__replace(lower(@alg_id), ' ', '_' ) || '.html'
+        |
+        publish data
+        where
+            data = @uc_typical_file_header
+                || @uc_typical_table
+                || @uc_typical_tr_data
+                || "   <td><b>Algorithm</b></td><td>" || @alg_id || "</td>"
+                || "</tr>"
+                || @uc_typical_tr_data
+                || "   <td><b>Description</b></td><td>" || @alg_descr || "</td>"
+                || "</tr>"
+                || @uc_typical_tr_data
+                || "   <td><b>Group</b></td><td>" || @alg_grp_id || "</td>"
+                || "</tr>"
+                || @uc_typical_tr_data
+                || "   <td><b>Change Log</b></td><td>" || ossi__data_version_url ( @alg_id, 'sl_alg' ) || "</td>"
+                || "</tr>"
+                || @uc_typical_tr_data
+                || "   <td><b>Overstack</b></td><td>" || decode(@overstack_arg_flg,'T', 'Yes', 'No') || "</td>"
+                || "</tr>"
+                || @uc_typical_tr_data
+                || "   <td><b>Always Local</b></td><td>" || decode(@always_local_flg,'T', 'Yes', 'No') || "</td>"
+                || "</tr>"
+                || @uc_typical_tr_data
+                || '   <td valign="top"><b>Code</b></td>'
+                || '   <td valign="top"><pre style="white-space: pre-wrap;font-size: 10"><code>' || @code || '</code></pre></td>'
+                || "</tr>"
+                || "</table>" 
+        and data_index = @uc_typical_tr_data
+                      || "<td>" || @alg_grp_id || "</td>"
+                      || '<td><a href="../uc_int_alg/' || @filnam || '">' || @alg_id || '</a>'
+                      || "<td>" || @alg_descr || "</td>"      
+                      || "</tr>"
+        |
+        {
+            save session variable
+            where name = @alg_index_sess_var
+            and value = ossi__sess_var ( @alg_index_sess_var, '', 'Y' ) || @data_index
+            ;
+            write output file 
+            ;
+            publish data
+            where mode = 'a'
+            |
+            {
+                if ( @uc_has_map_link = 1 )
+                {
+                    publish data
+                    where map_filnam  = @map_file_prefix || ossi__html_val ( @map_grp,1 ) || '__' || iif ( @map_id = '----', 'all', @map_id) || '.html'
+                    |
+                    publish data
+                    where map_link = @uc_typical_table
+                                  || @uc_typical_tr_data
+                                  || '        <td><b><a href="' || @map_file_path || @map_filnam || '">Typical Mapping Data</a></b></td>'
+                                  || '    </tr>'
+                                  || '</table>'
+                    |
+                    write output file
+                    where data = @map_link
+                }
+                ;
+                write output file
+                where data = "<h3>Algorithm Usage</h>"
+                          || @uc_typical_table
+                          || @uc_typical_tr_head
+                          || "<th>Context</th>"
+                          || "<th>Primary Key</th>"
+                          || "<th>Argument</th>"
+                          || "<th>Event</th>"
+                          || "<th>EO</th>"
+                          || "<th>IFD</th>"
+                          || "<th>Links</th>"
+                          || "</tr>"
+                ;
+                get ossi documentation alg usage
+                catch (@?)
+                |
+                publish data
+                where usage_stat = @? and usage_msg = @!
+                |
+                save session variable where name = 'usage_stat' and value = @usage_stat
+                |
+                save session variable where name = 'usage_msg' and value = @usage_msg
+                |
+                if ( @usage_stat = 0 )
+                {
+                    write output file 
+                    where data = @uc_typical_tr_data
+                              || "<td>" || @typ || "</td>"
+                              || "<td>" || @pk || "</td>"
+                              || "<td>" || @alg_arg || "</td>"
+                              || "<td>" || @evt_id || "</td>"
+                              || "<td>" || @eo_id || ' / ' || @eo_ver || "</td>"
+                              || "<td>" || @ifd_id|| ' / ' || @ifd_ver|| "</td>"
+                              || "<td>" || @uc_link_data|| "</td>"
+                              || "</tr>"
+                }
+                ;
+                write output file
+                where data = "</table>"
+                          || @uc_typical_file_footer /* close the whole file html */
+                ;
+                publish data
+                where alg_grp_id = @alg_grp_id
+                and alg_id = @alg_id
+                and alg_descr = @alg_descr
+                and usage_stat = ossi__sess_var ( 'usage_stat', '0', 'Y' )
+                and usage_msg = ossi__sess_var ( 'usage_msg', '', 'Y' )
+                and uc_link_ref = @uc_link_ref
+                and map_grp = @map_grp
+                and map_id = @map_id
+                and uc_has_map_link = @uc_has_map_link
+                and uc_link_ref = @uc_link_ref
+            } /* mode = a */
+        }
+    } /* alg */
+} /* scope */
+>> res
+|
+{
+    /*
+     * Get title for the algorithm index
+     */
+    get ossi head for integration documentation
+    where doc_title = 'Algorithm Index'
+    |
+    {
+        /*
+         * We create two indexes.  One with a single file header and one without.
+         * Reason being that the second one will be merged into the main index so we dont want headers there
+         */
+        publish data
+        where main_data = @uc_typical_table
+                       || @uc_typical_tr_head
+                       ||     "<th>Group</th>"
+                       ||     "<th>Algorithm</th>"
+                       ||     "<th>Description</th>"
+                       || "</tr>"
+                       || ossi__sess_var ( @alg_index_sess_var, '', 'Y' )
+                       || "</table>"
+        |
+        {
+            write output file 
+            where filnam = @alg_index
+            and path = @path_alg_index
+            and data = @uc_typical_file_header || @main_data || @uc_typical_file_footer
+            and mode = 'w'
+            ;
+            write output file 
+            where filnam = @alg_index_merge
+            and path = @path_alg_index
+            and data = @main_index_dupl_insert_prevent_tag || @main_data || @uc_typical_file_footer
+            and mode = 'w'
+        }
+    }
+    ;
+    if ( @modify_integration_index = 1 )
+    {
+        publish data
+        where src_index_file = @@LESDIR || '/docs/integration/index.html'
+        and backup_index_file = @@LESDIR || '/docs/integration/index.html' || to_char(sysdate,'YYYY-MM-DDHH24-MI-SS')
+        |
+        {
+            copy file
+            where src = @src_index_file
+            and dest = @backup_index_file
+            ;
+            sl_cat file 
+            where filename = @src_index_file
+            |
+            publish data
+            where src_data = @data
+            |
+            if ( @src_data not like '%' || @main_index_dupl_insert_prevent_tag || '%' )
+            {
+                sl_cat file
+                where filename = @path_alg_index || '/' || @alg_index_merge
+                |
+                publish data
+                where new_data = ossi__replace ( @src_data, @main_index_insert_tag, @data || @main_index_insert_tag )
+                |
+                write output file 
+                where filnam = 'index.html' 
+                and path = @@LESDIR || '/docs/integration'
+                and mode = 'w' 
+                and data = @new_data
+            }
+        }
+    }
+    ;
+    publish data combination where res = @res 
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This generates html documentation for all algroithms
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+<retcol name="@*" type="COMTYP_CHAR">See command</retcol>
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+<seealso cref="get ossi documentation alg usage"></seealso>
+
+</documentation>
+
+
+
+</command>

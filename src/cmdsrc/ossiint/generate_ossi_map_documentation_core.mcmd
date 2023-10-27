@@ -1,0 +1,285 @@
+<command>
+<name>generate ossi map documentation core</name>
+<description>Core component for generating maps
+</description>
+<type>Local Syntax</type>
+
+<argument name="map_id" required="yes" datatype="string"></argument>
+<argument name="map_grp" required="yes" datatype="string"></argument>
+<argument name="all_in_one_file" required="yes" datatype="string"></argument>
+<argument name="use_map_filnam" required="yes" datatype="string"></argument>
+
+<argument name="index_path" required="yes" datatype="string"></argument>
+<argument name="index_filnam" required="yes" datatype="string"></argument>
+
+
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20191003 saad.ahmad - 10291 - Generate docymentaion
+ */
+publish data
+where path = @@LESDIR || '/docs/uc_int_map'
+|
+/*
+ * This will not give a good tile but give typical tags
+ */
+get ossi head for integration documentation
+|
+publish data
+where my_table_html = '<table class="my-table" width="140%">'
+and my_td_style = 'valign="top" style="word-wrap: break-word;font-size: 12"'
+and table_head_expr = @uc_typical_tr_head
+                   || '<th>Map Id</th>'
+                   || '<th>Sort Sequence</th>'
+                   || '<th>Mapped Value</th>'
+                   || '<th>Expression</th>'
+                   || '<th>Enabled?</th>'
+                   || '</tr>'
+and table_head_lit  = @uc_typical_tr_head
+                   || '<th>Map Id</th>'
+                   || '<th>Mapped Value</th>'
+                   || '<th>Sort Sequence</th>'
+                   || '<th>Source Value</th>'
+                   || '<th>Enabled Mapped to Source</th>'
+                   || '<th>Enabled Source to Mapped</th>'
+                   || '</tr>'
+|
+{
+    create directory 
+    where directory = @path
+    catch(@?)
+    ;
+    if ( @map_grp is null )
+        [
+        select distinct uc_rule_grp_id map_grp
+        from usr_rule_engine_expr
+        where uc_rule_grp_id like 'USR-INTEGRATION%'
+        ]
+    |
+    /*
+     * We create files per map or one global based on passed in
+     */
+    if ( @all_in_one_file = 1 )
+    {
+        get ossi head for integration documentation
+        where doc_title = 'Map Group:' || @map_grp
+        |
+        [
+        select count(*) cnt_expr
+        from usr_rule_engine_expr
+        where uc_rule_grp_id = @map_grp
+        and ( uc_rule_expr like '%@%' or uc_rule_expr like '%=%' )
+        ]
+        |
+        {
+            /* Add a row in index */
+            if ( @index_filnam is not null )
+            {
+                write output file
+                where filnam = @index_filnam and path = @index_path and mode = 'a'
+                and data = @uc_typical_tr_data
+                        ||     ossi__html_data ( @map_grp, 'td' ) 
+                        ||     ossi__html_data ('All', 'td' )
+                        ||     '<td><a href="' || @use_map_filnam || '">Map Data</a></td>'
+                        || '</tr>'
+            }
+            ;
+            write output file
+            where mode = 'w'
+            and data = @uc_typical_file_header
+                    || '<h4>Values are ' || iif ( @cnt_expr > 0, 'Expressions', 'Literal Maps' ) || '</h4>'
+                    || '<h5><a href="' || @uc_rev_log_map_file_path || '">Revision Log</a></h5>'
+                    || @my_table_html
+                    || iif ( @cnt_expr > 0, @table_head_expr, @table_head_lit )
+            and filnam = @use_map_filnam
+            ;
+            publish data
+            where filnam = @use_map_filnam
+            and cnt_expr = @cnt_expr
+        }
+    }
+    |
+    [
+    select distinct uc_rule_subgrp_id map_id
+    from usr_rule_engine_expr
+    where uc_rule_grp_id = @map_grp
+    and uc_rule_subgrp_id like @map_id
+    order by 1
+    ]
+    |
+    {
+        /*
+         * We create files per map or one global based on passed in
+         */
+        if ( @all_in_one_file != 1 )
+        {
+            get ossi filename for map documentation
+            |
+            [
+            select count(*) cnt_expr
+            from usr_rule_engine_expr
+            where uc_rule_grp_id = @map_grp
+            and uc_rule_subgrp_id like @map_id
+            and ( uc_rule_expr like '%@%' or uc_rule_expr like '%=%' )
+            ]
+            |
+            filter data
+            where moca_filter_level = 2
+            and cnt_expr = @cnt_expr
+            and filnam = @use_map_filnam
+        }
+        |
+        {
+            if ( @all_in_one_file != 1 )
+            {
+                /* Add a row in index */
+                if ( @index_filnam is not null )
+                {
+                    write output file
+                    where filnam = @index_filnam and path = @index_path and mode = 'a'
+                    and data = @uc_typical_tr_data
+                            ||     ossi__html_data ( @map_grp, 'td' ) 
+                            ||     ossi__html_data (@map_id, 'td' )
+                            ||     '<td><a href="' || @use_map_filnam || '">Map Data</a></td>'
+                            || '</tr>'
+                }
+                ;
+                get ossi head for integration documentation
+                where doc_title = 'Map Group ' || @map_grp || ' - Map Id ' || @map_id
+                |
+                write output file
+                where mode = 'w'
+                and data = @uc_typical_file_header
+                        || '<h4>Values are ' || iif ( @cnt_expr > 0, 'Expressions', 'Literal Maps' ) || '</h4>'
+                        || '<h5><a href="' || @uc_rev_log_map_file_path || '">Revision Log</a></h5>'
+                        || @my_table_html
+                        || iif ( @cnt_expr > 0, @table_head_expr, @table_head_lit )
+            }
+            ;
+            [
+            select /*#nobind*/
+                   uc_rule_grp_id,
+                   uc_rule_subgrp_id,
+                   srtseq,
+                   uc_rule_expr,
+                   uc_rule_value,
+                   decode ( ena_flg, 1, 'Yes', 'No' ) ena_flg_str
+            from usr_rule_engine_expr
+            where 1=1
+            and uc_rule_grp_id = @map_grp
+            and uc_rule_subgrp_id = @map_id
+            order by 
+                srtseq,
+                uc_rule_value
+            ]
+            catch (-1403,510)
+            |
+            if ( @? = 0 )
+            {
+                if ( @cnt_expr > 0 )
+                {
+                    write output file
+                    where mode = "a"
+                    and  data = @uc_typical_tr_data
+                              ||     ossi__html_data ( @uc_rule_subgrp_id, 'td', @my_td_style )
+                              ||     ossi__html_data ( @srtseq,            'td', @my_td_style )
+                              ||     ossi__html_data ( @uc_rule_value,     'td', @my_td_style )
+                              ||     ossi__html_data ( @uc_rule_expr,      'td', @my_td_style, null, 0, '<pre style="white-space: pre-wrap;">', '</pre>')
+                              ||     ossi__html_data ( @ena_flg_str ,      'td', @my_td_style )
+                              || '</tr>'
+                }
+                else
+                {
+                    /* This does not apply in our case */
+                    write output file
+                    where mode = "a"
+                    and   data = @uc_typical_tr_data
+                              ||     ossi__html_data ( @uc_rule_subgrp_id, 'td', @my_td_style )
+                              ||     ossi__html_data ( @uc_rule_value,     'td', @my_td_style )
+                              ||     ossi__html_data ( @srtseq,            'td', @my_td_style )
+                              ||     ossi__html_data ( @uc_rule_expr,      'td', @my_td_style )
+                              ||     ossi__html_data ( @ena_flg_str ,      'td', @my_td_style )
+                              ||     ossi__html_data ( '' ,                'td', @my_td_style )
+                              || '</tr>'
+                }
+            } /* loop on maps */
+            ;
+            /*
+             * If every map has a file, close it here
+             */
+            if ( @all_in_one_file != 1 )
+            {
+                write output file
+                where mode = 'a'
+                and data = '</table>'
+            }
+            ;
+            publish data
+            where map_grp = @map_grp
+            and map_id = @map_id
+            and filnam = @filnam
+            and all_in_one_file = @all_in_one_file
+        } /* poldat lookup */
+    } /* polcod in scope */
+} 
+>> res
+|
+{
+    /*
+     * If all was in a single file - close the table 
+     */
+    if ( @all_in_one_file = 1 )
+    {
+        write output file
+        where mode = 'a'
+        and data =  '</table>'
+        and filnam = @use_map_filnam
+    }
+    ;
+    /*
+     * In all cases close the final file tag
+     */
+    write output file
+    where mode = 'a'
+    and data =  @uc_typical_file_footer
+    and filnam = @use_map_filnam
+    ;
+    publish data combination where res = @res 
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This generates html documentation for a specifc set of maps
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+<retcol name="map_grp" type="COMTYP_CHAR"></retcol>
+<retcol name="map_id" type="COMTYP_CHAR"></retcol>
+<retcol name="filnam" type="COMTYP_CHAR"></retcol>
+
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+<seealso cref="get ossi documentation alg usage"></seealso>
+
+</documentation>
+
+
+
+</command>

@@ -1,0 +1,140 @@
+<command> 
+<name>read usr csv file</name> 
+<description>Command to read and parse cvs files.</description> 
+<type>Local Syntax</type> 
+<local-syntax>
+
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+publish data where trim_flg = nvl(@trim_flg,'N')
+|
+/* The full filename should be passed in.  Error out if not on the stack. */
+if ( @filename = '' )
+{
+    set return status
+        where status = 2005
+          and errnum = '2005'
+          and argid = 'filename'
+          and lookup_argdsc = 'filename'
+}
+else
+{
+    read file where filename = @filename >> res1
+    |
+    [[
+    
+        import com.redprairie.moca.*;
+        res1.reset();
+    
+        res2 = new SimpleResults();
+    
+        int first_record = 1;
+        String[] header_columns;
+    
+        while ( res1.next() ) 
+        {
+            String data_record = res1.getString( "text" )
+            moca.trace( "Data record read: " + data_record );
+            if ( first_record == 1 )
+            {
+                first_record = 0;
+                moca.trace( "Parsing header record" );
+                header_columns = data_record.split(",");
+
+                // build result set based on values in header record of .csv file            
+                for ( int i = 0; i < header_columns.length; i++ ) 
+                {
+                    moca.trace( "Adding header: " + header_columns[i] + " to result set" );
+                    res2.addColumn( header_columns[i], MocaType.STRING );
+            
+                }            
+            }
+            /* Updated the code to handle situations where there are " " surrounding fields in .csv files with commas */
+            /* in field that are data, but should not be considered record seperators.  For example, some of the      */
+            /* rtstr1 values that are loaded in the poldat table are like this.                                       */
+            else
+            {
+                String regExp = ",(?=([^\"]*\"[^\"]*\")*[^\"]*\$)";
+                // add data records to the result set
+                String[] data_columns = data_record.split( regExp );
+                res2.addRow();
+
+                moca.trace( "Parsing data record" );
+                for ( int i = 0; i < data_columns.length; i++ )
+                {
+                    /* Added a check in case there are less headers than details, */
+                    /* otherwise an out of bounds exception is thrown.            */
+                    if ( i <= header_columns.length )
+                    {
+                        moca.trace( "Adding data column: " + header_columns[i] + " data value: " + data_columns[i] );
+                        /* Edit out any double quotes left after the parsing */
+                        String temp = data_columns[i].replaceAll("^\"|\"\$", "" );
+                        
+                        /* Check for trim flag and call trim on the string if set to Y or y */ 
+                        if ( trim_flg.compareToIgnoreCase("Y") == 0 )
+                            res2.setStringValue( header_columns[i], temp.trim() );
+                        else
+                            res2.setStringValue( header_columns[i], temp );
+                    }
+                }
+            }    
+        }
+
+        res2;    
+
+    ]]
+
+}
+
+]]> 
+</local-syntax> 
+<documentation>
+
+<argument datatype="string" name="filename">csv filename to read and parse</argument>
+<argument datatype="string" name="trim_flg">flag to turn on space/tab trimming for the fields in the csv file</argument>
+
+<remarks>
+<![CDATA[
+    <p>
+    This command is used to read a .csv file, parse the values in the header,
+    and use those header values to construct a result set with column names.
+    The data records in the .csv file are then loaded into the result set and
+    returned to the caller.
+
+    Its important that the 1st record of the .csv file has the names that match
+    what you want in the result set.  For example, if a .csv file contains
+    part, prt_client_id, and wh_id data, then you will want to use:
+
+    prtnum,prt_client_id,wh_id 
+
+    as the first record in the .csv file.
+
+    Note also that this command will handle simple .csv files, but .csv files
+    that also have double quote delimited fields with embedded commas:
+
+    "This is some custom message, With a command"
+
+    with not be parsed correctly.
+    
+    One additional point.  The argument trim_flg can be used to turn on space/tab
+    trimming for the data fields in the .csv file.  By calling this command with 
+    either trim_flg = 'Y' or trim_flg = 'y', the trimming will be performed.  If 
+    the flag is not passed in, the default is to perform no field trimming.    
+
+    </p>
+]]>
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+<exception value="eDB_NO_ROWS_AFFECTED">No rows found</exception>
+<exception value=" eAPP_MISSING_ARG (2005)">Missing a required argument</exception>
+
+</documentation>
+
+</command>

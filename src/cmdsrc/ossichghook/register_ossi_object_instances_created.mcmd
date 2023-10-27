@@ -1,0 +1,118 @@
+<command>
+<name>register ossi object instances created</name>
+<description>See all instances of an object (table) and see which PK value needs to be registered as created
+</description>
+
+<argument name="uc_reg_table_name" required="yes" datatype="string"></argument>
+<argument name="comflg" required="yes" datatype="string"></argument>
+<argument name="uc_num_concurrent_calls" required="yes" datatype="string"></argument>
+<argument name="wh_id" required="yes" datatype="string"></argument>
+<argument name="uc_ossi_job_id" required="yes" datatype="string"></argument>
+
+<argument name="uc_get_context_cmd" required="yes" datatype="string"></argument>
+<argument name="uc_rule_grp_id" required="yes" datatype="string"></argument>
+<argument name="uc_rule_subgrp_id" required="yes" datatype="string"></argument>
+
+<argument name="uc_pk_col" required="yes" datatype="string"></argument>
+<argument name="uc_data_col" required="yes" datatype="string"></argument>
+
+<argument name="uc_table_list_set_defaults" required="yes" datatype="string">
+This is a coma-separated list of tables that we will go through and set values by using the rules engine.
+</argument>
+
+<argument name="uc_set_default_rule_grp_id" required="yes" datatype="string">
+This is the uc_rule_grp_id for setting the defaults.  Needed when uc_table_list_set_defaults is passed in.  If not passed in
+defaulted to uc_rule_grp_id
+</argument>
+
+
+
+
+<argument name="@*" required="yes" datatype="string"></argument>
+<argument name="uc_show_all_data" required="yes" datatype="string"></argument>
+
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+if ( @wh_id is null )
+    hide stack variable where name = 'wh_id'
+|
+publish data
+where uc_log_wh_id = nvl(@wh_id, 'ALL' )
+|
+publish data
+where comflg = nvl(@comflg, 0 )
+and uc_ossi_job_id = nvl(@uc_ossi_job_id, 'UC_W_' || @uc_log_wh_id || '_' || @uc_reg_table_name )
+and uc_ossi_who = nvl(@uc_ossi_who, @uc_log_wh_id || '-' || @@USR_ID )
+and uc_num_concurrent_calls = nvl(@uc_num_concurrent_calls, 20)
+and uc_set_default_rule_grp_id = nvl(@uc_set_default_rule_grp_id, @uc_rule_grp_id)
+|
+{
+    execute ossi work using async execution
+    where uc_get_work_cmd = "list ossi object instances for create registration"
+    and uc_do_work_cmd = 'register ossi one object instance as created'
+    and uc_ossi_job_id = @uc_ossi_job_id
+    and uc_ossi_who = @uc_ossi_who
+    and uc_pk_col = @uc_pk_col
+    and uc_num_concurrent_calls = @uc_num_concurrent_calls
+    and comflg = @comflg
+    and uc_exec_status_col = 'uc_ossi_err_code'
+    and uc_exec_message_col = 'uc_ossi_err_descr'
+    and uc_data_col = @uc_data_col
+    and uc_table_list_set_defaults = @uc_table_list_set_defaults
+    and uc_set_default_rule_grp_id = @uc_set_default_rule_grp_id
+}
+   
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This job will utilize async processing to register orders as ready to plan
+</p>
+]]>
+</remarks>
+
+<retrows>n</retrows>
+
+<retcol name="wh_id" type="COMTYP_CHAR"></retcol>
+<retcol name="ship_id" type="COMTYP_CHAR"></retcol>
+<retcol name="my_savepoint" type="COMTYP_CHAR"></retcol>
+<retcol name="comflg" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_ossi_job_seq" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_ossi_module_seq" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_ossi_action_seq" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_ossi_err_code" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_ossi_err_descr" type="COMTYP_CHAR"></retcol>
+
+
+
+
+
+<example>
+<![CDATA[
+<p>
+</p>
+]]>
+
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+<seealso cref="list ossi object instances for create registration"></seealso>
+<seealso cref="register ossi one object instance as created"></seealso>
+<seealso cref="register ossi object created core"></seealso>
+
+
+
+</documentation>
+
+
+</command>

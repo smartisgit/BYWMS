@@ -1,0 +1,173 @@
+<command>
+<name>evaluate ossi rules for policy based rules engine</name>
+<description>Evaluate Rules for Policy based rule engine</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20171010 chris.holdren - 8025 - Create a new .Net screen (I dont think DDA will work) to maintain rules engine where we have condition and action
+ */
+publish data
+where return_all = nvl(@return_all, '0')
+and uc_return_failed_rules = nvl(@uc_return_failed_rules, '0' )
+|
+if ( @uc_return_failed_rules = '1' )
+   publish data
+   where return_all = '1'
+|
+[[
+test_cmd;
+srtseq;
+rtstr1;
+polval;
+rtflt2;
+
+r_polval;
+r_rtstr2;
+r_rtnum2;
+r_rtflt1;
+r_rtflt2;
+uc_rule_string;
+
+first = true;
+error = 0;
+
+ret_r = new SimpleResults();
+
+moca.trace("Evaluate policy " + polcod + "/" + polvar + ". Returning all? " + return_all);
+
+while ( res.next() )
+{ 
+   srtseq = res.getInt ( "srtseq" );
+   rtflt2 = res.getDouble ( "rtflt2" );
+   if (res.containsColumn("polval"))
+   {
+      polval = res.getString ( "polval" );
+   }
+   rtstr1 = res.getString ("rtstr1");
+   uc_rule_string = rtstr1;
+
+   moca.trace("Evaluate polval " + polcod + "/" + polvar + "/" + polval + ", rtflt2 = " + rtflt2);
+   moca.trace("Rtstr1 = " + rtstr1);
+
+   //
+   // If our rtstr1 is within [] then assume it has some SQL in it so do check using select from dual
+   // otherwise do simple publish data
+   cmdRes = moca.executeCommand("get ossi policy expression command where rtstr1 = \"" + rtstr1.replace("\"", "\"\"") + "\"");
+   cmdRes.next();
+   test_cmd = cmdRes.getString("cmd");
+   try {
+     res_test = moca.executeInline ( test_cmd );
+   } catch (MocaException e) {
+       if (uc_validate_flg == 1)
+       {
+           error = e.getErrorCode();
+           break;
+       }
+       else
+       {
+           throw(e);
+       }
+   } 
+   
+   srtseq = null;
+   polval = null;
+   rtstr1 = null;
+   
+   if ( uc_validate_flg != 1 && res_test.next() )
+   {
+      if (res_test.getInt(0) == 1)
+      { 
+         moca.trace("Evaluated to true");
+         addRow(true);
+
+         if ( return_all == '0' )
+            break;
+      }
+      else if ( uc_return_failed_rules == '1' )
+      {
+         addRow(false);
+      } // also return failed
+   }
+}
+
+   void addRow(boolean passed)
+   {
+     ret_r.addRow();
+     if ( first )
+     {
+        moca.trace("init columns");
+        if (res.containsColumn("polval"))
+        {
+           ret_r.addColumn ( "r_polval", MocaType.STRING );
+        }
+        ret_r.addColumn ( "r_rtstr2", MocaType.STRING );
+        ret_r.addColumn ( "r_rtnum2", MocaType.INTEGER );
+        ret_r.addColumn ( "r_rtflt1", MocaType.DOUBLE );
+        ret_r.addColumn ( "r_rtflt2", MocaType.DOUBLE );
+        ret_r.addColumn ( "uc_rule_string", MocaType.STRING );
+        ret_r.addColumn ( "uc_rule_passed", MocaType.INTEGER );
+        first = false;
+     }
+
+     if (res.containsColumn("polval"))
+     {
+        r_polval = res.getString ( "polval" );
+     }
+     r_rtstr2 = res.getString ( "rtstr2");
+     r_rtnum2 = res.getInt    ( "rtnum2" );
+     r_rtflt1 = res.getDouble ( "rtflt1" );
+     r_rtflt2 = res.getDouble ( "rtflt2" );
+
+     moca.trace("set columns");
+     if (res.containsColumn("polval"))
+     {
+        ret_r.setValue ( "r_polval", r_polval );
+     }
+     ret_r.setValue ( "r_rtstr2", r_rtstr2 );
+     ret_r.setValue ( "r_rtnum2", r_rtnum2 );
+     ret_r.setValue ( "r_rtflt1", r_rtflt1 );
+     ret_r.setValue ( "r_rtflt2", r_rtflt2 );
+     ret_r.setValue ( "uc_rule_string", uc_rule_string );
+     ret_r.setValue ( "uc_rule_passed", passed ? 1 : 0 );
+   }
+//[r_polval:r_polval,r_rtstr2:r_rtstr2,r_rtnum2:r_rtnum2,r_rtflt1:r_rtflt1,r_rtflt2:r_rtflt2]
+[res:ret_r,uc_error_code:error,uc_error_srtseq:srtseq,uc_error_polval:polval,uc_error_rtstr1:rtstr1]
+]]
+|   
+publish data combination
+where res = @res
+|
+publish data
+where r_polval_orig = @r_polval
+|
+resolve ossi rules engine return value
+where uc_rules_engine_value = @r_polval
+|
+filter data 
+where moca_filter_level = 3 
+and uc_error_code = @uc_error_code
+and uc_error_srtseq = @uc_error_srtseq
+and uc_error_polval = @uc_error_polval
+and uc_error_rtstr1 = @uc_error_rtstr1
+and r_polval_orig = @r_polval_orig
+and r_polval = @use_uc_rules_engine_value
+and uc_valid_value_to_use  = @uc_valid_value_to_use
+and uc_value_type_cd = @uc_value_type_cd 
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<remarks>
+This command is used to evaluate rules for policy based rule engine.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

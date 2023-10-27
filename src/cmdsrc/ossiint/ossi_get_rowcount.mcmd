@@ -1,0 +1,39 @@
+<command>
+<name>ossi get_rowcount</name>
+<description>Function to lookup number of rows in a table for passed Column Value</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="moca_farg1">Table_Prefix</argument>
+<argument datatype="string" name="moca_farg2">Column_Name</argument>
+<argument datatype="string" name="moca_farg3">Column_Value</argument>
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+publish data
+where table_prefix = @moca_farg1
+and column_name = @moca_farg2
+and column_value = @moca_farg3
+|
+[
+select count(*) 
+from @table_prefix:raw
+where @column_name:raw = @column_value
+]
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+MOCA Function to return number of rows for passed input value in the specified table
+</remarks>
+<exception value="eOK">Normal successful completion</exception>
+</documentation>
+</command>

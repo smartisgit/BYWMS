@@ -1,0 +1,780 @@
+<command>
+<name>list order lines available for wave planning</name>
+<description>List Order Lines Available For Wave Planning</description>
+<type>Local Syntax</type>
+ 
+<local-syntax>
+<![CDATA[
+
+    publish data
+    where uc_auto_wave_order_by = 'wh_id,' || nvl(@uc_auto_wave_order_by, 'prcpri, adddte' ) || ',ordnum'
+    and uc_max_ord = nvl(@uc_max_ord,0)
+    and uc_def_max_ord = 999999
+    and uc_con_cmb_ord = ossi__polval('UC-PLAN-WAVE', 'CHECK-COMB-ORD-CHK-FLG', 'ENABLED', '', 'rtnum1',@wh_id)
+    |
+    if (!@wh_id#onstack or @wh_id is null)
+    {
+        /* eAPP_MISSING_ARG */
+        set return status
+             where status = 2005
+               and errnum = '2005'
+               and  argid = 'wh_id'
+               and lookup_argdsc = 'wh_id'
+    }
+    |
+    if (@dst_mov_zone_id)
+    {
+        publish data where dst_mov_zone_id = '(ord_line.dst_mov_zone_id = ' || @dst_mov_zone_id || ' or ord_line.dst_mov_zone_id is null)'
+    }
+    else
+    {
+        publish data where dst_mov_zone_id = ' 1=1 '
+    }
+    |
+    /* Validate client id for user */
+    get client in clause for user
+        where table_prefix = 'ord_line'
+          and usr_id = nvl(@usr_id, @@usr_id)
+          and wh_id = @wh_id
+          and prt_client_id_flg = 0
+    |
+    /* We'll create a where clause using the rule name that was passed to
+     * this command.  Since the "create clause..." command will check for
+     * the 'rule_nam' parameter, we won't check for that argument here. A
+     * row is always returned by this create command..."
+     */
+    create clause for wave planning
+        where rule_nam = @rule_nam >> res
+    |
+    [[
+        String prev_dtl_ordnum = "";
+        Integer dtl_ordcnt = 0;
+        String cmd;
+        String whereClause;
+        String invAttrWhereClause;
+        String wavesetwhereClause = " ";
+        String ordnumwhereClause = " ";
+        String wh_id = wh_id;
+        String wave_set = wave_set;
+        String ordnumList = ordnum_list;
+        String clientswhereClause = "and " + client_in_clause;
+        Integer sumflg = sumflg;
+
+        res.next();
+
+        uc_outer_q_filter = res.getString ( "uc_outer_q_filter" ); /*## CUSTOM */
+        if ( uc_max_ord == 0 )
+        {
+            if ( res.containsColumn("uc_max_ord"))
+                uc_max_ord = res.getInt("uc_max_ord");
+        }
+        //
+        if ( uc_max_ord == 0 )
+            uc_max_ord = uc_def_max_ord;
+        //
+        whereClause = res.getString("whereClause");
+        invAttrWhereClause = res.getString("invAttrWhereClause");
+        if (wave_set && (wave_set.length() > 0))
+        {
+            wavesetwhereClause = " and ord_line.wave_set = '" + wave_set + "' ";
+        }
+        if ( uc_con_cmb_ord == 1 )
+        {
+        abowhereclause = " and (ord.uc_comb_ord_chk_flg = '0' OR ord.uc_comb_ord_chk_flg is NULL) ";
+        }
+        else
+        {
+        abowhereclause = " and 1 = 1 "
+        }
+        /*
+         * Find all orders matching our criteria
+         * For all orders found, we need to plan them into shipments.
+         * Consider only the orders which are not cancelled.
+         * WMD-163122 Going forward Through our system we will plan orders through waves
+         * only so wavable flag will be obsolete, so removing the check for wavableflag.
+         */
+        if (sumflg && sumflg == 1)
+        {
+            /*
+             * CUSTOM - this is changed as follows
+             * 1. Changed ord join to be as SQL 92.  Previous one had it as old style
+             * 2. added adrmst_st and adrmst_rt aliases
+             * 3. Made an outer query x so that we can put a limit clause retuned form wave criteria call above for uc_max_ord
+             */
+            cmd = String.format(
+            " [/*#limit=@offset,@limit,true*/" +
+            " select y.* from ( select x.* from (" +
+            " select ord.ordnum," +
+            "         ord.adddte, ord.entdte, ord.cpodte," +
+            "         ord.client_id," +
+            "         ord.wh_id, " +
+            "         ord.ordtyp," +
+            "         count(distinct ord_line.ordlin) numsls," +
+            "         min(ord_line.prcpri) prcpri," +
+            "         ord.stcust," +
+            "         ord.btcust," +
+            "         ord.rtcust," +
+            "         ord.brcust," +
+            "         ord.dlvnum," +
+            "         ord.dlvseq," +
+            "         ord.st_adr_id," +
+            "         ord.bt_adr_id," +
+            "         ord.br_adr_id," +
+            "         ord.rt_adr_id," +
+            "         ord.cpotyp," +
+            "         ord.cponum," +
+            "         ord.carflg," +
+            "         ord.deptno," +
+            "         ord.rmanum," +
+            "         sum(ord_line.pckqty) pckqty," +
+            "         sum(decode(prtmst_view.dspuom, null, ord_line.pckqty, " +
+            "             ord_line.pckqty / pfd.untqty)) dsp_pckqty, " +
+            "         sum(decode(prtmst_view.dspuom, null, cast(null as int), prtmst_view.stkuom, cast(null as int), " +
+            "             mod(ord_line.pckqty, pfd.untqty))) rem_pckqty, " +
+            "         nvl(o_note.note_flag, 0) as ord_flag " +
+            "    from ord_line " +
+            "    join ord on ord.client_id = ord_line.client_id and ord.wh_id = ord_line.wh_id and ord.ordnum = ord_line.ordnum" +
+            "    join cstmst cstmst_st on cstmst_st.cstnum = ord.stcust and cstmst_st.client_id = ord.client_id" +
+            "    join cstmst cstmst_rt on cstmst_rt.cstnum = ord.rtcust and cstmst_rt.client_id = ord.client_id" +
+            "    join adrmst adrmst_st on adrmst_st.adr_id = ord.st_adr_id" +
+            "    join adrmst adrmst_rt on adrmst_rt.adr_id = ord.rt_adr_id" +
+            "    join prtmst_view " +
+            "      on (ord_line.wh_id = prtmst_view.wh_id) " +
+            "     and (ord_line.prt_client_id = prtmst_view.prt_client_id) " +
+            "     and (ord_line.prtnum = prtmst_view.prtnum) " +
+            "    left join prtftp pf " +
+            "      on (prtmst_view.wh_id = pf.wh_id) " +
+            "     and (prtmst_view.prt_client_id = pf.prt_client_id) " +
+            "     and (prtmst_view.prtnum = pf.prtnum) " +
+            "     and ((pf.ftpcod = ord_line.ftpcod) " +
+            "         or pf.defftp_flg = decode(ord_line.ftpcod, null, 1, cast(null as int))) " +
+            "    left join prtftp_dtl pfd " +
+            "      on (pf.wh_id = pfd.wh_id) " +
+            "     and (pf.prt_client_id = pfd.prt_client_id) " +
+            "     and (pf.prtnum = pfd.prtnum) " +
+            "     and (pf.ftpcod = pfd.ftpcod) " +
+            "     and (pfd.uomcod = nvl(prtmst_view.dspuom, prtmst_view.stkuom)) " +
+            "    left outer join (select ordnum, client_id, wh_id, 1 note_flag from ord_note " +
+            "                    union " +
+            "                    select ordnum, client_id, wh_id, 1 note_flag from ord_line_note) o_note" +
+            "      on ord.ordnum = o_note.ordnum " +
+            "     and ord.client_id = o_note.client_id " +
+            "     and ord.wh_id = o_note.wh_id " +
+            "   where (ord.super_ord_flg    = 0 or ord.super_ord_flg is null) " +
+            "     and ord.uc_regdte is not null" + /* MOD - Only work on registered orders */
+            "     and ord.super_ordnum is null " +
+            "     and ord_line.pckqty      > 0 " +
+            "     and ord_line.cancelled_flg != 1 " +
+            "     and ord_line.blk_slot_only_flg = 0 " +
+            "     and (ord.requir_tms_flg   = 0 or ord.requir_tms_flg is null) " +
+            "     and ord.wh_id            = '%s' " +
+            "     and @ord_line.dst_mov_zone_id:raw" +
+            "     %s  %s %s %s %s" +
+            "  group by ord.wh_id, " +
+            "           ord.ordnum," +
+            "           ord.adddte, ord.entdte, ord.cpodte," +
+            "           ord.client_id," +
+            "           ord.ordtyp, " +
+            "           ord.stcust, " +
+            "           ord.btcust, " +
+            "           ord.rtcust," +
+            "           ord.brcust," +
+            "           ord.dlvnum, " +
+            "           ord.dlvseq, " +
+            "           ord.st_adr_id," +
+            "           ord.bt_adr_id," +
+            "           ord.br_adr_id," +
+            "           ord.rt_adr_id," +
+            "           ord.cpotyp," +
+            "           ord.cponum," +
+            "           ord.carflg," +
+            "           ord.deptno," +
+            "           ord.rmanum," +
+            "           o_note.note_flag "+
+            " ) x" +
+            " where rownum < 999999" + // this is to keep sqlserver happy as have order by
+            " order by " + uc_auto_wave_order_by + // sqlsevrer needs where for order by to be in subquery.  Above where is basically saying all rows
+            " ) y where " + uc_outer_q_filter + // this is our real filter.  Idea is that it applies after ordering by ordnum
+            "] ",
+            wh_id,
+            wavesetwhereClause,
+            abowhereclause,
+            whereClause,
+            invAttrWhereClause,
+            clientswhereClause);
+
+            try{
+                res = moca.executeInline(cmd);
+            }
+            catch (MocaException ex)
+            {
+                def errorCode = ex.getErrorCode();
+
+                /* eDB_NO_ROWS_AFFECTED || eSRV_NO_ROWS_AFFECTED */
+                if ((errorCode == -1403) || (errorCode ==510))
+                {
+                  /* eNO_ORDER_LINES_MATCHING_CRITERIA */
+                  errorCode = 10539 ;
+                }
+                cmd = String.format("set return status " +
+                                    "   where status = %s" +
+                                    "     and errnum = '%s'",
+                                errorCode,
+                                errorCode);
+                moca.executeCommand(cmd);
+            }
+            res;
+        }
+        else
+        {
+            if (ordnumList && (ordnumList.length() > 0))
+            {
+                /* Here we scan the order number list, and make sure that each
+                 * sql clause "ordnum in (....)" have not more than 10 items,
+                 * since in the Oracle database, when the expression is more
+                 * than 1000, the sql clause would fail. For example, "select
+                 * ordnum from ord where ord_id in (1,2,....,1024) ", at this
+                 * time, in the "in ()", there are 1024 items, so it would
+                 * fail when executing it in Oracle.  Here we make sure that
+                 * each "in()" has not more than 10 items.
+                 */
+
+                String[] ordList = ordnumList.split(",");
+
+                for (i=0;i<ordList.size();i++)
+                {
+                    if (i > 0)
+                    {
+                        if((i % 10) == 0)
+                            ordnumwhereClause += ") or ord_line.ordnum in ( ";
+                        else
+                            ordnumwhereClause += ",";
+                    }
+                    else
+                        ordnumwhereClause += " and ( ord_line.ordnum in ( ";
+
+                    ordnumwhereClause += ordList[i];
+                }
+                ordnumwhereClause += ") )";
+            }
+
+            /*
+             * Consider only the orders which are not cancelled.
+             * WMD-163122 Going forward Through our system we will plan orders through waves
+             * only so wavable flag will be obsolete, so removing the check for wavableflag.
+             */
+            cmd =String.format(
+                " [/*#limit=@offset,@limit,true*/" +
+                " select q2.* from (select q1.*, dense_rank() over (partition by wh_id order by " + uc_auto_wave_order_by + ") uc_ordcnt from (" +
+                " select distinct ord_line.*, " +
+                "                  nvl(ol_note.ordlin_note_flg, 0) ordlin_note_flg, " +
+                "                  prtdsc.lngdsc, " +
+                "                  prtdsc.lngdsc prt_desc, " +
+                "                  ord.carflg, " +
+                "                  ord.adddte,ord.entdte uc_ord_entdte, ord.cpodte, ord.cponum," +
+                "                  decode(prtmst_view.dspuom, null, ord_line.host_ordqty, " +
+                "                         ord_line.host_ordqty / pfd.untqty) " +
+                "                         dsp_host_ordqty, " +
+                "                  decode(prtmst_view.dspuom, null, prtmst_view.stkuom, prtmst_view.dspuom) " +
+                "                         dsp_host_ordqty_uom, " +
+                "                  decode(prtmst_view.dspuom, null, cast(null as int), prtmst_view.stkuom, cast(null as int), " +
+                "                         mod(ord_line.host_ordqty, pfd.untqty)) " +
+                "                         rem_host_ordqty, " +
+                "                  decode(prtmst_view.dspuom, null, null, prtmst_view.stkuom, null, " +
+                "                         prtmst_view.stkuom) rem_host_ordqty_uom, " +
+                "                  decode(prtmst_view.dspuom, null, ord_line.ordqty, " +
+                "                         ord_line.ordqty / pfd.untqty) dsp_ordqty, " +
+                "                  decode(prtmst_view.dspuom, null, prtmst_view.stkuom, " +
+                "                         prtmst_view.dspuom) dsp_ordqty_uom, " +
+                "                  decode(prtmst_view.dspuom, null, cast(null as int), prtmst_view.stkuom, cast(null as int), " +
+                "                         mod(ord_line.ordqty, pfd.untqty)) rem_ordqty, " +
+                "                  decode(prtmst_view.dspuom, null, null, prtmst_view.stkuom, null, " +
+                "                         prtmst_view.stkuom) rem_ordqty_uom, " +
+                "                  decode(prtmst_view.dspuom, null, ord_line.rsvqty, " +
+                "                         ord_line.rsvqty / pfd.untqty) dsp_rsvqty, " +
+                "                  decode(prtmst_view.dspuom, null, prtmst_view.stkuom, " +
+                "                         prtmst_view.dspuom) dsp_rsvqty_uom, " +
+                "                  decode(prtmst_view.dspuom, null, cast(null as int), prtmst_view.stkuom, cast(null as int), " +
+                "                         mod(ord_line.rsvqty, pfd.untqty)) rem_rsvqty, " +
+                "                  decode(prtmst_view.dspuom, null, null, prtmst_view.stkuom, null, " +
+                "                         prtmst_view.stkuom) rem_rsvqty_uom, " +
+                "                  decode(prtmst_view.dspuom, null, ord_line.pckqty, " +
+                "                         ord_line.pckqty / pfd.untqty) dsp_pckqty, " +
+                "                  decode(prtmst_view.dspuom, null, prtmst_view.stkuom, " +
+                "                         prtmst_view.dspuom) dsp_pckqty_uom, " +
+                "                  decode(prtmst_view.dspuom, null, cast(null as int), prtmst_view.stkuom, cast(null as int), " +
+                "                         mod(ord_line.pckqty, pfd.untqty)) rem_pckqty, " +
+                "                  decode(prtmst_view.dspuom, null, null, prtmst_view.stkuom, null, " +
+                "                         prtmst_view.stkuom) rem_pckqty_uom, " +
+                "                  decode(prtmst_view.dspuom, null, ord_line.shpqty, " +
+                "                         ord_line.shpqty / pfd.untqty) dsp_shpqty, " +
+                "                  decode(prtmst_view.dspuom, null, prtmst_view.stkuom, " +
+                "                         prtmst_view.dspuom) dsp_shpqty_uom, " +
+                "                  decode(prtmst_view.dspuom, null, cast(null as int), prtmst_view.stkuom, cast(null as int), " +
+                "                         mod(ord_line.shpqty, pfd.untqty)) rem_shpqty, " +
+                "                  decode(prtmst_view.dspuom, null, null, prtmst_view.stkuom, null, " +
+                "                         prtmst_view.stkuom) rem_shpqty_uom, " +
+                "                  prtmst_view.dsp_prtnum, " +
+                "                  inv_attrs.lotnum, " +
+                "                  inv_attrs.orgcod, " +
+                "                  inv_attrs.revlvl, " +
+                "                  inv_attrs.mandte, " +
+                "                  inv_attrs.expire_dte, " +
+                "                  inv_attrs.inv_attr_str1, " +
+                "                  inv_attrs.inv_attr_str2, " +
+                "                  inv_attrs.inv_attr_str3, " +
+                "                  inv_attrs.inv_attr_str4, " +
+                "                  inv_attrs.inv_attr_str5, " +
+                "                  inv_attrs.inv_attr_str6, " +
+                "                  inv_attrs.inv_attr_str7, " +
+                "                  inv_attrs.inv_attr_str8, " +
+                "                  inv_attrs.inv_attr_str9, " +
+                "                  inv_attrs.inv_attr_str10, " +
+                "                  inv_attrs.inv_attr_str11, " +
+                "                  inv_attrs.inv_attr_str12, " +
+                "                  inv_attrs.inv_attr_str13, " +
+                "                  inv_attrs.inv_attr_str14, " +
+                "                  inv_attrs.inv_attr_str15, " +
+                "                  inv_attrs.inv_attr_str16, " +
+                "                  inv_attrs.inv_attr_str17, " +
+                "                  inv_attrs.inv_attr_str18, " +
+                "                  inv_attrs.inv_attr_int1, " +
+                "                  inv_attrs.inv_attr_int2, " +
+                "                  inv_attrs.inv_attr_int3, " +
+                "                  inv_attrs.inv_attr_int4, " +
+                "                  inv_attrs.inv_attr_int5, " +
+                "                  inv_attrs.inv_attr_flt1, " +
+                "                  inv_attrs.inv_attr_flt2, " +
+                "                  inv_attrs.inv_attr_flt3, " +
+                "                  inv_attrs.inv_attr_dte1, " +
+                "                  inv_attrs.inv_attr_dte2 " +
+                "              from ord_line "+
+                "              left join (select ordnum, " +
+                "                       ordlin, " +
+                "                       ordsln, " +
+                "                       client_id, " +
+                "                       wh_id, " +
+                "                       1 ordlin_note_flg " +
+                "            from ord_line_note group by ordnum, ordlin, ordsln, client_id, wh_id) ol_note " +
+                "              on ord_line.ordnum = ol_note.ordnum " +
+                "             and ord_line.ordlin = ol_note.ordlin " +
+                "             and ord_line.ordsln = ol_note.ordsln " +
+                "             and ord_line.client_id = ol_note.client_id " +
+                "             and ord_line.wh_id = ol_note.wh_id " +
+                "              join prtmst_view " +
+                "                on (ord_line.wh_id = prtmst_view.wh_id) " +
+                "               and (ord_line.prt_client_id = prtmst_view.prt_client_id) " +
+                "               and (ord_line.prtnum = prtmst_view.prtnum) " +
+                "              left outer join prtftp pf " +
+                "                on (prtmst_view.wh_id = pf.wh_id) " +
+                "               and (prtmst_view.prt_client_id = pf.prt_client_id) " +
+                "               and (prtmst_view.prtnum = pf.prtnum) " +
+                "               and ((pf.ftpcod = ord_line.ftpcod) " +
+                "                or pf.defftp_flg = decode(ord_line.ftpcod, " +
+                "                   null, 1, cast(null as int))) " +
+                "              left outer join prtftp_dtl pfd " +
+                "                on (pf.wh_id = pfd.wh_id) " +
+                "               and (pf.prt_client_id = pfd.prt_client_id) " +
+                "               and (pf.prtnum = pfd.prtnum) " +
+                "               and (pf.ftpcod = pfd.ftpcod) " +
+                "               and (pfd.uomcod = nvl(prtmst_view.dspuom, prtmst_view.stkuom)) " +
+                "              join ord " +
+                "                on ord_line.ordnum      = ord.ordnum " +
+                "               and ord_line.client_id   = ord.client_id " +
+                "               and ord_line.wh_id       = ord.wh_id " +
+                "        join cstmst cstmst_st on cstmst_st.cstnum = ord.stcust and cstmst_st.client_id = ord.client_id" +
+                "        join cstmst cstmst_rt on cstmst_rt.cstnum = ord.rtcust and cstmst_rt.client_id = ord.client_id" +
+                "        join adrmst adrmst_st on adrmst_st.adr_id = ord.st_adr_id" +
+                "        join adrmst adrmst_rt on adrmst_rt.adr_id = ord.rt_adr_id" +
+                "        left outer join (select alloc_rule_hdr.rule_nam, " +
+                "                   alloc_rule_hdr.wh_id, " +
+                "                   alloc_rule_hdr.rule_cmd_str, " +
+                "                   'SIMPLE' rule_type, " +
+                "           (select max(value) " +
+                "              from alloc_rule_dtl dtl " +
+                "             where dtl.field_name = 'lotnum' " +
+                "               and dtl.rule_nam   = alloc_rule_hdr.rule_nam " +
+                "               and dtl.wh_id      = alloc_rule_hdr.wh_id " +
+                "               and @+dtl.value^lotnum) lotnum, " +
+                "           (select max(value) " +
+                "              from alloc_rule_dtl dtl " +
+                "             where dtl.field_name = 'sup_lotnum' " +
+                "               and dtl.rule_nam   = alloc_rule_hdr.rule_nam " +
+                "               and dtl.wh_id      = alloc_rule_hdr.wh_id " +
+                "               and @+dtl.value^sup_lotnum) sup_lotnum, " +
+                "           (select max(value) " +
+                "              from alloc_rule_dtl dtl " +
+                "             where dtl.field_name = 'orgcod' " +
+                "               and dtl.rule_nam   = alloc_rule_hdr.rule_nam " +
+                "               and dtl.wh_id      = alloc_rule_hdr.wh_id " +
+                "               and @+dtl.value^orgcod) orgcod, " +
+                "           (select max(value) " +
+                "              from alloc_rule_dtl dtl " +
+                "             where dtl.field_name = 'revlvl' " +
+                "               and dtl.rule_nam   = alloc_rule_hdr.rule_nam " +
+                "               and dtl.wh_id      = alloc_rule_hdr.wh_id " +
+                "               and @+dtl.value^revlvl) revlvl, " +
+                "           (select max(value) " +
+                "              from alloc_rule_dtl dtl " +
+                "             where dtl.field_name = 'mandte' " +
+                "               and dtl.rule_nam   = alloc_rule_hdr.rule_nam " +
+                "               and dtl.wh_id      = alloc_rule_hdr.wh_id) mandte, " +
+                "           (select max(value) " +
+                "              from alloc_rule_dtl dtl " +
+                "             where dtl.field_name = 'expire_dte' " +
+                "               and dtl.rule_nam   = alloc_rule_hdr.rule_nam " +
+                "               and dtl.wh_id      = alloc_rule_hdr.wh_id) expire_dte, " +
+                "           (select max(value) " +
+                "              from alloc_rule_dtl dtl " +
+                "             where dtl.field_name = 'inv_attr_str1' " +
+                "               and dtl.rule_nam   = alloc_rule_hdr.rule_nam " +
+                "               and dtl.wh_id      = alloc_rule_hdr.wh_id) inv_attr_str1, " +
+                "           (select max(value) " +
+                "              from alloc_rule_dtl dtl " +
+                "             where dtl.field_name = 'inv_attr_str2' " +
+                "               and dtl.rule_nam   = alloc_rule_hdr.rule_nam " +
+                "               and dtl.wh_id      = alloc_rule_hdr.wh_id) inv_attr_str2, " +
+                "           (select max(value) " +
+                "              from alloc_rule_dtl dtl " +
+                "             where dtl.field_name = 'inv_attr_str3' " +
+                "               and dtl.rule_nam   = alloc_rule_hdr.rule_nam " +
+                "               and dtl.wh_id      = alloc_rule_hdr.wh_id) inv_attr_str3, " +
+                "           (select max(value) " +
+                "              from alloc_rule_dtl dtl " +
+                "             where dtl.field_name = 'inv_attr_str4' " +
+                "               and dtl.rule_nam   = alloc_rule_hdr.rule_nam " +
+                "               and dtl.wh_id      = alloc_rule_hdr.wh_id) inv_attr_str4, " +
+                "           (select max(value) " +
+                "              from alloc_rule_dtl dtl " +
+                "             where dtl.field_name = 'inv_attr_str5' " +
+                "               and dtl.rule_nam   = alloc_rule_hdr.rule_nam " +
+                "               and dtl.wh_id      = alloc_rule_hdr.wh_id) inv_attr_str5, " +
+                "           (select max(value) " +
+                "              from alloc_rule_dtl dtl " +
+                "             where dtl.field_name = 'inv_attr_str6' " +
+                "               and dtl.rule_nam   = alloc_rule_hdr.rule_nam " +
+                "               and dtl.wh_id      = alloc_rule_hdr.wh_id) inv_attr_str6, " +
+                "           (select max(value) " +
+                "              from alloc_rule_dtl dtl " +
+                "             where dtl.field_name = 'inv_attr_str7' " +
+                "               and dtl.rule_nam   = alloc_rule_hdr.rule_nam " +
+                "               and dtl.wh_id      = alloc_rule_hdr.wh_id) inv_attr_str7, " +
+                "           (select max(value) " +
+                "              from alloc_rule_dtl dtl " +
+                "             where dtl.field_name = 'inv_attr_str8' " +
+                "               and dtl.rule_nam   = alloc_rule_hdr.rule_nam " +
+                "               and dtl.wh_id      = alloc_rule_hdr.wh_id) inv_attr_str8, " +
+                "           (select max(value) " +
+                "              from alloc_rule_dtl dtl " +
+                "             where dtl.field_name = 'inv_attr_str9' " +
+                "               and dtl.rule_nam   = alloc_rule_hdr.rule_nam " +
+                "               and dtl.wh_id      = alloc_rule_hdr.wh_id) inv_attr_str9, " +
+                "           (select max(value) " +
+                "              from alloc_rule_dtl dtl " +
+                "             where dtl.field_name = 'inv_attr_str10' " +
+                "               and dtl.rule_nam   = alloc_rule_hdr.rule_nam " +
+                "               and dtl.wh_id      = alloc_rule_hdr.wh_id) inv_attr_str10, " +
+                "           (select max(value) " +
+                "              from alloc_rule_dtl dtl " +
+                "             where dtl.field_name = 'inv_attr_str11' " +
+                "               and dtl.rule_nam   = alloc_rule_hdr.rule_nam " +
+                "               and dtl.wh_id      = alloc_rule_hdr.wh_id) inv_attr_str11, " +
+                "           (select max(value) " +
+                "              from alloc_rule_dtl dtl " +
+                "             where dtl.field_name = 'inv_attr_str12' " +
+                "               and dtl.rule_nam   = alloc_rule_hdr.rule_nam " +
+                "               and dtl.wh_id      = alloc_rule_hdr.wh_id) inv_attr_str12, " +
+                "           (select max(value) " +
+                "              from alloc_rule_dtl dtl " +
+                "              where dtl.field_name = 'inv_attr_str13' " +
+                "               and dtl.rule_nam   = alloc_rule_hdr.rule_nam " +
+                "               and dtl.wh_id      = alloc_rule_hdr.wh_id) inv_attr_str13, " +
+                "           (select max(value) " +
+                "              from alloc_rule_dtl dtl " +
+                "             where dtl.field_name = 'inv_attr_str14' " +
+                "               and dtl.rule_nam   = alloc_rule_hdr.rule_nam " +
+                "               and dtl.wh_id      = alloc_rule_hdr.wh_id) inv_attr_str14, " +
+                "           (select max(value) " +
+                "              from alloc_rule_dtl dtl " +
+                "             where dtl.field_name = 'inv_attr_str15' " +
+                "               and dtl.rule_nam   = alloc_rule_hdr.rule_nam " +
+                "               and dtl.wh_id      = alloc_rule_hdr.wh_id) inv_attr_str15, " +
+                "           (select max(value) " +
+                "              from alloc_rule_dtl dtl " +
+                "             where dtl.field_name = 'inv_attr_str16' " +
+                "               and dtl.rule_nam   = alloc_rule_hdr.rule_nam " +
+                "               and dtl.wh_id      = alloc_rule_hdr.wh_id) inv_attr_str16, " +
+                "           (select max(value) " +
+                "              from alloc_rule_dtl dtl " +
+                "             where dtl.field_name = 'inv_attr_str17' " +
+                "               and dtl.rule_nam   = alloc_rule_hdr.rule_nam " +
+                "               and dtl.wh_id      = alloc_rule_hdr.wh_id) inv_attr_str17, " +
+                "           (select max(value) " +
+                "              from alloc_rule_dtl dtl " +
+                "             where dtl.field_name = 'inv_attr_str18' " +
+                "               and dtl.rule_nam   = alloc_rule_hdr.rule_nam " +
+                "               and dtl.wh_id      = alloc_rule_hdr.wh_id) inv_attr_str18, " +
+                "           (select max(cast(value as int)) " +
+                "              from alloc_rule_dtl dtl " +
+                "             where dtl.field_name = 'inv_attr_int1' " +
+                "               and dtl.rule_nam   = alloc_rule_hdr.rule_nam " +
+                "               and dtl.wh_id      = alloc_rule_hdr.wh_id) inv_attr_int1, " +
+                "           (select max(cast(value as int)) " +
+                "              from alloc_rule_dtl dtl " +
+                "             where dtl.field_name = 'inv_attr_int2' " +
+                "               and dtl.rule_nam   = alloc_rule_hdr.rule_nam " +
+                "               and dtl.wh_id      = alloc_rule_hdr.wh_id) inv_attr_int2, " +
+                "           (select max(cast(value as int)) " +
+                "              from alloc_rule_dtl dtl " +
+                "             where dtl.field_name = 'inv_attr_int3' " +
+                "               and dtl.rule_nam   = alloc_rule_hdr.rule_nam " +
+                "               and dtl.wh_id      = alloc_rule_hdr.wh_id) inv_attr_int3, " +
+                "           (select max(cast(value as int)) " +
+                "              from alloc_rule_dtl dtl " +
+                "             where dtl.field_name = 'inv_attr_int4' " +
+                "               and dtl.rule_nam   = alloc_rule_hdr.rule_nam " +
+                "               and dtl.wh_id      = alloc_rule_hdr.wh_id) inv_attr_int4, " +
+                "           (select max(cast(value as int)) " +
+                "              from alloc_rule_dtl dtl " +
+                "             where dtl.field_name = 'inv_attr_int5' " +
+                "               and dtl.rule_nam   = alloc_rule_hdr.rule_nam " +
+                "               and dtl.wh_id      = alloc_rule_hdr.wh_id) inv_attr_int5, " +
+                "           (select max(value) " +
+                "              from alloc_rule_dtl dtl " +
+                "             where dtl.field_name = 'inv_attr_flt1' " +
+                "               and dtl.rule_nam   = alloc_rule_hdr.rule_nam " +
+                "               and dtl.wh_id      = alloc_rule_hdr.wh_id) inv_attr_flt1, " +
+                "           (select max(value) " +
+                "              from alloc_rule_dtl dtl " +
+                "             where dtl.field_name = 'inv_attr_flt2' " +
+                "               and dtl.rule_nam   = alloc_rule_hdr.rule_nam " +
+                "               and dtl.wh_id      = alloc_rule_hdr.wh_id) inv_attr_flt2, " +
+                "           (select max(value) " +
+                "              from alloc_rule_dtl dtl " +
+                "             where dtl.field_name = 'inv_attr_flt3' " +
+                "               and dtl.rule_nam   = alloc_rule_hdr.rule_nam " +
+                "               and dtl.wh_id      = alloc_rule_hdr.wh_id) inv_attr_flt3, " +
+                "           (select max(value) " +
+                "              from alloc_rule_dtl dtl " +
+                "             where dtl.field_name = 'inv_attr_dte1' " +
+                "               and dtl.rule_nam   = alloc_rule_hdr.rule_nam " +
+                "               and dtl.wh_id      = alloc_rule_hdr.wh_id) inv_attr_dte1, " +
+                "           (select max(value) " +
+                "              from alloc_rule_dtl dtl " +
+                "             where dtl.field_name = 'inv_attr_dte2' " +
+                "               and dtl.rule_nam   = alloc_rule_hdr.rule_nam " +
+                "               and dtl.wh_id      = alloc_rule_hdr.wh_id) inv_attr_dte2 " +
+                "              from alloc_rule_hdr " +
+                "             where cplx_flg = 0) inv_attrs " +
+                "                on inv_attrs.rule_nam = ord_line.rule_nam " +
+                "               and inv_attrs.wh_id = ord_line.wh_id " +
+                "              join prtdsc " +
+                "                on prtdsc.colnam = 'prtnum|prt_client_id|wh_id_tmpl' " +
+                "               and prtdsc.colval = /*=varchar(*/prtmst_view.prtnum||'|'||prtmst_view.prt_client_id||'|'||prtmst_view.wh_id_tmpl/*=)*/ " +
+                "               and prtdsc.locale_id = nvl(@locale_id, @@locale_id) " +
+                "             where (ord.super_ord_flg    = 0 or ord.super_ord_flg is null) " +
+                "               and ord.uc_regdte is not null" + /* MOD - Only work on registered orders */
+                "               and ord.super_ordnum is null " +
+                "               and ord_line.pckqty      > 0 " +
+                "               and ord_line.cancelled_flg != 1 " +
+                "               and @ord_line.dst_mov_zone_id:raw" +
+                "               and ord_line.blk_slot_only_flg = 0 " +
+                "               %s " +
+                "               and (ord.requir_tms_flg   = 0 or ord.requir_tms_flg is null) " +
+                "               and ord.wh_id            = '%s' " +
+                "               %s %s  %s %s %s" +
+                "               )q1 where rownum < 999999 order by " + uc_auto_wave_order_by + " ) q2 where uc_ordcnt <= " + uc_max_ord +
+                " ] ",
+                ordnumwhereClause,
+                wh_id,         
+                wavesetwhereClause,
+                abowhereclause,
+                whereClause,
+                invAttrWhereClause,
+                clientswhereClause);
+
+            currentContext = MocaUtils.currentContext();
+
+            try
+            {
+                res = currentContext.executeInline(cmd);
+            }
+            catch (MocaException ex)
+            {
+                def errorCode = ex.getErrorCode();
+
+                /* eDB_NO_ROWS_AFFECTED || eSRV_NO_ROWS_AFFECTED */
+                if ((errorCode == -1403) || (errorCode == 510))
+                {
+                    errorCode = 10539;   /* eNO_ORDER_LINES_MATCHING_CRITERIA */
+                }
+                cmd = String.format("set return status " +
+                                    "     where status = %s " +
+                                    "       and errnum = '%s'",
+                                errorCode,
+                                errorCode);
+                moca.executeCommand(cmd);
+            }
+
+            /*
+             * If we get a maximum qty in, then we need to make sure we don't
+             * violate that.  Otherwise, we can just send back the results
+             * we selected.
+             */
+            if(currentContext.isVariableAvailable("totpcs"))
+            {
+                /* We do not know if totpcs is specified as a string or an
+                 * integer, so convert whatever format it's in to a string,
+                 * and then trim it to avoid the case where we either have a
+                 * null value or a string whose value is a series of spaces.
+                 * We need to do this to avoid a 'NumberFormatException' from
+                 * using the valueOf() method from the Integer class.
+                 */
+                String  maxQtyValue;
+                int     totalPieces;
+
+                try
+                {
+                    maxQtyValue = currentContext.getVariable("totpcs").toString().trim();
+                    totalPieces = Integer.parseInt(maxQtyValue);
+                }
+                catch (NumberFormatException ex)
+                {
+                    moca.trace("Error: 'total pieces' specified but could not get value");
+                    totalPieces = -1;
+                }
+
+                if (totalPieces > 0)
+                {
+                    moca.trace("Total pieces allowed is " + totalPieces);
+
+                    /*
+                     * What we are going to do here is loop around all the rows
+                     * returned, and find out which rows will not violate the
+                     * total number of pieces allowed.  We will simply just
+                     * grab the first x amount of rows until the total unit
+                     * qty we've accumulated equals the maximum pieces allowed.
+                     */
+                    int totalQty = 0;
+                    int rowCount = 0;
+                    int  pck_qty = 0;
+
+                    boolean maxQuantityNotExceeded = true;
+
+                    while(maxQuantityNotExceeded)
+                    {
+                        if (res.next())
+                        {
+                            pck_qty = res.getInt("pckqty") ;
+                            if (totalQty + pck_qty <= totalPieces)
+                            {
+                                totalQty = totalQty + pck_qty;
+                                rowCount++;
+                            }
+                            else
+                            {
+                                maxQuantityNotExceeded = false;
+                            }
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+
+                    /* We could run into a situation where they entered a total
+                     * pieces quantity that's smaller than the quantity on any
+                     * of the rows. If that's the case, we'll be stripping off
+                     * all of the rows and will end up with an empty recordset.
+                     * Rather than send back 0 rows, we're going to provide
+                     * them with an error.
+                     */
+
+                    if (rowCount == 0)
+                    {
+                        /* eNO_ORDER_LINES_MATCHING_CRITERIA */
+                        moca.trace("Total pieces is less than the quantity of any " +
+                                   "of the order lines. ");
+                        cmd = String.format("set return status " +
+                                            "   where status = 10539" +
+                                            "     and errnum = '10539'");
+                        moca.executeCommand(cmd);
+                    }
+
+                    /*
+                     * If maxQuantityNotExceeded has been set to true, we need
+                     * to strip off any remaining rows in the result set. The
+                     * reason we do it this way rather than just defining our
+                     * result set and adding rows to it is because we are doing
+                     * a select * so we don't have to hard-code the columns we
+                     * are sending back, allowing us to be more flexible.
+                     */
+
+                    /* The current row is the first row that causes the
+                     * maxQuantityNotExceeded flag to be set to false.  So we
+                     * need to remove this current row before advancing to
+                     * the next.
+                     */
+
+                    if (!maxQuantityNotExceeded)
+                    {
+                        //We need to account for the current row that caused
+                        // the max quantity to be exceeded.
+                        res.removeRow();
+
+                        // Now we can loop and delete everything after the last
+                        // qualified row to satisfy the total pieces quantity.
+                        while(res.next())
+                        {
+                            res.removeRow();
+                        }
+                    }
+                    res.reset();
+                }
+            }
+            res;  /*publish out the result */
+        }
+    ]]
+
+
+]]>
+</local-syntax>
+
+<argument name="rule_nam" alias="wave_rule" datatype="string"> </argument>
+<argument name="wave_set" datatype="string"> </argument>
+<argument name="sumflg" datatype="integer"> </argument>
+<argument name="ordnum_list"   datatype="string"> </argument>
+<argument name="wh_id" datatype="string"> </argument>
+<argument name="dst_mov_zone_id" datatype="integer"> </argument>
+<argument name="dst_mov_zone_id" datatype="integer"> </argument>
+
+<argument name="uc_auto_wave_order_by" datatype="integer"> </argument>
+
+
+<documentation>
+<remarks>
+<![CDATA[
+  <p>
+  This command is used to list order lines that still have lines associatd
+  with them that have quantity available to be planned into a shipment.
+  This command is used primarily by shipment planning to give a list
+  of orders that may still be planned into shipments.
+  The order lines must be on an order with the wave flag set to true. If the
+  summary flag is set, the command returns a list of all the orders available for
+  wave planning, but not the individual order lines.
+  </p>
+  <p>
+  Note, this command respects restricted client access.  The user will
+  only be able to see order lines for clients that he is authorized to see.
+  </p>
+]]>
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+<seealso cref="plan shipment wave by order selection"> </seealso>
+<seealso cref="process usr auto wave"> </seealso>
+
+
+</documentation>
+</command>

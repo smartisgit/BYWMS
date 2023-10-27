@@ -1,0 +1,143 @@
+<command>
+<name>list usr order cartons and confirmation</name>
+<description>List usr Order cartons for Cancellation and Confirmation</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/* Calling the select to verify if any variables are passed in.  If not, the
+ * select will come back with 1=1 for each variable, which will cause the
+ * select to execute successfully.  If anything is passed in, the column
+ * doesn't exist, which causes the select to fail.
+ * Used this approach as (@ordnum is not null) didn't work if using wildcards.
+ */
+
+ /* BUG 1023 - 2015-05-20
+  * AIUBCJ0 - Added schbat
+  */
+/*
+marge the list usr order cartons and list usr order confirmation
+*/
+
+if (@ordnum is null and @cstnum is null and @vc_ordage is null and @vc_rtcode is null and @ship_id is null )
+{
+  set return status 
+    where status = 88224 
+}
+|
+[
+
+select distinct od.ordnum,
+        lm.wh_id,
+        od.stcust cstnum,
+        am.adrnam,
+        od.vc_rtcode,
+        sl.ship_id,
+        ins.subnum,
+        ins.subucc,
+        inl.stoloc,
+        '1' uc_is_cancel,
+        '0' uc_is_confirm
+   from aremst arm
+   join locmst lm
+     on arm.arecod = lm.arecod
+    and arm.wh_id = lm.wh_id
+   join loc_typ ltyp
+     on ltyp.loc_typ_id = lm.loc_typ_id
+   join invlod inl
+     on lm.stoloc = inl.stoloc
+    and lm.wh_id = inl.wh_id
+   join invsub ins
+     on inl.lodnum = ins.lodnum
+   join invdtl ind
+     on ins.subnum = ind.subnum
+   join shipment_line sl
+     on sl.ship_line_id = ind.ship_line_id
+   join shipment sh
+     on sh.ship_id = sl.ship_id
+   join ord_line ol
+     on ol.wh_id = sh.wh_id
+    and ol.ordnum = sl.ordnum
+    and ol.client_id = sl.client_id
+    and ol.ordlin = sl.ordlin
+    and ol.ordsln = sl.ordsln
+    and ol.wh_id = sl.wh_id
+   join ord od
+     on od.client_id = ol.client_id
+    and od.ordnum = ol.ordnum
+    and od.wh_id = ol.wh_id
+   join adrmst am
+     on am.adr_id = od.st_adr_id
+  where ltyp.shpflg != 1
+    and arm.wh_id = nvl(@wh_id, @@wh_id)
+    and @+sh.ship_id
+    and to_date(to_char(sh.late_shpdte, 'YYYYMMDD')) <= to_date(to_char(sysdate, 'YYYYMMDD'))-nvl(@vc_ordage, 0)
+    and @+od.ordnum
+    and @+od.vc_rtcode
+    and @+od.stcust^cstnum
+  order by ordnum 
+]
+|
+/* Get split case carton Count */
+[select count(*) vc_num_split_casctn 
+   from pckwrk_dtl pckwrk 
+  where ordnum = @ordnum 
+    and lodlvl = 'S' 
+    and wrktyp = 'K' 
+    and wh_id = @wh_id 
+] 
+|
+/* Get Full case carton count */
+[select count(*) vc_num_full_casctn 
+   from pckwrk_dtl pckwrk  
+  where ordnum = @ordnum 
+    and lodlvl = 'S' 
+    and wrktyp = 'P' 
+    and wh_id = @wh_id 
+] 
+|
+Publish data 
+  where ordnum = @ordnum 
+    and wh_id = @wh_id 
+    and cstnum = @cstnum 
+    and adrnam = @adrnam 
+    and vc_rtcode = @vc_rtcode 
+    and ship_id = @ship_id 
+    and subnum = @subnum 
+    and subucc = @subucc 
+    and stoloc = @stoloc 
+    and shpsts=@shpsts
+    and payment_type=@payment_type
+    and schbat=@schbat
+    and batsts=@batsts
+    and vc_num_pieces=@vc_num_pieces
+    and vc_num_split_casctn = @vc_num_split_casctn 
+    and vc_num_full_casctn = @vc_num_full_casctn 
+    and uc_is_cancel=@uc_is_cancel
+    and uc_is_confirm=@uc_is_confirm
+    
+
+
+]]>
+</local-syntax>
+<argument name="ordnum" required="no" datatype="string"></argument>
+<argument name="cstnum" required="no" datatype="string"></argument>
+<argument name="vc_rtcode" required="no" datatype="string"></argument>
+<argument name="wh_id" required="yes" datatype="string"></argument>
+<argument name="schbat" required="yes" datatype="string"></argument>
+
+<documentation>
+<remarks>
+<![CDATA[
+
+Author: AIUBCJ0 -- 2015-05-20 -- BUG 1023
+Added Schedule Batch to the command as input parameter
+
+Updated to be USRDDA command. Updated to use join syntax.
+
+Author: AIUUX65
+
+2021-2-16:marge the list usr order cartons and list usr order confirmation
+]]>
+</remarks>
+</documentation>
+</command>

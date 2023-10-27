@@ -1,0 +1,28 @@
+<!-- Sets several key variables -->
+<project project-dir="."
+         js-dir="${project-dir}/ossi-policylogic"
+         app-id="${appId}"
+         hf-compliant="true">
+
+
+  <target name="les.ossi-policylogic"
+          type="js"
+          source-dir="${js-dir}">
+		  
+        <include name="model/PolicyLogicModel.js" />
+        <include name="model/ChangeLogModel.js" />
+        <include name="model/MainGridModel.js" />
+		<include name="store/PolicyLogicStore.js" />
+        <include name="store/MainGridStore.js" />
+        <include name="store/VariableStore.js" />
+        <include name="store/EvaluateStore.js" />
+        <include name="store/ExpressionValidation.js" />
+        <include name="store/RuleExpressionValidation.js" />
+        <include name="store/ChangeLogStore.js" />
+        <include name="store/RuleGroupStore.js" />
+        <include name="store/HelpStore.js" />
+        <include name="view/Main.js" />	
+		<include name="controller/MainController.js" />
+        <include name="App.js" />	
+</target>
+</project>

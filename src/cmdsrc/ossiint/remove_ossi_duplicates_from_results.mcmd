@@ -1,0 +1,56 @@
+<command>
+<name>remove ossi duplicates from results</name>
+<description>Remove duplicates from results</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+
+publish data
+  where column = @column
+|
+/* Results must be sorted because it compares adjacent rows */
+sort result set
+  where result_set = @res
+    and sort_list = @column
+>> res
+|
+[[
+  String value = null;
+  while (res.next())
+  {
+    if (res.getString(column).equals(value))
+    {
+      res.removeRow();
+    }
+    else
+    {
+      value = res.getString(column);
+    }
+  }
+[res:res]
+]]
+|
+publish data combination
+  where res = @res
+
+]]>
+</local-syntax>
+<argument name="res" required="yes" datatype="string"></argument>
+<argument name="column" required="yes" datatype="string"></argument>
+
+<documentation>
+
+<remarks>
+This command may be used to remove duplicate from results.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

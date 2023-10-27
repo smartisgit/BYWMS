@@ -1,0 +1,32 @@
+<command>
+<name>convert ossi results to string</name>
+<description>Convert result to strings</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+
+[[
+import com.oracular.util.MOCAUtils;
+
+res.reset();
+result_string = MOCAUtils.getCSV(res);
+]]
+
+]]>
+</local-syntax>
+<argument name="res" required="yes" datatype="resultset"></argument>
+<documentation>
+
+<remarks>
+This command converts a resultset to a CSV equivalent.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

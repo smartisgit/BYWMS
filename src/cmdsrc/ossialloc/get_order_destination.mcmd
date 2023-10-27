@@ -1,0 +1,137 @@
+<command>
+<name>get order destination</name>
+<description>Determine the order destination based on a rules engine</description>
+
+<argument name="ship_id" datatype="string"></argument>
+<argument name="ship_line_id" datatype="string"></argument>
+<argument name="wkonum" datatype="string"></argument>
+<argument name="wkorev" datatype="string"></argument>
+<argument name="wkolin" datatype="string"></argument>
+<argument name="client_id" datatype="string"></argument>
+<argument name="wh_id" datatype="string"></argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+if ( @uc_inhibit_change_hook = '1' or
+     ossi__polval('USR-OSSI-DATA-CHANGE-HOOK', 'CMD_GET_ORDER_DESTINATION', 'ENABLED', '', 'rtnum1', nvl(@wh_id,@@WH_ID) ) = 0 )
+    ^get order destination where @*
+else
+{
+    ^get order destination where @*
+    |
+    {
+        publish data
+        where uc_tmp_dst_mov_zone_id = @dst_mov_zone_id
+        and uc_tmp_dstloc = @dstloc
+        |
+        if ( @dst_mov_zone_id is not null and @dstloc is null )
+        {
+            [
+            select mov_zone_cod
+            from mov_zone
+            where mov_zone_id = @dst_mov_zone_id
+            ] 
+            catch (-1403,510)
+            | 
+            if ( @? = 0 and @mov_zone_cod = 'UC_RULE_BASEDS' and (@ship_line_id is not null or @ship_id is not null) )
+            {
+                if ( @ship_line_id is null ) hide stack variable where name = 'ship_line_id'
+                |
+                if ( @ship_id is null ) hide stack variable where name = 'ship_id'
+                |
+                execute ossi les_cmd
+                where les_cmd_id = 'uc_ctxt_cmd_get_order_destination'
+                and uc_les_cmd_inline = 1
+                and exec_uc_les_cmd_cust_lvl = null
+                and uc_inhibit_return_extra_columns = 1
+                catch (-1403,510)
+                |
+                get ossi result by evaluating policy
+                where uc_rule_grp_id = 'OSSI-ORDER-DESTINATION'
+                and uc_rule_subgrp_id = 'RULE-BASED-SELECTION'
+                catch (-1403,510)
+                |
+                if ( @? = 0 and @r_polval is not null)
+                {
+                    [
+                    select mov_zone_id
+                    from mov_zone
+                    where wh_id = @wh_id
+                    and mov_zone_cod = @r_polval
+                    ]
+                    catch (-1403,510)
+                    |
+                    filter data
+                    where moca_filter_level = 12
+                    and dst_mov_zone_id = nvl (@mov_zone_id, @dst_mov_zone_id)
+                    and uc_reason = 'Returned a movement zone from rules engine -' || @r_polval
+                } /* rule engine found a value */
+                else
+                    filter data
+                    where moca_filter_level = 10
+                    and uc_reason = 'Nothing from rules engine so return what we have form std'
+            } /* have our special move zone */
+            else
+                filter data 
+                where moca_filter_level = 5
+                and uc_reason = 'dst_mov_zone_id Lookup failed or found move_zone_cod=' || @mov_zone_cod || ' was not our special one.  Return std'
+        } /* we have dst zone and not a location */
+        else
+            filter data
+            where moca_filter_level = 3
+            and uc_reason = 'No dst_mov_zone_id or yes dstloc.  Return std'
+    } /* scope of standard call */
+} /* enabled */
+   
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This command will return the order destination per the rules engine.  Idea is that the staging movment zone should be determined as UC_RULE_BASEDS
+by standard configuration.  if it is determined to be that, then the rules engine kicks in and changes to the one that rule engine determines.
+
+This can be achieved by using [default ship staging zone] to be this in the setup.  if it does not exist, then create it with this name.  
+Note that for this configuration screen to show it, the zone must have a location in it.
+
+So regardless of how - if the standard call yields this special one, then we will adjust by rules
+
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+
+<retcol name="dst_mov_zone_id" type="COMTYP_CHAR"></retcol>
+<retcol name="dstloc" type="COMTYP_CHAR"></retcol>
+<retcol name="wh_id" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_reason" type="COMTYP_CHAR">For debigging, reason for returning the value that it returned</retcol>
+
+
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+<seealso cref="get order destination"></seealso>
+<seealso cref="get ossi result by evaluating policy"></seealso>
+
+<policy
+    polcod="USR-OSSI-DATA-CHANGE-HOOK"
+    polvar="CMD_GET_ORDER_DESTINATION"
+    polval="ENABLED"
+    rtnum1="0 for disable and 2 to enable"
+></policy>
+
+</documentation>
+
+
+</command>

@@ -1,0 +1,59 @@
+<command>
+<name>ossi get_xml_attr_value</name>
+<description>Parse XML old fashion way to get the value of an attribute.  if a node just has attributes moca way does not work</description>
+<argument datatype="string" name="moca_farg1">xml string</argument>
+<argument datatype="string" name="moca_farg2">attribute to look up</argument>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+publish data
+where uc_xml = @moca_farg1
+and uc_attr = @moca_farg2
+|
+publish data
+where uc_look_str = @uc_attr || '="'
+|
+{
+    publish data
+    where uc_attr_pos = instr(@uc_xml, @uc_look_str )
+    |
+    if ( @uc_attr_pos > 0 )
+    {
+        publish data
+        where uc_value = substr(@uc_xml, @uc_attr_pos + len(@uc_look_str) )
+        |
+        publish data
+        where uc_quote2_pos = instr(@uc_value, '"' )
+        |
+        if ( @uc_quote2_pos > 0 )
+            publish data
+            where ret = substr(@uc_value, 1, @uc_quote2_pos-1 )
+        else
+            publish data
+            where ret = ''
+    }
+    else
+        publish data
+        where ret = ''
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<remarks>
+This command may be used to get value of xml attribute.
+</remarks>
+
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

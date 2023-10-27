@@ -1,0 +1,67 @@
+<command>
+<name>ossi get_policy_data_as_var_list</name>
+<description>Get policy data as a list of @+ moca variables</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+publish data 
+  where polcod = @moca_farg1 
+    and polvar = @moca_farg2 
+    and polval = @moca_farg3 
+    and wh_id = nvl(@moca_farg4, nvl(nvl(@wh_id, @@wh_id), '----')) 
+    and separator = nvl(@moca_farg5, ' and @+') 
+    and first_var_prefix = decode(@moca_farg5, null, '@+', '')
+| 
+if ( @polval is null )
+   hide stack variable where name = 'polval'
+|
+[select rtstr1 || rtstr2 value
+   from poldat_view 
+  where polcod = @polcod 
+    and polvar = @polvar 
+    and polval = @polval
+    and wh_id = @wh_id 
+    and rtnum1 = 1 
+] catch (-1403) >> res 
+| 
+if (@? = 0) 
+{
+  convert column results to string 
+    where res = @res 
+      and colnam = 'value'
+      and separator = @separator
+  |
+  filter data where result_string = @first_var_prefix || @result_string
+}
+else
+{
+  publish data where result_string = null
+}
+
+]]>
+</local-syntax>
+<argument datatype="string" name="moca_farg1">POLCOD</argument>
+<argument datatype="string" name="moca_farg2">POLVAR</argument>
+<argument datatype="string" name="moca_farg3">POLVAL</argument>
+<argument datatype="string" name="moca_farg5">WH_ID</argument>
+
+<documentation>
+
+<remarks>
+This command may be used to get policy data as var list.
+</remarks>
+
+<retcol name="result_string" type="String"></retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

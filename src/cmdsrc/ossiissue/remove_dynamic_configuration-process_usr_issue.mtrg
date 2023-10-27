@@ -1,0 +1,25 @@
+<trigger>
+<name>process usr issue</name>
+<on-command>remove dynamic configuration</on-command>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ */
+process usr issue
+  where uc_table_name = 'LES_DYN_CFG'
+    and uc_action = 'REMOVE'
+]]></local-syntax>
+<fire-sequence>10000</fire-sequence>
+<documentation>
+
+<remarks>
+This trigger process issue for deleting dynamic configuration.
+</remarks>
+
+<seealso cref="process usr issue"></seealso>
+
+</documentation>
+</trigger>

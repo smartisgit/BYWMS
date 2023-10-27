@@ -1,0 +1,418 @@
+<command>
+<name>log ems event</name>
+<description>Override log ems event for mini EMS</description>
+
+<argument name="wh_id" required="no" datatype="string"></argument>
+<argument name="uc_ems_publish_results" required="no" datatype="string">'0' or '1'.  By default 0.  if '1' then datais published Helpful in troubleshooting</argument>
+
+<argument name="evt_nam" required="no" datatype="string"></argument>
+
+<argument name="uc_inhibit_send_email" required="yes" datatype="string">For testing - if we pass in '1' then it does not sned email
+This is respected by underlying send ossi email command
+</argument>
+
+<argument name="uc_log_dlytrn" required="yes" datatype="integer">1 or 0.  If 1 we log dlytrn.  if not passed in we look up policy</argument>
+<argument name="uc_email_body" required="yes" datatype="string">If passed in, use this email body.  Else determine by rules</argument>
+<argument name="uc_email_subject" required="yes" datatype="string">If passed in, use this email subject.  Else determine by rules</argument>
+<argument name="uc_email_to" required="yes" datatype="string">If passed in, use this email to address.  Else determine by rules</argument>
+<argument name="uc_email_rpt_id" required="yes" datatype="string">If passed in, use this email report id.  Else determine by rules</argument>
+
+<argument name="uc_force_use_standard_ems" required="no" datatype="integer">If passed in as 1 (for testiong) we will force standard call</argument>
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20211016 saad.ahmad - 12567 - EMS Lite Functionality
+ */
+publish data
+where pol_wh_id = '----'
+|
+publish data
+where my_wh_id = nvl(nvl(@wh_id#keep, @@WH_ID),'----')
+and uc_inhibit_email = nvl(@uc_inhibit_email, '0')
+and uc_ems_publish_results = nvl(@uc_ems_publish_results, '0')
+and uc_ems_error_log_file = ''
+and uc_ems_log_file = ''
+and dlytrn_id = null
+and moca_envname = @@MOCA_ENVNAME
+and uc_ems_les_cmd_id = lower('uc_ems_ctxt_' || @evt_nam )
+and uc_mon_data_res = null
+and uc_my_log_path = @@LESDIR || '/log'
+|
+/*
+ * Not caching this so going at poldat
+ */
+[
+select rtnum1 uc_ems_overrride,
+       rtnum2 uc_allow_ems_functionality
+from poldat_view
+where polcod = 'USR-EMSLITE'
+and polvar = 'SETUP'
+and polval = 'OVERRIDE-ENABLED'
+and wh_id = @pol_wh_id
+and rownum < 2
+]
+catch (-1403,510)
+|
+if (@? = 0 and @uc_ems_overrride = 1 and @uc_force_use_standard_ems != 1 )
+{
+    publish data
+    where uc_ems_event_enabled = ossi__polval_nc ( 'EMS', 'EVENTS', @evt_nam, '', 'rtnum1', @my_wh_id )
+    |
+    if (@uc_allow_ems_functionality = 1 and @uc_ems_event_enabled  = 1 )
+    { 
+        publish data
+        where mail_from     = ossi__polval('USR-EMSLITE', 'SETUP', 'MAIL-SEND-FROM',  '', 'rtstr1', @pol_wh_id)
+        and   uc_log_dlytrn = nvl(@uc_log_dlytrn, ossi__polval('USR-EMSLITE', 'SETUP', 'LOG-DLYTRN',      '', 'rtnum1', @pol_wh_id) )
+        and   wh_id         = @my_wh_id
+        and   usr_id        = nvl(@usr_id,@@USR_ID)
+        and   devcod        = nvl(@devcod,@@DEVCOD)
+        and   locale_id     = nvl(nvl(@locale_id,@@LOCALE_ID),'US_ENGLISH')
+        |
+        /* Whatever is on our where clause we want to create an all_args variable so that we can use it as needed */
+        process ossi moca context arguments
+        where @*
+        |
+        publish data
+        where all_args = @uc_moca_args_str
+        |
+        {
+            /*
+             * Call an les_cmd that can provided additional data to context
+             */
+            execute ossi les_cmd
+            where les_cmd_id = @uc_ems_les_cmd_id
+            and uc_les_cmd_inline = 1
+            and exec_uc_les_cmd_cust_lvl = null
+            and uc_inhibit_return_extra_columns = 1
+            catch(@?) /* this is ems - dont want any error */
+            |
+            {
+                execute ossi all conditional rules
+                where uc_rule_grp_id = 'OSSI-EMSLITE'
+                and uc_rule_subgrp_id = 'GLOBAL-MAP'
+                and uc_cache_key= null
+                catch (@?) /* this is ems - dont want any error */
+                ;
+                noop
+            }
+            |
+            /*
+             * Now call the rules engines to get email body, subject, to-list etc.
+             */
+            get ossiemslite email data
+            where uc_rule_subgrp_id = 'EMAIL-BODY'
+            and uc_return_column = 'message'
+            and uc_override_value_passed_in = @uc_email_body
+            and uc_replace_variables = 1
+            |
+            get ossiemslite email data
+            where uc_rule_subgrp_id = 'EMAIL-SUBJECT'
+            and uc_return_column = 'subject'
+            and uc_override_value_passed_in = @uc_email_subject
+            and uc_replace_variables = 1
+            |
+            get ossiemslite email data
+            where uc_rule_subgrp_id = 'EMAIL-TO'
+            and uc_return_column = 'send_to'
+            and uc_override_value_passed_in = @uc_email_to
+            and uc_replace_variables = 0
+            |
+            get ossiemslite email data
+            where uc_rule_subgrp_id = 'RPT_ID'
+            and uc_return_column = 'uc_email_rpt_id'
+            and uc_override_value_passed_in = @uc_email_rpt_id
+            and uc_replace_variables = 0
+            |
+            /* This gets email body.  @* passed in so that all context to this is passed through */
+            {
+                {
+                    /*
+                     * 3 types of email messages
+                     * -- if we have a report to do, then we excute report and attach that to the message
+                     * -- if we have this special parameter as res and has rows then we will attach contents of that to the email message
+                     * -- otherwise we email
+                     */
+                    if ( @send_to is not null )
+                    {
+                        if ( @uc_email_rpt_id is not null )
+                            execute ossi report and email
+                            where rpt_id = @uc_email_rpt_id
+                        else if ( @uc_mon_data_res is not null and rowcount(@uc_mon_data_res) > 0 )
+                            send ossi app monitor email
+                            where uc_mon_mail_from = @mail_from
+                            and uc_mon_mail_subject = @subject
+                            and uc_mon_mail_message = @message
+                            and uc_mon_mail_send_to = @send_to
+                        else
+                            send ossi email
+                        |
+                        filter data
+                        where moca_filter_level = 1
+                        and uc_email_sent = 1
+                    }
+                }
+                catch (@?)
+                |
+                publish data
+                where uc_send_email_status = @status
+                and uc_email_sent = @uc_email_sent
+                and uc_ems_err_code = @?
+                and uc_ems_err_descr = @!
+                |
+                {
+                    if ( @uc_log_dlytrn = 1 )
+                    {
+                        publish data
+                        where dlytrn_id = ossi__next_number('dlytrn_id')
+                        |
+                        write ossi daily transaction aut
+                        where actcod = 'UC_EMS'
+                        and wh_id = @my_wh_id
+                        and cmnt  = "all_args=" || @all_args
+                        and var_nam = 'evt_nam'
+                        and to_value= @evt_nam
+                        and fr_value= substr(@send_to,1,200)
+                        and excp_code = substr(@uc_ems_err_code || ':' || @uc_ems_err_descr,1,200)
+                        and frinvs = nvl(@frinvs, @invsts)
+                        and frstol = nvl(@frstol, @stoloc)
+                        catch(@?) /* we dont want this process to stop */
+                        |
+                        publish data
+                        where dlytrn_id = @dlytrn_id
+                    }
+                    |
+                    if (@uc_ems_err_code != 0)
+                    {
+                        {
+                            [[
+                            uc_actual_nl_str = System.getProperty("line.separator")
+                            ]]
+                            |
+                            publish data
+                            where uc_ems_err_file_time = to_char(sysdate,'YYYY-MM-DD' )
+                            and err_prefix = to_char(sysdate,'YYYY-MM-DD HH24:MI:SS' ) || ':' || @evt_nam || ':'
+                            |
+                            publish data
+                            where uc_err_filnam = 'usr_ems_error_' || @uc_ems_err_file_time || '.log'
+                            |
+                            write output file
+                            where filnam = 'usr_ems_error_' || @uc_ems_err_file_time || '.log'
+                            and path = @uc_my_log_path
+                            and newline = 'Y'
+                            and mode = 'a'
+                            and data = @err_prefix || 'EMS ALERT FAILED TO SEND EMAIL' || @uc_actual_nl_str
+                                    || @err_prefix || 'dlytrn_id was:' || @dlytrn_id || @uc_actual_nl_str
+                                    || @err_prefix || 'Error was:'     || @uc_ems_err_code || ': ' || @uc_ems_err_descr || @uc_actual_nl_str
+                                    || @err_prefix || 'Email subject:' || @subject || @uc_actual_nl_str
+                                    || @err_prefix || 'Email To:'      || @send_to || @uc_actual_nl_str
+                                    || @err_prefix || 'Email body:'    || @message || @uc_actual_nl_str
+                            |
+                            publish data
+                            where uc_ems_error_log_file = @uc_my_log_path || '/' || @uc_err_filnam
+                        }
+                        catch(@?) /* it is ems logic - dont want this itself to raise issue */
+                    }
+                    |
+                    if ( @uc_ems_publish_results = '1' )
+                    {
+                        publish data
+                        where evt_nam = @evt_nam
+                        and wh_id = @my_wh_id
+                        and usr_id = @usr_id
+                        and devcod = @devcod
+                        and uc_ems_les_cmd_id = @uc_ems_les_cmd_id
+                        and uc_log_dlytrn = @uc_log_dlytrn
+                        and dlytrn_id = @dlytrn_id
+                        and uc_email_subject = @subject
+                        and uc_email_send_to = @send_to
+                        and uc_email_message = @message
+                        and uc_send_email_status = @uc_send_email_status
+                        and uc_email_sent = @uc_email_sent
+                        /**/
+                        and uc_ems_all_args = @all_args
+                        and uc_mon_data_res = @uc_mon_data_res
+                        and uc_ems_err_code = @uc_ems_err_code
+                        and uc_ems_err_descr = @uc_ems_err_descr
+                        and uc_ems_error_log_file = @uc_ems_error_log_file
+                        /**/
+                        and uc_email_rpt_id = @uc_email_rpt_id
+                        and uc_full_filename = @uc_full_filename
+                        /**/
+                        /*Raw values */
+                        and uc_email_subject_raw = @subject_raw
+                        and uc_email_subject_int = @subject_int
+                        and uc_email_message_raw = @message_raw
+                        and uc_email_message_int = @message_int
+                        /**/
+                        and uc_inhibit_email = @uc_inhibit_email
+                        and uc_email_hostname = @hostname
+                        and uc_email_port = @port
+                        and uc_email_enableTLS = @enableTLS
+                        and uc_email_user = @user
+                    }
+                }
+            } /* scope of output of send email */
+        } /* have subject, body etc */
+    }
+    else 
+    {
+        noop
+    }
+}
+else 
+{
+    ^log ems event
+    where evt_nam = @evt_nam
+    and key_val = @stoloc
+    and src_sys = @src_sys
+    and usr_id = nvl(@usr_id, @@usr_id)
+    and wh_id = @my_wh_id
+    and @*
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+This is an override of core EMS component to bypass it and instead simply email.  It respects the policies listed below and as a result can do following:
+- bypass ems completely
+- log dlytrn as well
+- use a specific email address to send emails
+
+if we are in the override then it works as follows:
+- Get the args passed to this command.  They are available as ^all_args^ for an email message
+- Execute LES Command uc_ems_ctxt_[evt nam].  Ignore any errors.  Idea is that it can publish some extra stuff
+  for an email message or subject.  Also can publish special variable uc_mon_data_res with >0 rows so that it could be included
+  as email attachment.
+- Execute conditional rules OSSI-EMSLITE / GLOBAL-MAP
+- Using rules of rule group OSSI-EMSLITE, determine 
+  - message via subgroup EMAIL-BODY
+  - subject via subgroup EMAIL-SUBJECT
+  - to address via subgroup EMAIL-TO
+  - report id via subgroup RPT_ID
+  All these can be overridden by passing in values 
+- Then do the email.  if report is needed then report is generated and emailed
+- If needed log a dlytrn in autonomus transaction
+- If we have email failure create a log file
+- return data if needed
+
+The distributed data provides following samples for testing:
+- evt_nam = TESTRPTEMS will send a report called Std-AllEmployees
+- evt_nam = TESTEMSCMD will utilize an les_cmd that also publishes variable uc_mon_data_res.  So we will get email with resultset
+- evt_nam = TESTEMSACT will execute an action to set a session variable and then EMAIL-TO rule will end up ignoring email due to this
+- evt_nam = NORMALTEST will end up sending a normal email
+
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+
+
+
+<retrows>1 or 0. 1 only if input said we publish</retrows>
+<retcol name="evt_nam" type="string"></retcol>
+<retcol name="wh_id" type="string"></retcol>
+<retcol name="usr_id" type="string"></retcol>
+<retcol name="uc_log_dlytrn" type="Integer">1 means we logged a dlytrn</retcol>
+<retcol name="dlytrn_id" type="string">daily transaction id of ems</retcol>
+
+<retcol name="uc_ems_les_cmd_id" type="string">Execute this les_cmd to enrich the context</retcol>
+
+
+
+<retcol name="uc_email_subject" type="string"></retcol>
+<retcol name="uc_email_send_to" type="string"></retcol>
+<retcol name="uc_email_message" type="string"></retcol>
+<retcol name="uc_send_email_status" type="string">returned from send email</retcol>
+<retcol name="uc_email_sent" type="integer">1 means email was sent</retcol>
+
+
+<retcol name="uc_ems_all_args" type="string">All passed on where clause changed to a string for emailing</retcol>
+<retcol name="uc_ems_err_code" type="integer">Error code for email</retcol>
+<retcol name="uc_ems_err_descr" type="string">Error description for email</retcol>
+<retcol name="uc_ems_error_log_file" type="string">Only if attempt to email failed</retcol>
+<retcol name="uc_mon_data_res" type="results">May be published</retcol>
+
+
+
+<retcol name="uc_email_rpt_id" type="string">If we have associated repot</retcol>
+<retcol name="uc_full_filename" type="string">Report file we created</retcol>
+
+<retcol name="uc_email_subject_raw" type="string"></retcol>
+<retcol name="uc_email_subject_int" type="string"></retcol>
+<retcol name="uc_email_message_raw" type="string"></retcol>
+<retcol name="uc_email_message_int" type="string"></retcol>
+<retcol name="uc_email_message" type="string"></retcol>
+
+
+<retcol name="uc_inhibit_email" type="string">Per input</retcol>
+
+<retcol name="uc_email_hostname" type="string">Per policy</retcol>
+<retcol name="uc_email_port" type="string">Per policy</retcol>
+<retcol name="uc_email_enableTLS" type="string">Per policy</retcol>
+<retcol name="uc_email_user" type="string">Per policy</retcol>
+
+<policy
+    polcod="USR-EMSLITE"
+    polvar="SETUP"
+    polval="OVERRIDE-ENABLED"
+    rtnum1="1 means override is enabled.  if 0 then go to standard"
+    rtnum2="1 means we do the EMS work.  0 means we dont.  Comes into play only when rtnum1=1"
+></policy>
+
+
+<policy
+    polcod="USR-EMSLITE"
+    polvar="SETUP"
+    polval="MAIL-SEND-FROM"
+    rtstr1="email address to be used as from email"
+></policy>
+
+<policy
+    polcod="USR-EMSLITE"
+    polvar="SETUP"
+    polval="LOG-DLYTRN"
+    rtnum1="1 means we log dlytrn"
+></policy>
+
+<seealso cref="get ossiemslite email data"></seealso>
+<seealso cref="process ossi moca context arguments"></seealso>
+<seealso cref="execute ossi report and email"></seealso>
+<seealso cref="send ossi app monitor email"></seealso>
+<seealso cref="send ossi email"></seealso>
+
+<example>
+/* This will run normally and send email */
+log ems event where evt_nam = 'NORMALTEST' and uc_ems_publish_results = '1' and wh_id=  'WMD1'
+;
+/* This will send an email attachment of a report */
+log ems event where evt_nam = 'TESTRPTEMS' and uc_ems_publish_results = '1' and wh_id=  'WMD1'
+;
+/* This will test that we executed LES Command and also that the email message included attachment of resultset */
+log ems event where evt_nam = 'TESTEMSCMD' and uc_ems_publish_results = '1' and wh_id=  'WMD1'
+;
+/* This will test that we executed actions.  And as a result the to address is null and no email */
+log ems event where evt_nam = 'TESTEMSACT' and uc_ems_publish_results = '1' and wh_id=  'WMD1'
+;
+/* Change policy USR-OSSI-SYSTEM-SETTINGS / MAIL-PORT-EXPR to point to bad port then run it. Make sure 
+ * 1. email fails 
+ * 2. log file created (we run twice so it should append to log file)
+ * 3. dlytrn is still logged
+ * 4. A file is created in $LESDIR/log with error information
+ */
+log ems event where evt_nam = 'NORMALTEST' and uc_ems_publish_results = '1' and wh_id=  'WMD1'
+;
+log ems event where evt_nam = 'NORMALTEST' and uc_ems_publish_results = '1' and wh_id=  'WMD1'
+
+</example>
+
+</documentation>
+
+</command>

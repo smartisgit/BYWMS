@@ -1,0 +1,42 @@
+<command>
+<name>write ossi aut daily transaction</name>
+<description>Logs a daily transaction entry and commit</description>
+<type>Local Syntax</type>
+<transaction>new</transaction>
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+try
+{
+   write daily transaction
+}
+finally
+{
+   if ( @comflg = 0 )
+      rollback
+   else
+      commit
+}
+
+]]>
+</local-syntax>
+
+<argument name="@*" required="no" datatype="string">Whatever write daily transaction returns</argument>
+
+<documentation>
+<remarks>
+<![CDATA[
+    <p>
+   Used when we want to log daily transaction that should write data for failures as well
+    </p>
+]]>
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

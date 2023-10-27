@@ -1,0 +1,109 @@
+<command>
+<name>get ossi table data with alias for key</name>
+<description>For a given table, look up for the primary key (or passerd in key) and select the rows.  Each column will
+have a certain prefix.  This will be useful in pre triggers to select existing data with old_ prefix</description>
+
+<argument datatype="string" name="table_name">Table</argument>
+<argument datatype="string" name="uc_key_where_clause">We can pass in an explicit where clause.  If not then PK is used from context</argument>
+<argument datatype="string" name="uc_column_prefix">if passed in, this the column prefix we should use</argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+{
+    if ( @uc_key_where_clause is null )
+        get ossi clause for primary key from stack 
+        where table_name = @table_name
+    else
+        publish data
+        where uc_where_clause = @uc_key_where_clause
+    |
+    publish data
+    where uc_sel_col_list = ossi__table_columns_as_list ( @table_name, '0', @table_name, @uc_column_prefix )
+    |
+    {
+        [
+        select @uc_sel_col_list:raw
+        from @table_name:raw
+        where @uc_where_clause:raw
+        ]
+        catch (-1403,510)
+    }
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+
+This command can be used in crud commands to easily get the current row and push to the stack.  We dont have to list the columns as it will 
+list all the columns and alias all of them.  In change commands this can be used as
+
+get ossi table data with alias for key
+where table_name = 'ord'
+&gt;&gt; uc_res_old
+|
+change order
+&gt;&gt; uc_this_res
+|
+combine ossi columns from multiple results
+where uc_cmb_res_cnt = 2
+and uc_cmb_res1 = @res1
+and uc_cmb_res2 = @res2
+
+Performance Concern
+====================
+A test with running this 100,000 times as follows.  the work is "publish data" in this case so there is little overhead.  In that case
+over 100,000 runs we have a 3 second penalty which is fairly negligible.
+
+
+do loop where count = 100000
+|
+{
+publish data where a=1&gt;&gt; res1
+|
+publish data where b=2&gt;&gt;res2
+|
+combine ossi columns from multiple results
+where uc_cmb_res_cnt = 2
+and uc_cmb_res1 = @res1
+and uc_cmb_res2 = @res2
+}
+;
+noop
+
+ran in 7.06 seconds and by running equivalent code:
+
+equivalent code below
+
+do loop where count = 100000
+|
+{
+publish data where a=1
+|
+publish data where b=2
+|
+filter data where moca_filter_level = 1 and a=@a
+}
+;
+noop
+
+ran in 4.91 seoconds.  
+
+</remarks>
+
+<retrows>n depending on the where clause</retrows>
+<retcol name="@*" type="String">All columns are returned with a prefix</retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+
+
+<seealso cref="ossi table_columns_as_list"></seealso>
+<seealso cref="combine ossi columns from multiple results"></seealso>
+<seealso cref="change order"></seealso>
+<seealso cref="change order line"></seealso>
+</documentation>
+
+</command>

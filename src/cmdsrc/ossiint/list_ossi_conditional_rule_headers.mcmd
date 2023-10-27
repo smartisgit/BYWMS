@@ -1,0 +1,41 @@
+<command>
+<name>list ossi conditional rule headers</name>
+<description>this command will list rule headers only</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+/*
+ * Change Log
+ * Initial Check In
+ * 20200512 - Haseeb.Ahmed- 11118 - Create a new web screen to maintain rules engine where we have condition and action
+ */
+parse ossi policy logic 
+|
+[select distinct uc_rule_id as polval 
+   from usr_rule_engine_cond_expr 
+  where uc_rule_grp_id = nvl(@uc_rule_grp_id, @polcod) 
+    and uc_rule_subgrp_id = nvl(@uc_rule_subgrp_id, @polvar) 
+    and @+uc_rule_id 
+    and @+rtnum1 
+  order by 1 
+] 
+]]>
+</local-syntax>
+<documentation>
+<remarks>
+This command can be used to get all conditional rule headers as polval
+</remarks>
+
+<argument name="uc_policy_logic" required="yes" datatype="string">Policy Logic</argument>
+<argument name="polcod" required="no" datatype="string">Policy Code</argument>
+<argument name="polvar" required="no" datatype="string">Policy Variable</argument>
+<argument name="rtnum1" required="no" datatype="integer">An integer value for policy.</argument>
+
+<retcol name="polval" type="String">Policy Value</retcol>
+
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

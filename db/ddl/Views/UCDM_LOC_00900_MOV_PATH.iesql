@@ -1,0 +1,47 @@
+#use $DCSDIR/include
+
+#include <dcsddl.h>
+
+#include <dcscolwid.h>
+
+#include <dcstbldef.h>
+
+#include <sqlDataTypes.h>
+
+
+#use $SALDIR/include
+
+#include <salcolwid.h>
+
+mset command on
+
+[
+DROP_VIEW(UCDM_LOC_00900_MOV_PATH)
+] catch (ERR_CANNOT_DROP_TABLE_NOT_FOUND)
+RUN_DDL
+
+mset command off
+
+CREATE_VIEW(UCDM_LOC_00900_MOV_PATH)
+select mov_path.*, 
+        mz_src.mov_zone_cod mov_zone_src,
+		mz_src.wh_id mov_zone_src_wh_id,	
+        mz_dst.mov_zone_cod mov_zone_dst, 
+		mz_dst.wh_id mov_zone_dst_wh_id,	
+        d.lngdsc mov_path_name
+   from mov_path 
+   left join dscmst 
+     on dscmst.colnam = 'lodlvl' 
+    and dscmst.colval = mov_path.lodlvl 
+    and dscmst.locale_id = nvl(NULL, 'US_ENGLISH') 
+   left join dscmst d
+     on d.colnam = 'dst_mov_zone_id|lodlvl|src_mov_zone_id' 
+    and d.colval = cast(mov_path.dst_mov_zone_id as VARCHAR(20)) || '|'|| mov_path.lodlvl || '|'|| cast(mov_path.src_mov_zone_id as VARCHAR(20)) 
+    and d.locale_id = nvl(NULL, 'US_ENGLISH') 
+   left join mov_zone mz_src
+     on mz_src.mov_zone_id = mov_path.src_mov_zone_id 
+   left join mov_zone mz_dst
+     on mz_dst.mov_zone_id = mov_path.dst_mov_zone_id
+RUN_DDL
+
+mset command on

@@ -1,0 +1,149 @@
+<command>
+<name>publish ossi fields from rules engine</name>
+<description>Set the fields on order that are calculated</description>
+
+<argument name="wh_id" required="yes" datatype="string"></argument>
+<argument name="client_id" required="yes" datatype="string"></argument>
+<argument name="ordnum" required="yes" datatype="string"></argument>
+<argument name="uc_set_default_mode" required="yes" datatype="string">
+We base on policy in USR-DEFAULT.  polvar is SET-ORD, SET-ORD_LINE for when order is created
+PLAN-ORD, PLAN-ORD_LINE when order is planned to shipment.  So this is passed in as SET or PLAN.  
+Default is SET
+</argument>
+<argument name="uc_table_name" required="yes" datatype="string"></argument>
+<argument name="uc_publish_data_cmd" required="yes" datatype="string"></argument>
+
+<argument name="uc_rule_grp_id" required="yes" datatype="string"></argument>
+
+<argument name="uc_ignore_field_errors" required="yes" datatype="integer">If we pass in 1 here then it means that we want to ignore error.</argument>
+<argument name="uc_publish_error_fields_with_error_info" required="yes" datatype="integer">If 1 here as well, then the published field will have error info</argument>
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+
+publish data
+where uc_rule_grp_id = nvl(@uc_rule_grp_id, 'USR-DEFAULT')
+and uc_ignore_field_errors= nvl(@uc_ignore_field_errors, 0)
+and uc_publish_error_fields_with_error_info = nvl(@uc_publish_error_fields_with_error_info, 0)
+|
+if ( @uc_ignore_field_errors = 1 and @uc_publish_error_fields_with_error_info = 1)
+    publish data
+    where uc_catch_suffix = " catch(@?)"
+                         || " |"
+                         || " if ( @? = 0 ) "
+                         || "     filter data where moca_filter_level = 1 "
+                         || " else"
+                         || "     publish data where uc_valid_value_to_use = '1' and r_polval = 'ERROR-' || @? || '-' || @!"
+else if ( @uc_ignore_field_errors = 1 )
+    publish data
+    where uc_catch_suffix = " catch(@?)"
+else
+    publish data
+    where uc_catch_suffix = ""
+|
+if ( @uc_publish_data_cmd is not null )
+   execute server command
+   where cmd = @uc_publish_data_cmd
+   and inline = 1
+   catch (-1403,510)
+|
+{
+   publish data
+   where polcod = @uc_rule_grp_id
+   |
+   execute ossi moca and cache
+   where uc_cache_grp = 'OSSI__RULE_ENGINE'
+   and uc_moca_cmd = "[select distinct uc_rule_subgrp_id polvar, "
+                  || " replace(uc_rule_subgrp_id, '" || @uc_set_default_mode || "-" || upper(@uc_table_name) || "-','') uc_col "
+                  || " from usr_rule_engine_expr"
+                  || " where uc_rule_grp_id = @polcod"
+                  || " and uc_rule_subgrp_id like '" || @uc_set_default_mode || "-" || upper(@uc_table_name) || "-%'"
+                  || " and ena_flg = 1]"
+   and uc_inline = 1
+   and uc_force_ossi_cache1 = '1'  
+   and uc_cache_key = upper(@uc_table_name) || '_FIELDS_TO_PRESET-' || @uc_set_default_mode
+   catch (-1403,510)
+   >> res
+   |
+   {
+      [[
+      StringBuffer publish_data_cmd;
+      //
+      publish_data_cmd = new StringBuffer( " publish data where uc_never_have_this_as_field_name = 0 " );
+      //
+      while ( res.next() )
+      {
+         my_polvar = res.getString("polvar");
+         my_col= res.getString("uc_col" );
+         //
+         res_eval = moca.executeInline ( " get ossi result by evaluating policy" +
+                                         " where polcod = @polcod" +
+                                         " and polvar = @my_polvar" + uc_catch_suffix,
+                                         [polcod:polcod,my_polvar:my_polvar] );
+         if ( res_eval.next() )
+         {
+            try
+            {
+               //properly escape quotes
+               my_value      = (res_eval.getString ( "r_polval" ).replaceAll("'", "''")).replaceAll('"', '""');
+               my_value_use  = res_eval.getString ( "uc_valid_value_to_use" );
+            }
+            catch ( Exception ee )
+            {
+               my_value = null;
+               my_value_use = "0";
+            }
+            if ( my_value_use == "1" )
+            {
+               publish_data_cmd.append ( " and " + my_col + " = '" + my_value + "'" );
+            }
+         } // valid value 
+      } // res.next
+      res_final = moca.executeInline (  publish_data_cmd.toString() );
+      [res_final:res_final]
+      ]]
+      |
+      publish data combination
+      where res = @res_final
+   }
+}
+   
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+The references here that say polcod, polvar is because at one point we did not have a table to store these
+This component will execute the rules engine and publish out the data that we need to then pass on.  Handy for pre-triggers
+to default data
+</p>
+]]>
+</remarks>
+
+<retrows>1 or 0</retrows>
+
+<retcol name="@*" type="COMTYP_CHAR">Variable based on the rules matrix</retcol>
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+
+<seealso cref="list ossi order line data for field calculation"></seealso>
+<seealso cref="list ossi order data for field calculation"></seealso>
+<seealso cref="set ossi order calculated fields"></seealso>
+
+
+
+</documentation>
+
+
+</command>

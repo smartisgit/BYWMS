@@ -1,0 +1,43 @@
+<command>
+<name>ossi res_column_index</name>
+<description>Get resultset index column</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+publish data
+  where res = @moca_farg1
+    and column = @moca_farg2
+|
+if (@column)
+ [[
+  int index = -1;
+  if (res.containsColumn(column))
+  {
+    index = res.getColumnNumber(column);
+  }
+  [index:index]
+ ]]
+else
+  publish data where index=-1
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<remarks>
+This command may be used to get resultset index column record.
+</remarks>
+
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

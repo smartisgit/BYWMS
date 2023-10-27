@@ -1,0 +1,110 @@
+<command>
+<name>fix ossi sql_crsr_col for alg rm</name>
+<description>If it is an algorithm based retrieve method we cannot use bind variables in it</description>
+<type>Local Syntax</type>
+
+<argument name="trg_sys_id" datatype="string"></argument>
+<argument name="trg_ifd_id" datatype="string"></argument>
+<argument name="trg_ifd_ver" datatype="string"></argument>
+
+<argument name="debug_mode" datatype="string">If 1 then only show what will be changed.  Default is 1</argument>
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+publish data
+where var_char_absent_ind_char = 'absent_ind_char'
+and var_num_absent_ind_char = 'num_absent_ind_char'
+and var_dt_absent_ind_char = 'dt_absent_ind_char'
+/**/
+and debug_mode = nvl(@debug_mode, '1' )
+|
+if ( @trg_sys_id is null and @trg_ifd_id is null )
+   set return status
+   where status = '507'
+   and message = 'One of trg_sys_id and trg_ifd_id|trg_ifd_ver must be passed'
+|
+{
+   [
+   select seg.* , rmi.retr_mthd_impl_genid, rmi.alg_id rmi_alg_id
+   from sl_eo_seg seg 
+        join sl_retr_mthd_def rm on rm.retr_mthd_id = seg.retr_mthd_id
+        join sl_retr_mthd_impl_def rmi 
+           on rmi.retr_mthd_id = rm.retr_mthd_id 
+           and rmi.retr_mthd_impl_cd = 'ALG' 
+           and @+rmi.sys_id^trg_sys_id
+           and @+rmi.ifd_id^trg_ifd_id
+           and @+rmi.ifd_ver^trg_ifd_ver
+   where 1=1
+   ]
+   catch (-1403,510)
+   |
+   if ( @? = 0 )
+   {
+      [
+      select col.*, fld.data_typ_cd
+      from sl_eo_col col
+           join sl_eo_fld fld 
+              on fld.eo_id = col.eo_id
+              and fld.eo_ver = col.eo_ver
+              and fld.eo_seg_id = col.eo_seg_id
+              and fld.eo_fld_id = col.eo_fld_id
+      where col.eo_id = @eo_id
+      and col.eo_ver = @eo_ver
+      and col.eo_seg_id = @eo_seg_id
+      and col.retr_mthd_impl_genid = @retr_mthd_impl_genid
+      and col.sql_crsr_col like '%:%'
+      ]
+      catch (-1403,510)
+      |
+      if ( @? = 0 )
+      {
+         publish data 
+         where @+eo_id and @+eo_ver and @+eo_seg_id and @+eo_fld_id and @+retr_mthd_id and @+retr_mthd_impl_genid
+         and   old_sql_crsr_col = @sql_crsr_col
+         and   new_sql_crsr_col = decode ( @data_typ_cd, 'D', @var_dt_absent_ind_char, 'N', @var_num_absent_ind_char, @var_char_absent_ind_char )
+         |
+         if ( @debug_mode = '1' )
+            filter data
+            where moca_filter_level = 1
+         else
+            sl_change eo_col
+            where eo_id = @eo_id
+            and eo_ver = @eo_ver
+            and eo_seg_id = @eo_seg_id
+            and eo_fld_id = @eo_fld_id
+            and sql_component_seq = @sql_component_seq
+            and retr_mthd_id = @retr_mthd_id
+            and retr_mthd_impl_genid = @retr_mthd_impl_genid
+            and sql_crsr_col = @new_sql_crsr_col
+      }
+   }
+}
+;
+noop
+
+]]>
+</local-syntax>
+<documentation>
+<private>
+</private>
+<remarks>
+<![CDATA[
+<p>
+This component is used to check missing eo columns.
+</p>
+]]>
+</remarks>
+<retcol name="none" type="COMTYP_STRING">Nothing is returned</retcol>
+
+<seealso cref="sl_check seq">
+</seealso>
+
+<exception value="eOK">Normal successful completion</exception>
+</documentation>
+</command>

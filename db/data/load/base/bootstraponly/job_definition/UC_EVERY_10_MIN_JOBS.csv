@@ -1,0 +1,2 @@
+job_id,role_id,name,enabled,type,command,log_file,trace_level,overlap,schedule,start_delay,timer,grp_nam
+UC_EVERY_10_MIN_JOBS,,Jobs that should run every 10 minutes,0,timer,"execute ossi jobs using job manager where uc_exec_job_grp = 'EVERY-10-MINUTES'",$LESDIR/log/JOB-UC_EVERY_10_MIN_JOBS.log,,0,,0,600,GK

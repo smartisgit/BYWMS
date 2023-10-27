@@ -1,0 +1,35 @@
+<command>
+<name>ossi_unload i_ifd_evt_map</name>
+<description>Unload i_idf_evt_map</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ */
+{ 
+  sl_unload gen_maint 
+    where table_name = 'sl_i_ifd_action_id' 
+      and ifd_id = @ifd_id 
+      and ifd_ver = @ifd_ver 
+  ; 
+  sl_unload gen_maint 
+    where table_name = 'sl_i_ifd_evt_map' 
+      and ifd_id = @ifd_id 
+      and ifd_ver = @ifd_ver 
+} 
+ 
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This command is used to unload ifd
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

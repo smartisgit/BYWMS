@@ -1,0 +1,28 @@
+#use $DCSDIR/include
+#include <dcsddl.h>
+#include <dcscolwid.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+#use $SALDIR/include
+
+#include <salcolwid.h>
+
+mset command on
+
+[drop view usr_rcvtrk_full_view] catch(@?)
+;
+publish data
+where uc_rcvtrk_cols = ossi__table_columns_as_list ( 'rcvtrk', 1, 'rcvtrk', '' )
+and uc_trlr_cols = ossi__table_columns_as_list ( 'trlr', 1, 'trlr', 'uc_trlr_' )
+|
+[
+create view usr_rcvtrk_full_view
+as
+select @uc_rcvtrk_cols:raw,
+       @uc_trlr_cols:raw
+from rcvtrk
+     left outer join trlr on trlr.trlr_id = rcvtrk.trlr_id
+]
+RUN_DDL
+
+mset command on

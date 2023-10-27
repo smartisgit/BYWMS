@@ -1,0 +1,326 @@
+<command>
+<name>calculate ossi carton weight</name>
+<description>calculate usr carton weight.</description>
+<type>Local Syntax</type>
+<argument name="wrkref" datatype="string">Work Ref</argument>
+<argument name="isparcelflg" datatype="integer">Is Parcel Flag</argument>
+<argument name="wh_id" datatype="string">Warehouse Id</argument>
+
+<argument name="uc_filter_ctnnum" datatype="string">If passed in then we are filtering for that carton</argument>
+<argument name="uc_recursive_call" datatype="string">1 if we are called recursively</argument>
+<argument name="uc_recursive_ctnwgt" datatype="string">When called for a K pick recursively, this is passed in as well</argument>
+
+<argument name="uc_donot_process_child_k" datatype="string">need while doing recursive processing.  if 1 we do not process child k</argument>
+
+<argument name="uc_force_legacy_logic" datatype="string">Test legacy call</argument>
+
+<local-syntax>
+<![CDATA[
+
+/*
+ * Revision Log
+ * 2021-11-30 saad.ahmad 12613 - Active
+ */
+publish data
+where wh_id = nvl(@wh_id, @@WH_ID )
+and uc_recursive_call= nvl(@uc_recursive_call,1 )
+and uc_recursive_ctnwgt= nvl(@uc_recursive_ctnwgt, 0)
+and uc_cnt_child_k_picks = 0
+and uc_donot_process_child_k = nvl(@uc_donot_process_child_k, 0 )
+|
+{
+    /*
+     * When called from outside, we are always called by wrkref.  But when this is called recursively we call by 
+     * uc_filter_ctnnum (to sum data for direct chuld picks within K)
+     * or by wrkref again (for child K pick)
+     * If we are called by uc_filter_ctnnum we hide the wrkref
+     */
+    if ( @uc_filter_ctnnum is null ) hide stack variable where name = 'uc_filter_ctnnum'
+    |
+    if ( @uc_filter_ctnnum is not null ) hide stack variable where name = 'wrkref'
+    |
+    /*
+     * When we have wrkef passed in, get some key data for that  For example if we were called for outter K pick know that
+     * Or we may be called for the L or S pick (not K) get some key data
+     */
+    if ( @wrkref is not null )
+        [
+        select pckwrk_hdr.wh_id,
+               pckwrk_hdr.lodlvl,
+               pckwrk_hdr.wrktyp,
+               pckwrk_dtl.subnum,
+               pckwrk_hdr.ctncod,
+               ctnmst.ctnwgt
+        from pckwrk_hdr
+             join pckwrk_dtl on pckwrk_dtl.wrkref = pckwrk_hdr.wrkref
+             left outer join ctnmst on ctnmst.wh_id = pckwrk_hdr.wh_id and ctnmst.ctncod = pckwrk_hdr.ctncod
+        where pckwrk_hdr.wrkref = @wrkref
+        and rownum < 2
+        ]
+    /*
+     * If we are called by ctnnum (Recursive call), then see if we have any child K picks within the outer K pick
+     * See code below - we can call this recursivly by passing in uc_donot_process_child_k =1 to not go here
+     * that is because when we are calling for a K recursively we first want to get direct child picks and then process the K
+     */
+    else if ( @uc_donot_process_child_k = 0 )
+        [
+        select count(*) uc_cnt_child_k_picks
+        from pckwrk_view
+        where wrktyp in ( 'P', 'B')
+        and prtnum = 'KITPART'
+        and ctnnum = @uc_filter_ctnnum
+        ]
+    |
+    /*
+     * Following code is called when we have some child K picks within a parent K pick
+     */
+    if ( @uc_cnt_child_k_picks > 0 )
+    {
+        /*
+         * This code snippet is calculating the weight of a K pick that has some child K picks as well
+         * This has following steps.
+         * Note that result from this section of code is never expected to be final result set retruned to caller
+         * this is because we came here AFTER a recursive call was made from K pick code path (next else if condition)
+         *
+         * 1. First call recursively but say that we explicitly ignore the child K.  So this section is not going 
+         *    to be entered then.  This ends up as initial values of the variables.  Here we call by ctnnum
+         * 2. Then we find all child K picks
+         * 2.1. And for each child K pick wrkref we call recursively BY WRKREF.  
+         *      In RP we can have only one level of K below K but logic is general
+         * 2.2  We add to the values which were determiend above
+         */
+        [[
+        Integer uc_pck_pckqty = 0;
+        Integer uc_pck_cnt_pckwrk = 0;
+        Double uc_use_pck_grswgt = 0;
+        Double uc_use_pck_netwgt = 0;
+        Double uc_pck_grswgt_by_ea = 0;
+        Double uc_pck_netwgt_by_ea =0;
+        Double uc_pck_grswgt_by_ca = 0;
+        Double uc_use_pck_tarwgt = 0;
+        //
+        // We first call for straight picks here and those become initial values
+        //
+        res = moca.executeCommand ( " calculate ossi carton weight " +
+                                    " where uc_recursive_call = 1" +
+                                    " and wh_id = @wh_id" +
+                                    " and uc_filter_ctnnum = @uc_filter_ctnnum" +
+                                    " and uc_donot_process_child_k = 1" +
+                                    " and uc_recursive_ctnwgt = @uc_recursive_ctnwgt",
+                                    [
+                                    wh_id:wh_id,
+                                    uc_filter_ctnnum:uc_filter_ctnnum,
+                                    uc_recursive_ctnwgt:uc_recursive_ctnwgt
+                                    ]
+                                  );
+        if ( res.next() )
+        {
+            uc_pck_pckqty        = res.getInt ( "uc_pck_pckqty" );
+            uc_pck_cnt_pckwrk    = res.getInt ( "uc_pck_cnt_pckwrk" );
+            uc_use_pck_grswgt    = res.getDouble ( "uc_use_pck_grswgt" );
+            uc_use_pck_netwgt    = res.getDouble ( "uc_use_pck_netwgt" );
+            uc_pck_grswgt_by_ea  = res.getDouble ( "uc_pck_grswgt_by_ea" );
+            uc_pck_netwgt_by_ea  = res.getDouble ( "uc_pck_netwgt_by_ea" );
+            uc_pck_grswgt_by_ca  = res.getDouble ( "uc_pck_grswgt_by_ca" );
+            uc_use_pck_tarwgt    = res.getDouble ( "uc_use_pck_tarwgt" );
+        }
+        //
+        // Now we are getting any child K picks and we will call for those.  And add these to the values
+        // determined above
+        //
+        res = moca.executeInline  ( "[select distinct pckwrk_dtl_ck.wrkref" +
+                                    " from pckwrk_hdr" +
+                                    " join pckwrk_dtl on pckwrk_dtl.wrkref = pckwrk_hdr.wrkref" +
+                                    " join pckwrk_dtl pckwrk_dtl_ck on pckwrk_dtl_ck.subnum = pckwrk_dtl.subnum and pckwrk_dtl_ck.wrktyp = 'K'" +
+                                    " where pckwrk_hdr.wrktyp in ( 'P', 'B')" +
+                                    " and pckwrk_hdr.prtnum = 'KITPART'" +
+                                    " and pckwrk_hdr.ctnnum = @uc_filter_ctnnum" +
+                                    " order by 1" +
+                                    " ] catch (-1403,510)" );
+        while ( res.next() )
+        {
+            //
+            // This is a recursive call for the specific K pick by the wrkref of the child K pick
+            //
+            res_w = moca.executeCommand ( " calculate ossi carton weight " +
+                                          " where uc_recursive_call = 1" +
+                                          " and uc_donot_process_child_k = 0" +
+                                          " and uc_filter_ctnnum = null" +
+                                          " and wh_id = @wh_id" +
+                                          " and wrkref = @wrkref" +
+                                          " and uc_recursive_ctnwgt = @ctnwgt",
+                                          [
+                                          wrkref:res.getString("wrkref"), 
+                                          ctnwgt:uc_recursive_ctnwgt
+                                          ] 
+                                        );
+            if ( res_w.next() )
+            {
+                uc_pck_pckqty     += res_w.getInt ( "uc_pck_pckqty" );
+                uc_pck_cnt_pckwrk += res_w.getInt ( "uc_pck_cnt_pckwrk" );
+                uc_use_pck_grswgt += res_w.getDouble ( "uc_use_pck_grswgt" );
+                uc_use_pck_netwgt += res_w.getDouble ( "uc_use_pck_netwgt" );
+                uc_pck_grswgt_by_ea += res_w.getDouble ( "uc_pck_grswgt_by_ea" );
+                uc_pck_netwgt_by_ea += res_w.getDouble ( "uc_pck_netwgt_by_ea" );
+                uc_pck_grswgt_by_ca += res_w.getDouble ( "uc_pck_grswgt_by_ca" );
+                uc_use_pck_tarwgt   += res_w.getDouble ( "uc_use_pck_tarwgt" );
+            }
+        }
+        [
+        uc_pck_pckqty:uc_pck_pckqty,
+        uc_pck_cnt_pckwrk:uc_pck_cnt_pckwrk,
+        uc_use_pck_grswgt:uc_use_pck_grswgt,
+        uc_use_pck_netwgt:uc_use_pck_netwgt,
+        uc_pck_grswgt_by_ea:uc_pck_grswgt_by_ea,
+        uc_pck_netwgt_by_ea:uc_pck_netwgt_by_ea,
+        uc_pck_grswgt_by_ca:uc_pck_grswgt_by_ca,
+        uc_use_pck_tarwgt:uc_use_pck_tarwgt,
+        uc_recursive_ctnwgt:uc_recursive_ctnwgt,
+        uc_cnt_child_k_picks:uc_cnt_child_k_picks
+        ]
+        ]]
+    }
+    /*
+     * This code is entered eithe directly (for header wrkref of K) or by recursive call
+     * for a child K.  In any case we then call recursively for the ctnnum.
+     * So code section above would apply or one below for final detail picks
+     */
+    else if ( @wrktyp = 'K' )
+    {
+        calculate ossi carton weight
+        where uc_recursive_call = 1
+        and wh_id = @wh_id
+        and uc_filter_ctnnum = @subnum
+        and uc_recursive_ctnwgt = @ctnwgt
+        and wrktyp = null
+        and uc_cnt_child_k_picks = null
+        |
+        /* Save off the total tare weight from all child K pick records */
+        filter data
+        where moca_filter_level = 1
+        and uc_int_tot_pck_tarwgt = @uc_use_pck_tarwgt 
+        |
+        filter data
+        where moca_filter_level = 1
+        and uc_use_pck_grswgt = @uc_use_pck_grswgt + @ctnwgt
+        |
+        filter data
+        where moca_filter_level = 1
+        and weight = @uc_use_pck_grswgt
+        and uc_use_pck_tarwgt = @ctnwgt
+        and uc_called_by_wrkref = @wrkref
+        and uc_called_by_ctnnum = @subnum
+        and uc_result_end_point = 'K-wrkref=' || @wrkref || ',subnum=' || @subnum
+    }
+    /*
+     * Following is the logic for calculating actual weight - either for a single non K wrkref
+     * Or when calculating by ctnnum (and in this case ignoring child K picks explicitly)
+     */
+    else
+    {
+        /*
+         * We can calculate weight in 2 ways.  We have each level weight in prtftp_dtl (grswgt or netwgt)
+         * But we also have cas weight (grswgt or netwgt)
+         * Each netwgt is never really interesting since what is shipped is a box of each.  So if it is a box of tylenol
+         * All that matters is the box - the bottle inside is never interesting for any real world WMS use case.
+         * So each grswgt is really interesting.  If we took case netwgt / units per case - that should also give us the same
+         * each gross weight.  That is preferred logic based on historically how WMS calculated this data.
+         */
+        [
+        select nvl(sum ( pckwrk_hdr.pckqty * prtftp_dtl_ea.grswgt ),-1) uc_pck_grswgt_by_ea,
+               nvl(sum ( pckwrk_hdr.pckqty * prtftp_dtl_ea.netwgt ),-1) uc_pck_netwgt_by_ea,
+               nvl(sum ( pckwrk_hdr.pckqty * ( prtftp_dtl_ca.netwgt / prtftp_dtl_ca.untqty ) ),-1) uc_pck_grswgt_by_ca,
+               nvl
+               (
+                   sum 
+                   ( 
+                       case
+                           when pckwrk_hdr.lodlvl = 'S' or pckwrk_hdr.lodlvl = 'L' 
+                           then prtftp_dtl_ca.grswgt * (pckwrk_hdr.pckqty/prtftp_dtl_ca.untqty)
+                           else 0
+                       end
+                   ), -1 
+               ) uc_pck_act_grswgt,
+               sum ( pckwrk_hdr.pckqty) uc_pck_pckqty,
+               count(*) uc_pck_cnt_pckwrk
+        from pckwrk_hdr
+             left outer join prtftp_dtl prtftp_dtl_ea
+                 on prtftp_dtl_ea.prt_client_id = pckwrk_hdr.prt_client_id
+                 and prtftp_dtl_ea.prtnum = pckwrk_hdr.prtnum
+                 and prtftp_dtl_ea.wh_id = pckwrk_hdr.wh_id
+                 and prtftp_dtl_ea.ftpcod = pckwrk_hdr.ftpcod
+                 and prtftp_dtl_ea.stk_flg = 1
+             left outer join prtftp_dtl prtftp_dtl_ca
+                 on prtftp_dtl_ca.prt_client_id = pckwrk_hdr.prt_client_id
+                 and prtftp_dtl_ca.prtnum = pckwrk_hdr.prtnum
+                 and prtftp_dtl_ca.wh_id = pckwrk_hdr.wh_id
+                 and prtftp_dtl_ca.ftpcod = pckwrk_hdr.ftpcod
+                 and prtftp_dtl_ca.cas_flg = 1
+        where 1=1
+        and @+pckwrk_hdr.wrkref
+        and @+pckwrk_hdr.wh_id
+        and @+pckwrk_hdr.ctnnum^uc_filter_ctnnum
+        and pckwrk_hdr.prtnum != 'KITPART' /* dont want to count these - just real ones */
+        and pckwrk_hdr.wrktyp in ( 'P', 'B' )
+        ]
+        |
+        filter data
+        where moca_filter_level = 1
+        /* Prefer getting by case route based on tradiional RP logic.  But really expect both to be same */
+        and uc_use_pck_netwgt = iif ( @uc_pck_grswgt_by_ca > 0, @uc_pck_grswgt_by_ca, @uc_pck_grswgt_by_ea )
+        /* Handle both cases e.g. straight case pick also has a tare concept */
+        and uc_use_pck_grswgt = iif 
+                                ( 
+                                    @uc_pck_act_grswgt > 0, @uc_pck_act_grswgt, 
+                                    iif
+                                    ( 
+                                        @uc_pck_grswgt_by_ca > 0, @uc_pck_grswgt_by_ca, @uc_pck_grswgt_by_ea
+                                    )
+                                )
+        |
+        filter data
+        where moca_filter_level = 1
+        and uc_use_pck_tarwgt = @uc_use_pck_grswgt - @uc_use_pck_netwgt
+        and weight = @uc_use_pck_grswgt /* to support existing code that goes by weight */
+        and uc_orig_lodlvl = @lodlvl
+        and uc_orig_wrktyp = @wrktyp
+        and uc_orig_ctnnum = @subnum
+        and uc_orig_ctncod = @ctncod
+        and uc_orig_ctnwgt = @ctnwgt 
+        and uc_recursive_call = @uc_recursive_call
+        and uc_recursive_ctnwgt = @uc_recursive_ctnwgt
+        and uc_called_by_wrkref = @wrkref
+        and uc_called_by_ctnnum = @uc_filter_ctnnum
+        and uc_result_end_point = 'P-WRKREF=' || @wrkref || ',ctnnum=' || @uc_filter_ctnnum
+    }
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<remarks>
+<![CDATA[
+    <p>
+    This code is to calculate the weight of a pick wrkref.  Outside world should call it for outer picks, i.e. picks directly 
+    worked on.  for example in cartonized case - only outside K pick and not inside K pick.  It can also be called for 
+    straight load or case pick as well.
+    </p>
+]]>
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+<exception value="eDB_NO_ROWS_AFFECTED">Inventory not found</exception>
+
+<retrows>1</retrows>
+
+<retcol name="uc_use_pck_grswgt" type="COMTYP_CHAR">This is the gross weight of this pick including any packaging</retcol>
+<retcol name="uc_use_pck_netwgt" type="COMTYP_CHAR">This is the weight of this pick without packaging</retcol>
+<retcol name="weight" type="COMTYP_CHAR">To support legacy code.  This is same as uc_use_pck_grswgt</retcol>
+<retcol name="uc_use_pck_tarwgt" type="COMTYP_CHAR">Weight of packaging.  So grswgt - netwgt for normal cases.  For K picks it is weight of outer carton</retcol>
+
+
+</documentation>
+
+</command>

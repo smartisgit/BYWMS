@@ -1,0 +1,43 @@
+<command>
+<name>parse ossi policy logic</name>
+<description>Parse Policy Logic</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+
+if (@uc_policy_logic is not null)
+{
+    publish data
+    where uc_rule_grp_id    = substr(@uc_policy_logic, 1, instr(@uc_policy_logic, '|') - 1)
+    and   uc_rule_subgrp_id = substr(@uc_policy_logic, instr(@uc_policy_logic, '|') + 1)
+    |
+    /*
+     * Following for supporting any legacy code that may still want it as polcod and polvar
+     */
+    filter data
+    where moca_filter_level = 1
+    and polcod = @uc_rule_grp_id
+    and polvar = @uc_rule_subgrp_id
+}
+
+]]>
+</local-syntax>
+<argument name="uc_policy_logic" required="no" datatype="string"></argument>
+<argument name="wh_id" required="no" datatype="string"></argument>
+<documentation>
+
+<remarks>
+This command may be used to parse policy logic.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>
+

@@ -1,0 +1,147 @@
+<command>
+<name>register ossi object created core</name>
+<description>Core component to register the object</description>
+
+<argument name="@*" required="yes" datatype="string">Data from list command is assumed to be on stack</argument>
+<argument name="uc_get_context_cmd"></argument>
+<argument name="uc_reg_table_name" required="yes" datatype="string"></argument>
+
+<argument name="expr_uc_ossi_reg_sql_where" required="yes" datatype="string"></argument>
+<argument name="uc_expanded_reg_sql_where" required="yes" datatype="string">
+one of the two i.e. expr_uc_ossi_reg_sql_where or uc_expanded_reg_sql_where may be passed.  uc_expanded_reg_sql_where
+is checked first.  Idea is that uc_expanded_reg_sql_where means that it is fully expanded and can be used as-is
+expr_uc_ossi_reg_sql_where has @ variables in it and will be expanded here
+</argument>
+
+
+<argument name="uc_rule_grp_id" required="yes" datatype="string"></argument>
+<argument name="uc_rule_subgrp_id" required="yes" datatype="string"></argument>
+
+
+<argument name="uc_table_list_set_defaults" required="yes" datatype="string">Passed in from register ossi one object instance as created</argument>
+<argument name="uc_set_default_rule_grp_id" required="yes" datatype="string">Passed in from register ossi one object instance as created</argument>
+
+<argument name="uc_hook_logic_code" required="yes" datatype="string">What is the hook logic.  Only when it is 1 do we execute the update</argument>
+
+
+<type>Local Syntax</type>
+
+<local-syntax>
+<![CDATA[
+
+
+if ( @expr_uc_ossi_reg_sql_where is null and @uc_expanded_reg_sql_where is null )
+    set return status
+    where status = '507'
+    and verb = 'register'
+    and noun = 'ossi object created core'
+    and argname = 'one of expr_uc_ossi_reg_sql_where and uc_expanded_reg_sql_where'
+else if ( @uc_reg_table_name is null )
+    set return status
+    where status = '507'
+    and verb = 'register'
+    and noun = 'ossi object created core'
+    and argname = 'uc_reg_table_name'
+else
+{
+    {
+        /*
+         * When the registration is disabled or being done inline we dont need this update here
+         */
+        if ( @uc_hook_logic_code = 0 or @uc_hook_logic_code = 2 )
+            noop
+        else
+        {
+            if ( @uc_expanded_reg_sql_where is not null )
+                publish data
+                where sl_expanded = @uc_expanded_reg_sql_where
+            else
+                ossi expand vars in string
+                where sl_string = @expr_uc_ossi_reg_sql_where
+            |
+            [
+            update @uc_reg_table_name:raw
+            set uc_regdte = sysdate,
+                uc_reg_stat_cd = 'C'
+            where @sl_expanded:raw
+            ]
+            catch (-1403,510)
+        }
+        ;
+        if ( @uc_get_context_cmd is not null )
+            execute server command
+            where cmd = @uc_get_context_cmd
+            and inline = 1
+        |
+        filter data
+        where moca_filter_level = 1
+        and uc_rule_grp_id = @uc_rule_grp_id
+        and uc_rule_subgrp_id = @uc_rule_subgrp_id
+        and uc_reg_table_name = @uc_reg_table_name
+        and uc_table_list_set_defaults = @uc_table_list_set_defaults
+        and uc_set_default_rule_grp_id = @uc_set_default_rule_grp_id
+    }
+}
+  
+]]>
+
+</local-syntax>
+
+<documentation>
+
+<remarks>
+<![CDATA[
+  <p>
+   The object instance registration can happen in 2 ways.  inline, i.e. as create/change order/order_line are called within that it registers
+   this.  That approach will be typical for order type of transactions so that when integration completes order exists as it should.
+   We can also have delayed were order cretaion creates an ord with uc_reg_stat_cd of P and then a job registers them.
+   Regardless of how we get this far - when we get here we do 2 things.
+   a. Set values (if data setup is there)
+   b. Execute conditioinal actions
+
+   As an illustration, conider following flow when policy USR-OSSI-DATA-CHANGE-HOOK / ORD / ENABLED is set to 2 (meaning inline registration)
+   create/change order is called - 
+       pre-trigger sets the ord.uc_reg_stat_cd is set to P
+       post trigger will invoke this from [process ossi table data change hook]
+          If we were called within integrator and policy USR-OSSI-DATA-CHANGE-HOOK/ORD/DELAY-EXECUTION-WHEN-CALLED-FROM-INTEGRATOR was 1 - then we dont execute it but submit for
+          delayed execution.  if not from integration then it is called right away
+   create/change order line is called -
+       post trigger [mark ossi parent table as needing register] calls [mark ossi parent table as needing register].  Which sets the ord table uc_reg_stat_cd to P
+       and also calls [process ossi table data change hook] (same as above)
+          If we were called within integrator and policy USR-OSSI-DATA-CHANGE-HOOK/ORD/DELAY-EXECUTION-WHEN-CALLED-FROM-INTEGRATOR was 1 - then we dont execute it but submit for
+          delayed execution.  if not from integration then it is called right away
+
+   So when this flow happens from integrations then we will execute this logic only once when order and lines are created.  But if we are doing interactive work then after every change to
+   order or any change to order line the whole flow fires.
+
+   If on the other hand, e.g. USR-OSSI-DATA-CHANGE-HOOK / ORD / ENABLED is set to 1 (meaning that registration happens via job)
+   As order and order lines are maintained - all that happens is that ord.uc_reg_stat_cd  is set to P
+
+   Then we have jobs which are named by default UC_W_[warehouse]_ORDER_CRTREG that call [register ossi object instances created].  The job looks for all orders in P and invokes this command
+   for each so that the logic is done.  This flow will work fine except that if we wanted to validate order for certain rules then that information will not be repoted back on integration
+  </p>
+]]>
+</remarks>
+
+<retcol name="@*" type="(varies according to field type)">All order columns</retcol>
+<retcol name="uc_rule_grp_id" type="string">echoed from input</retcol>
+<retcol name="uc_rule_subgrp_id" type="string">echoed from input</retcol>
+<retcol name="uc_reg_table_name" type="string">echoed from input</retcol>
+<retcol name="uc_table_list_set_defaults" type="string">echoed from input</retcol>
+<retcol name="uc_set_default_rule_grp_id" type="string">echoed from input</retcol>
+
+
+
+<exception value="eOK">Normal successful completion</exception>
+
+
+<seealso cref="mark ossi parent table as needing register"></seealso>
+<seealso cref="process ossi table data change hook"></seealso>
+<seealso cref="submit ossi command for delayed integration execution"></seealso>
+<seealso cref="list ossi object instances for create registration"></seealso>
+<seealso cref="register ossi one object instance as created"></seealso>
+<seealso cref="register ossi object instances created"></seealso>
+
+
+</documentation>
+</command>

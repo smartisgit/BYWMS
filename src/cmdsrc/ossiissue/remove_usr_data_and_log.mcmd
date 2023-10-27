@@ -1,0 +1,43 @@
+<command>
+<name>remove usr data and log</name>
+<description>Remove data and log</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ */
+[select *
+   from usr_ossi_issue_obj_log
+  where uc_ossi_issue_assign_seq = @uc_ossi_issue_assign_seq
+    and uc_ossi_issue_obj_log_seq = @uc_ossi_issue_obj_log_seq
+]
+|
+[[
+  String[] pkNames = uc_ossi_obj_pk_col.split(",");
+  String[] pkVals = uc_ossi_obj_pk_data.split("__");
+  StringBuilder buf = new StringBuilder("[delete from " + uc_ossi_obj_name + " where 1=1 ");
+  for (int n=0; n<pkNames.length; n++)
+  {
+    buf.append(" and " + pkNames[n] + " = '" + pkVals[n] + "'");
+  }
+  buf.append("] catch (-1403)");
+  moca.executeCommand(buf.toString());
+]]
+;
+remove usr obj log
+
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This command can be used to remove data and logs
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

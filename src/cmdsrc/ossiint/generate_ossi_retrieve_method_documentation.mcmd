@@ -1,0 +1,212 @@
+<command>
+<name>generate ossi retrieve method documentation</name>
+<description>Generate documentatkion for all retrieve method implementations
+</description>
+<type>Local Syntax</type>
+
+<argument name="retr_mthd_id" required="yes" datatype="string"></argument>
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20191003 saad.ahmad - 10291 - Generate docymentaion
+ */
+publish data
+where path = @@LESDIR || '/docs/uc_retr_mthd'
+and mode = 'w'
+and filenam_prefix = 'rmi_'
+and my_td_style_sql = 'valign="top" style="word-wrap: break-word;font-size: 10"'
+|
+{
+    create directory 
+    where directory = @path
+    catch(@?)
+    ;
+    if ( @retr_mthd_id is null )
+        hide stack variable where name = 'retr_mthd_id'
+    |
+    [
+    select rm.retr_mthd_id,
+           impl.retr_mthd_impl_genid,
+           rm.retr_mthd_descr,
+           impl.sys_id,
+           impl.ifd_id,
+           impl.ifd_ver,
+           impl.ifd_seg_id,
+           impl.alg_id
+    from sl_retr_mthd_def rm
+         join sl_retr_mthd_impl_def impl on impl.retr_mthd_id = rm.retr_mthd_id
+    where 1=1
+    and @+rm.retr_mthd_id
+    order by 1,2
+    ]
+    catch (-1403,510)
+    |
+    if (@? = 0 )
+    {
+        if ( @ifd_id is not null )
+            publish data
+            where impl_tag = 'IFD Segment:' || @ifd_id || '/' || @ifd_ver || '/' || @ifd_seg_id
+        else
+            publish data
+            where impl_tag = 'System:' || @sys_id
+        |
+        get ossi head for integration documentation
+        where doc_title = 'Retrieve Method Implementation - ' || @retr_mthd_id || ' ' || @impl_tag
+        |
+        if ( @alg_id is null )
+            publish data
+            where alg_url = null
+        else
+        {
+            get ossi new remapped expression for documentation 
+            where remapped_expr = @alg_id
+            |
+            publish data
+            where alg_url = nvl(@alg_id_url, @alg_id )
+        }
+        |
+        publish data
+        where filnam = ossi__html_val ( @filenam_prefix || @retr_mthd_id || '__' || @retr_mthd_impl_genid || '.html', 1 )
+        and data1= '<table class="my-table" width="140%">'
+                || @uc_typical_tr_data
+                || '    <td width="20%"><b>Retrieve Method</b></td>'
+                || '    <td width="80%">' || @retr_mthd_id || '</td>'
+                || "</tr>"
+                || @uc_typical_tr_data
+                || "    <td><b>Implementation Id</b></td>"
+                || "    <td>" || @retr_mthd_impl_genid || "</td>"
+                || "</tr>"
+                || @uc_typical_tr_data
+                || "    <td><b>Triggering System</b></td>"
+                || "    <td>" || @sys_id || "</td>"
+                || "</tr>"
+                || @uc_typical_tr_data
+                || "    <td><b>Triggering Inbound IFD Id</b></td>"
+                || "    <td>" || @ifd_id  || "</td>"
+                || "</tr>"
+                || @uc_typical_tr_data
+                || "    <td><b>Triggering Inbound IFD Version</b></td>"
+                || "    <td>" || @ifd_ver  || "</td>"
+                || "</tr>"
+                || @uc_typical_tr_data
+                || "    <td><b>Triggering Inbound IFD Segment</b></td>"
+                || "    <td>" || @ifd_seg_id  || "</td>"
+                || "</tr>"
+                || @uc_typical_tr_data
+                || "    <td><b>Algorithm</b></td>"
+                || "    <td>" || @alg_url  || "</td>"
+                || "</tr>"
+        |
+        {
+            write output file 
+            where data = @uc_typical_file_header || @data1
+            ;
+            publish data 
+            where mode = 'a'
+            |
+            {
+                write output file 
+                where data = @uc_typical_tr_data
+                          || '    <td valign="top"><b>SQL Code</b></td>'
+                          || '    <td valign="top">'
+                          || '        <table border="1" cellpadding="0" cellspacing="0" >'
+                          || '            <tr>'
+                          || '                <td ' || @my_td_style_sql || '><b>Seq#</b></td>'
+                          || '                <td ' || @my_td_style_sql || '><b>Change Log</b></td>'
+                          || '                <td ' || @my_td_style_sql || '><b>Set Operation</b></td>'
+                          || '                <td ' || @my_td_style_sql || '><b>SQL Code</b></td>'
+                          || '            </tr>'
+                ;
+                [
+                select *
+                from sl_sql_crsr_component
+                where retr_mthd_id = @retr_mthd_id
+                and retr_mthd_impl_genid = @retr_mthd_impl_genid
+                order by component_ordr, sql_component_seq
+                ]
+                catch (-1403,510)
+                |
+                if ( @? = 0 )
+                {
+                    if ( @ifd_id is not null )
+                        publish data
+                        where change_log_tag = ossi__data_version_url ( @retr_mthd_id || '__seg_' || @ifd_id || '_' || @ifd_ver || '_' || @ifd_seg_id || '__' || sl_fmt__trim(@sql_component_seq,'B'),'sl_sql_crsr_component')
+                    else
+                        publish data
+                        where change_log_tag = ossi__data_version_url ( @retr_mthd_id || '__sys_' || @sys_id || '__' || sl_fmt__trim(@sql_component_seq,'B'),'sl_sql_crsr_component')
+                    |
+                    write output file 
+                    where data = "<tr>"
+                              ||     '<td ' || @my_td_style_sql || '>' || @sql_component_seq || '</td>'
+                              ||     '<td ' || @my_td_style_sql || '>' || @change_log_tag    || '</td>'
+                              ||     '<td ' || @my_td_style_sql || '>' || @sql_set_oper      || '</td>'
+                              ||     '<td ' || @my_td_style_sql || '><pre style="white-space: pre-wrap;"><code>' || @sql_code || '</code></pre></td>'
+                              || "</tr>"
+                }
+                ;
+                /*
+                 * Close the td which has SQL Code and table we are putting
+                 */
+                write output file 
+                where data = "</table></td></tr>"
+                ;
+                /*
+                 * Close the whole thing
+                 */
+                write output file 
+                where data = "</table>"
+                ;
+                /*
+                 * Final close of the file
+                 */
+                write output file 
+                where data = @uc_typical_file_footer
+            } /* append mode */
+            ;
+            publish data 
+            where retr_mthd_id = @retr_mthd_id
+            and retr_mthd_impl_genid = @retr_mthd_impl_genid
+            and retr_mthd_descr = @retr_mthd_descr
+            and filnam = @filnam
+            and path = @path
+        } /* block */    
+    } /* found rmi */
+} /* block */
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This generates html documentation for all retr methods
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+<retcol name="retr_mthd_id" type="COMTYP_CHAR"></retcol>
+<retcol name="retr_mthd_impl_genid" type="COMTYP_CHAR"></retcol>
+<retcol name="retr_mthd_descr" type="COMTYP_CHAR"></retcol>
+<retcol name="filnam" type="COMTYP_CHAR"></retcol>
+<retcol name="path" type="COMTYP_CHAR"></retcol>
+
+
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+<seealso cref="get ossi documentation alg usage"></seealso>
+
+</documentation>
+
+
+
+</command>

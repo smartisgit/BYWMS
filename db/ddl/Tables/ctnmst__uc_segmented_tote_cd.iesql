@@ -1,0 +1,28 @@
+#use $DCSDIR/include
+#include <dcsddl.h>
+#include <dcscolwid.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+
+#use $SALDIR/include
+#include <salcolwid.h>
+
+
+mset command on
+[
+ALTER_TABLE_TABLE_INFO(ctnmst)
+ALTER_TABLE_ADD_COLUMN_START(uc_segmented_tote_cd)
+    STRING_TY(10)
+ALTER_TABLE_ADD_COLUMN_END
+] catch (ERR_COLUMN_ALREADY_EXISTS)
+RUN_DDL
+
+create db column comment 
+where table_name   = 'ctnmst' 
+and column_name    = 'uc_segmented_tote_cd'
+and column_comment = 'A code that must be the same between cartons that can be put in the same tote'
+RUN_DDL
+
+
+mset command off
+

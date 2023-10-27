@@ -1,0 +1,102 @@
+<command>
+<name>override ossi pk data for one obj log</name>
+<description>Override the PK data that was logged for one</description>
+
+<argument name="uc_override_pk_list" required="yes" datatype="string"></argument>
+<argument name="uc_override_table_name" required="yes" datatype="string"></argument>
+<argument name="table_name" required="yes" datatype="string"></argument>
+<argument name="uc_ossi_obj_pk_col" required="yes" datatype="string"></argument>
+<argument name="uc_ossi_obj_pk_data" required="yes" datatype="string"></argument>
+<argument name="uc_ossi_issue_assign_seq" required="yes" datatype="string"></argument>
+<argument name="uc_ossi_issue_obj_log_seq" required="yes" datatype="string"></argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20170711 ossi\saad.ahmad - 7026 - Bring the core Oracular components
+ */
+publish data
+where uc_pk_data_separator = '__'
+|
+{
+    {
+        convert list 
+        where string = @uc_ossi_obj_pk_col
+        and type = 'L'
+        and separator = ','
+        |
+        {
+            publish data
+            where uc_this_col_value = ossi__get_fld_from_list ( @uc_ossi_obj_pk_data, @count, @uc_pk_data_separator )
+            and uc_mapped_pk_col = ossi__get_fld_from_list ( @uc_override_pk_list, @count, ',' )
+            |
+            publish data
+            where uc_where_clause = " and " || @retstr || " = '" || @uc_this_col_value || "'"
+            and uc_column_name = @retstr
+            and uc_column_value = @uc_this_col_value
+            and uc_mapped_pk_col = @uc_mapped_pk_col
+        }
+    }
+    >> res_where
+    |
+    {
+        convert column results to string
+        where resultset = @res_where
+        and colnam = 'uc_where_clause'
+        and separator = ""
+        |
+        publish data
+        where uc_full_override_sql = "[select " || @uc_override_pk_list || " from " || @uc_override_table_name || " where 1=1 " || @result_string || "] catch(-1403,510)"
+        |
+        execute server command 
+        where cmd = @uc_full_override_sql
+        and inline = 1
+        |
+        {
+            [[
+            StringBuffer mybuf = new StringBuffer("");
+            boolean first = true;
+            res_where.reset();
+            while ( res_where.next() )
+            {
+                res_alt_data = moca.executeInline ( "publish data where uc_this_value = @" + res_where.getString ( "uc_mapped_pk_col" ) );
+                res_alt_data.next();
+                if ( !first )
+                    mybuf.append ( uc_pk_data_separator );
+                mybuf.append ( res_alt_data.getString ( "uc_this_value" ) );
+                first = false;
+            }
+            [uc_mapped_pk_data:mybuf.toString()]
+            ]]
+            |
+            if ( @uc_mapped_pk_data is not null )
+            {
+                [
+                update usr_ossi_issue_obj_log
+                set uc_ossi_obj_name = @uc_override_table_name,
+                    uc_ossi_obj_pk_col = @uc_override_pk_list,
+                    uc_ossi_obj_pk_data = @uc_mapped_pk_data
+                where uc_ossi_issue_assign_seq = @uc_ossi_issue_assign_seq
+                and uc_ossi_issue_obj_log_seq = @uc_ossi_issue_obj_log_seq
+                ] 
+            }
+        } /* select alternate pk from alternate table */        
+    }  /* has res_where */  
+} /* main */
+    
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This command can be used to overeride primary key for one object log.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

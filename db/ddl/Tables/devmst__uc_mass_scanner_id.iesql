@@ -1,0 +1,25 @@
+#use $DCSDIR/include
+#include <dcsddl.h>
+#include <dcscolwid.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+
+#use $SALDIR/include
+#include <salcolwid.h>
+
+mset command on
+[
+ALTER_TABLE_TABLE_INFO(devmst)
+ALTER_TABLE_ADD_COLUMN_START(uc_mass_scanner_id)
+     STRING_TY(30)
+ALTER_TABLE_ADD_COLUMN_END
+] catch (-2705,-1430 )
+RUN_DDL
+
+create db column comment 
+where table_name   = 'devmst' 
+and column_name    = 'uc_mass_scanner_id'
+and column_comment = 'ID for a mass scanner associated with a device'
+RUN_DDL
+
+mset command off

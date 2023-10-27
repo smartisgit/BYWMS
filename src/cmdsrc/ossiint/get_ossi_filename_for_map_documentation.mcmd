@@ -1,0 +1,89 @@
+<command>
+<name>get ossi filename for map documentation</name>
+<description>get the filename information for map documentation</description>
+
+<argument name="map_grp" required="yes" datatype="string"></argument>
+<argument name="map_id" required="yes" datatype="string"></argument>
+<argument name="uc_single_map_file" required="yes" datatype="string"></argument>
+<argument name="uc_rev_log_path" required="yes" datatype="string"></argument>
+<argument name="uc_rev_log_table" required="yes" datatype="string"></argument>
+
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161208 saad.ahmad - 10291 - Origial
+ */
+publish data
+where uc_rev_log_path = nvl(@uc_rev_log_path, '../../uc_rev_log' )
+and uc_rev_log_table = nvl(nvl(@uc_rev_log_table, @uc_table_name), 'poldat')
+|
+publish data
+where uc_rev_log_file_path_prefix = @uc_rev_log_path || '/' || @uc_rev_log_table
+|
+if ( @uc_single_map_file is not null )
+{
+    if ( @uc_single_map_file = '1' )
+        publish data
+        where all_in_one_file = 1
+    else
+        publish data
+        where all_in_one_file = 0
+}
+/*
+ * Folloiwing is now obsolete
+ */
+else
+{
+    publish data
+    where map_grp_list_single_file = ',USR-SAP-STOLOC,USR-WMS-PRTFAM,USR-FLEX-BLOCKING-BY-WH,USR-FLEX-BLOCKING-FOR-IFD-SEG,USR-JDE-MQ-HEADER-MAP,USR-INT-MQ-BUFFER,'
+    |
+    if ( instr(@map_grp_list_single_file, ','||@retstr||',') > 0 )
+        publish data
+        where all_in_one_file = 1
+    else
+        publish data
+        where all_in_one_file = 0
+}
+|
+if ( @all_in_one_file = 1 )
+    publish data
+    where all_in_one_file = 1
+    and use_map_filnam = 'uc_map_' || ossi__html_val ( @map_grp || '__' || 'ALL' , 1 ) || '.html' 
+    and uc_single_map_file = @uc_single_map_file
+    and uc_rev_log_map_file_path = @uc_rev_log_file_path_prefix || '/'  || ossi__html_val ( @map_grp, 1 ) || '.html'
+else
+    publish data
+    where all_in_one_file = 0
+    and use_map_filnam = 'uc_map_' || ossi__html_val ( @map_grp || '__' || @map_id, 1 ) || '.html'
+    and uc_single_map_file = @uc_single_map_file
+    and uc_rev_log_map_file_path = @uc_rev_log_file_path_prefix || '/'  || ossi__html_val ( @map_grp || '__' || @map_id, 1 ) || '.html'
+    
+]]>
+</local-syntax>
+
+
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+To put data in an html
+</p>
+]]>
+</remarks>
+
+<retrows>Get the file name for maps based on type of map</retrows>
+
+<exception value="eOK">The command completed successfully.</exception>
+<exception value="510">If variable was not passed and no default was passed.</exception>
+
+<seealso cref="get session variable"></seealso>
+</documentation>
+
+</command>

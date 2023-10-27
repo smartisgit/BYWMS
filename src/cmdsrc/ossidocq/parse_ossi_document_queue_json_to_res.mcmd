@@ -1,0 +1,156 @@
+<command>
+<name>parse ossi document queue json to res</name>
+<description>Parse the document queue data (provided as json string per az standards) and return as a moca resultset
+</description>
+<type>Local Syntax</type>
+
+<argument name="uc_doc_q_json" required="yes" datatype="string">The json string</argument>
+<argument name="uc_date_time_format" required="yes" datatype="string">Date format string per java standards.  used to parse date/time provided in json.  Defult to yyyy-MM-dd'T'hh:mm:ssX</argument>
+
+
+<local-syntax>
+<![CDATA[
+
+publish data
+where uc_date_time_format = nvl(@uc_date_time_format, "yyyy-MM-dd'T'hh:mm:ssX" )
+|
+[
+select rtstr1
+from poldat_view
+where polcod = 'USR-OSSI-DOC-UPLOAD-Q'
+and polvar = 'CONTEXT'
+and polval = 'MAIN-COLUMN-LIST'
+and wh_id = '----'
+and rtnum1 = 1
+order by srtseq
+]
+catch (-1403,510)
+>> res_main_col_list
+|
+[[
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+import java.text.SimpleDateFormat;
+
+String COLUMN_NAME_INDEX_SEPARATOR = "__";
+//
+SimpleResults ret = new SimpleResults();
+SimpleResults kres;
+ret.addColumn ( "uc_doc_upload_q_id", MocaType.STRING );
+//
+while ( res_main_col_list.next() )
+{
+    ret.addColumn ( res_main_col_list.getString("rtstr1"), MocaType.STRING );
+}
+ret.addColumn ( "uc_key_res",         MocaType.RESULTS );
+ret.addColumn ( "uc_content_length",  MocaType.INTEGER );
+ret.addColumn ( "uc_creation_time",   MocaType.DATETIME );
+ret.addColumn ( "uc_modified_time",   MocaType.DATETIME );
+//
+JSONObject wrapper = new JSONObject(uc_doc_q_json);
+String data = wrapper.getString("data");
+JSONObject obj = new JSONObject(data);
+JSONArray blobs = obj.getJSONArray("results")
+SimpleDateFormat formatter = new SimpleDateFormat(uc_date_time_format, Locale.ENGLISH);
+for ( ii in 0 .. blobs.length()-1 )
+{
+    bb   = blobs.getJSONObject(ii);
+    prop = bb.getJSONObject("properties");
+    meta = bb.getJSONObject( "metadata" );
+    ret.addRow();
+    //
+    // Oogy returns docUploadQueryId but az returns name
+    //
+    String id = null
+    try
+    {
+        id = bb.getString("docUploadQueryId");
+    }
+    catch (Exception ee )
+    {
+        id = bb.getString("name");
+    }
+    ret.setStringValue ( "uc_doc_upload_q_id", id );
+    moca.trace(id);
+    
+    ret.setValue       ( "uc_content_length",  prop.getInt ( "contentLength") );
+
+    try { ret.setValue ( "uc_creation_time",   formatter.parse(prop.getString( "creationTime") ) ); } catch (Exception ee ) { ; }
+    try { ret.setValue ( "uc_modified_time",   formatter.parse(prop.getString( "lastModified") ) ); } catch (Exception ee ) { ; }
+    //
+    // create kres as a column for each returned row
+    kres = new SimpleResults();
+    kres.addColumn ( "column_name",  MocaType.STRING );
+    kres.addColumn ( "column_value", MocaType.STRING );
+    //
+    meta_iter = meta.keys();
+    while ( meta_iter.hasNext() )
+    {
+        String meta_key = (String)meta_iter.next();
+        String meta_value = meta[meta_key].toString();
+
+        // column names may be prefixed with an index
+        // convert "0__prtnum" to "prtnum"
+        int index = meta_key.indexOf(COLUMN_NAME_INDEX_SEPARATOR);
+        if (index != -1)
+        {
+            meta_key = meta_key.substring(index + COLUMN_NAME_INDEX_SEPARATOR.length());
+        }
+        
+        kres.addRow();
+        kres.setValue ( "column_name",  meta_key );
+        kres.setValue ( "column_value",  meta_value);
+        moca.trace("meta " + meta_key + " = " + meta_value);
+        if (ret.containsColumn(meta_key))
+        {
+            ret.setValue (meta_key, meta_value);
+        }
+    }
+    ret.setValue ( "uc_key_res", kres );
+}
+[ret:ret]
+]]
+|
+publish data combination where res = @ret
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+When we call the underlying azure blob commands to query data - they retrun data as JSON string.  This processes using Json API in java 
+per documentation of such strings and return data as a resultset so that we can handle it in BY
+</p>
+]]>
+</remarks>
+
+<retrows>n</retrows>
+<retcol name="uc_doc_upload_q_id" type="COMTYP_CHAR">Document Queue Id.  This uniquely identifies a blob in blob store</retcol>
+<retcol name="USR-OSSI-DOC-UPLOAD-Q/CONTEXT/MAIN-COLUMN-LIST" type="COMTYP_CHAR">This policy is queried and rtrts1 with rtnum1 = 1 becomes columns here</retcol>
+
+<retcol name="uc_key_res" type="COMTYP_RES">
+    All of metadata (including columns that have already been listed seprately) are set here as a res).
+    This resultset has 2 columns (string).  column_name and column_value
+</retcol>
+<retcol name="uc_content_length" type="COMTYP_INT">Length of data uploaded</retcol>
+<retcol name="uc_creation_time" type="COMTYP_DATE">Data/time when data was created on blob store</retcol>
+<retcol name="uc_modified_time" type="COMTYP_DATE">Data/time when data was modified on blob store</retcol>
+
+
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+<seealso cref="execute ossi blob service using az"></seealso>
+
+
+</documentation>
+
+
+
+</command>

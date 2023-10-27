@@ -1,0 +1,64 @@
+<command>
+    <name>convert ossi pdf to pcl</name>
+    <description>Converts a pdf file into a pcl file.</description>
+    <type>C Function</type>
+    <function>usrConvertPDF2PCL</function>
+    <argument name="pdf_pathname" required="yes" datatype="string">
+        The absolute path of the pdf file that is to be converted.
+    </argument>
+    <argument name="pcl_pathname" required="no" datatype="string">
+        The absolute path of the target pcl file. If ommitted, the new file will be placed with the old one and have the pcl file extension.
+    </argument>
+    <argument name="printer_device" required="no" datatype="string">
+        The device driver to be used by GhostScript. Defaults to ljet3.
+    </argument>
+    <argument name="paper_size" required="no" datatype="string">
+        Paper sizes according to ISO standards. Defaults to a4.
+    </argument>
+    <documentation>
+        <remarks>
+            printer_device can have a large impact on speed and quality. Options include:
+
+            +     atx23   Practical Automation ATX-23 label printer
+            +     atx24   Practical Automation ATX-24 label printer
+            +     atx38   Practical Automation ATX-38 label printer
+            +     deskjet  H-P DeskJet and DeskJet Plus
+                  djet500  H-P DeskJet 500; use -r600 for DJ 600 series
+            +     fs600   Kyocera FS-600 (600 dpi)
+            +     laserjet  H-P LaserJet
+            +     ljet2p  H-P LaserJet IId/IIp/III* with TIFF compression
+            +     ljet3   H-P LaserJet III* with Delta Row compression
+            +     ljet3d  H-P LaserJet IIID with duplex capability
+            +     ljet4   H-P LaserJet 4 (defaults to 600 dpi)
+            +     ljet4d  H-P LaserJet 4 (defaults to 600 dpi) with duplex
+            +     ljetplus  H-P LaserJet Plus
+                  lj5mono  H-P LaserJet 5 &amp; 6 family (PCL XL), bitmap;
+                  lj5gray  H-P LaserJet 5 &amp; 6 family, gray-scale bitmap;
+            *     lp2563  H-P 2563B line printer
+            *     oce9050  OCE 9050 printe
+                  (pxlmono) H-P black-and-white PCL XL printers (LaserJet 5 and 6 family)
+                  (pxlcolor) H-P color PCL XL printers (e.g. Color LaserJet 4500)
+
+            User-contributed drivers marked with + are maintained outside the ghostscript source tree. Please contact the original authors with any questions about these drivers.
+            Drivers marked with a * are maintained by with the assistance of users, since the core developers do not have access to necessary hardware or software for testing these.
+
+            For paper_size argument list, see "seealso", then "Appendix: Paper sizes known to Ghostscript".
+        </remarks>
+        <retcol name="pcl_pathname" type="string">Absolute path to the new file.</retcol>
+        <example>
+            do loop where count = 10
+            |
+            convert ossi pdf to pcl
+              where pdf_pathname = @@LESDIR || '\files\testin\' || @i || '.pdf'
+                and pcl_pathname = @@LESDIR || '\files\testout\' || @i || '.pcl'
+        </example>
+        <example>
+            convert usr pdf to pcl
+              where pdf_pathname = @@LESDIR || '\files\testin\sample.pdf'
+                and printer_device = 'pxlcolor'
+                and paper_size = 'a4'
+        </example>
+        <seealso>https://www.gnu.org/software/ghostscript/devices.html</seealso>
+        <seealso>https://www.ghostscript.com/doc/9.20/Use.htm</seealso>
+    </documentation>
+</command>

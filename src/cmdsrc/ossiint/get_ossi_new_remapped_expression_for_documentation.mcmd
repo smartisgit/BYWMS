@@ -1,0 +1,175 @@
+<command>
+<name>get ossi new remapped expression for documentation</name>
+<description>Standard JDA Integration documentation creates an expression for documentation that references algorithms.  This is to turn that to a hyperlink</description>
+
+<argument name="alg_id" required="yes" datatype="string">Algorithm</argument>
+<argument name="map_arg" required="no" datatype="string">Argument</argument>
+<argument name="remapped_expr" required="no" datatype="string">As returned by standard documentation</argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161208 saad.ahmad - 10291 - Origial
+ */
+publish data
+where alg_id = @alg_id
+and map_arg = @map_arg
+and alg_list_get_wh_id =  ',UC_GET_HOST_WH_ID,'
+and alg_list_typical_map =  ',UC_GET_MAPPED_VALUE,UC_GET_SAP_MOVEMENT_TYPE,UC_GET_HOST_WH_ID,UC_GET_HOST_INVSTS,UC_GET_MAPPED_VALUE_LOGIC,'
+and map_file_path = '../uc_int_map'
+and alg_file_path = '../uc_int_alg'
+|
+if ( @remapped_expr is not null )
+{
+    sl_parse arg where i_arg_list = @remapped_expr and i_delim = '('
+    |
+    /* parse on ( to get two parts*/
+    publish data
+    where alg_id = sl_fmt__trim(sl_fmt__trim(@o_arg1, 'B'), 'L', '^' ) /* macro indicator trimmed */
+    and remain_part = sl_fmt__trim(sl_fmt__trim(sl_fmt__trim(@o_arg2,'B'), 'R', ')'), 'B')
+    |
+    publish data
+    where remain_part_len = len(@remain_part)
+    |
+    {
+        [
+        select instr(@remain_part, '''', -1,1 ) last_quote,
+               instr(@remain_part, '''', -1,2 ) second_last_quote,
+               instr(@remain_part,',', -1 ) last_coma
+        from dual
+        ]
+    }
+    |
+    if ( @second_last_quote > 0 )
+        publish data
+        where map_arg = substr(@remain_part, @second_last_quote+1, @last_quote - @second_last_quote -1 )
+    else if ( @last_coma > 0 )
+        publish data
+        where map_arg = sl_fmt__trim(sl_fmt__trim(substr(@remain_part, @last_coma ), 'L', ','), 'B')
+    else
+        publish data
+        where map_arg = @remain_part
+    |
+    [
+    select count(*) cnt
+    from sl_alg_def
+    where alg_id = @alg_id
+    ]
+    |
+    publish data
+    where alg_id = @alg_id
+    and remap_map_arg = @map_arg
+    and valid_alg = iif ( @cnt > 0, 1, 0 )
+}
+|
+if ( @valid_alg = 1 )
+{
+    if ( instr ( @alg_list_get_wh_id, ','||@alg_id||',') > 0 )
+        publish data
+        where map_arg = 'WH_ID'
+    else if ( @alg_id = 'UC_GET_HOST_INVSTS' )
+        publish data
+        where map_arg = 'UC_HOST_INVSTS'
+    else if ( @alg_id = 'UC_GET_SAP_LGORT' )
+        publish data
+        where map_grp = 'USR-SAP-STOLOC'
+        and map_arg = ''
+    |
+    publish data
+    where map_arg = nvl(@map_arg, @remap_map_arg)
+    |
+    publish data
+    where remap_map_arg = nvl(@remap_map_arg, @map_arg)
+    |
+    if ( @map_arg like '%,%' )
+        publish data
+        where map_grp = ossi__get_fld_from_list ( @map_arg, 1 )
+        and map_id = ossi__get_fld_from_list ( @map_arg, 2 )
+    else if ( instr (@alg_list_typical_map, ','||@alg_id||',') > 0  )
+        [
+        select distinct polcod map_grp,
+                        polvar map_id
+        from poldat
+        where polcod like 'USR%'
+        and polvar = @map_arg
+        ]
+        catch (-1403,510)
+    |
+    {
+        get ossi filename for map documentation
+        |
+        publish data
+        where map_filenam = @use_map_filnam
+        and alg_filenam = 'uc_alg_' || ossi__html_val ( @alg_id,1 ) || '.html'
+        |
+        publish data
+        where path_map_filenam = @map_file_path || '/' || @map_filenam
+        and path_alg_filenam = @alg_file_path || '/' || @alg_filenam
+        |
+        publish data
+        where path_map_filenam = @path_map_filenam
+        and path_alg_filenam = @path_alg_filenam
+        and alg_id = @alg_id
+        and map_arg = @map_arg
+        and alg_id_url = '<a href="' || @path_alg_filenam || '" target="_blank">' || @alg_id || '</a>'
+        and map_arg_url = '<a href="' || @path_map_filenam|| '" target="_blank">' || @remap_map_arg|| '</a>'
+        and remap_map_arg = @remap_map_arg
+        |
+        /*
+         * replace first occurance of the algorithm id with URL
+         */
+        [
+        select regexp_replace(@remapped_expr, @alg_id, @alg_id_url, 1, 1 ) remapped_expr_alg
+        from dual
+        ]
+        |
+        if ( @map_id is not null and @map_grp is not null )
+        {
+            /*
+             * replace last occurance of the argument with it
+             */
+            [
+            select regexp_replace ( @remapped_expr_alg, @remap_map_arg, @map_arg_url, instr(@remapped_expr_alg, @remap_map_arg, -1, 1), 1 ) new_remapped_expr
+            from dual
+            ]
+            |
+            filter data
+            where moca_filter_level = 4
+            and new_remapped_expr = @new_remapped_expr
+        }
+        else
+            filter data
+            where moca_filter_level = 2
+            and new_remapped_expr = @remapped_expr_alg
+    }
+} 
+
+
+    
+]]>
+</local-syntax>
+
+
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+While generating standard cocumentation via mgendoc, component is called to get result IFD data.  This is called within that to turn algorithm references to hyperlinks
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+<exception value="eOK">The command completed successfully.</exception>
+<exception value="510">If variable was not passed and no default was passed.</exception>
+
+<seealso cref="sl_list mappings for result ifd"></seealso>
+</documentation>
+
+</command>

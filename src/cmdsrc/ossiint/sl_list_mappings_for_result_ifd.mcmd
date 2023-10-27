@@ -1,0 +1,82 @@
+<command>
+<name>sl_list mappings for result ifd</name>
+<description>Call standard command and put a new remapped expression</description>
+
+<argument name="@*" required="yes" datatype="string">Whatever standard needs</argument>
+
+<argument name="uc_inhibit_doc_res_ifd_mapping_override" required="no" datatype="integer">
+Referenced in this command to not do override logic and go to higher level.  Which is also an override - see next arg
+</argument>
+<argument name="uc_call_std_sl_list_mappings_for_result_ifd" required="no" datatype="integer">
+See the override which is also custom.
+</argument>
+<argument name="uc_inhibit_enh_remap_logic" required="no" datatype="integer">
+See the override which is also custom
+</argument>
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161208 saad.ahmad - 10291 - Origial
+ */
+if ( @uc_inhibit_doc_res_ifd_mapping_override = 1 )
+    ^sl_list mappings for result ifd where @*
+else
+{
+    ^sl_list mappings for result ifd
+    |
+    if ( @remapped_expr is not null )
+    {
+        get ossi new remapped expression for documentation
+        |
+        if ( @new_remapped_expr is not null )
+            filter data
+            where moca_filter_level = 3
+            and remapped_expr = @new_remapped_expr
+        else
+            filter data
+            where moca_filter_level = 3
+    }
+    else
+        filter data
+        where moca_filter_level = 1
+}
+
+]]>
+</local-syntax>
+
+
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+Modify the output to put a hyper link
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+<exception value="eOK">The command completed successfully.</exception>
+<exception value="510">If variable was not passed and no default was passed.</exception>
+
+<example>
+sl_list mappings for result ifd
+where rifd_id = 'UC_ORDER_INB_IFD'
+and rifD_ver = 'V2.0'
+and rifd_seg_id = 'ORDER_SEG'
+and evt_id = 'MODIFY ORDER'
+and iifd_id = 'UC_SHP_OBDLV_SAVE_REPLICA05'
+and iifd_ver = '1.0'
+</example>
+
+<seealso cref="get ossi new remapped expression for documentation"></seealso>
+</documentation>
+
+</command>

@@ -1,0 +1,103 @@
+<command>
+<name>process ossi soap request core</name>
+<description>Process a complete SOAP request</description>
+
+<argument name="url" datatype="string"></argument>
+<argument name="sys_id" datatype="string"></argument>
+<argument name="uc_soap_request_envelope" datatype="string"></argument>
+
+<argument name="uc_soap_request_payload" datatype="string"></argument>
+<argument name="uc_soap_security_token_tag" datatype="string">This value within XML is blindly replaced with login token we have</argument>
+<argument name="uc_soap_action" datatype="string"></argument>
+<argument name="uc_soap_request_namespace_tag" datatype="string"></argument>
+
+
+<argument name="uc_soap_request_userid" datatype="string"></argument>
+<argument name="uc_soap_request_password" datatype="string"></argument>
+<argument name="uc_soap_action_login" datatype="string"></argument>
+<argument name="uc_soap_request_namespace_tag_login" datatype="string"></argument>
+
+<argument name="uc_force_relogin" datatype="string"></argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+publish data
+where uc_soap_request_envelope = nvl(@uc_soap_request_envelope, 'http://schemas.xmlsoap.org/soap/envelope/' )
+and my_uc_soap_request_namespace_tag = @uc_soap_request_namespace_tag
+and my_uc_soap_action = @uc_soap_action
+|
+{
+    process ossi soap login
+    where uc_soap_action = @uc_soap_action_login
+    and uc_soap_request_namespace_tag = @uc_soap_request_namespace_tag_login
+    |
+    {
+        publish data
+        where uc_soap_request_namespace_tag = @my_uc_soap_request_namespace_tag
+        and uc_soap_action = @my_uc_soap_action
+        |
+        get ossi soap request commmand
+        where les_cmd_prefix = 'uc_soap_request_envelope'
+        |
+        execute server command
+        where cmd = @uc_use_syntax
+        and inline = 1
+        |
+        {
+	        get ossi soap request commmand
+	        where les_cmd_prefix = 'uc_soap_request_fault_parse'
+	        |
+            publish data
+            where uc_error_parse_logic = @uc_use_syntax
+            |
+            get ossi soap request commmand
+            where les_cmd_prefix = 'uc_soap_request_get_status'
+            |
+            publish data
+            where uc_status_check_logic = @uc_use_syntax
+            |
+            get ossi soap request commmand
+            where les_cmd_prefix = 'uc_soap_request_success_parse'
+            |
+            publish data
+            where uc_success_parse_logic = @uc_use_syntax
+            |
+            get ossi soap request commmand
+            where les_cmd_prefix = 'uc_soap_request_relogin_needed'
+            |
+            publish data
+            where uc_relogin_needed_logic = @uc_use_syntax
+            |
+            if ( @uc_soap_security_token_tag is not null )
+                publish data
+                where uc_request_xml = ossi__replace ( @uc_request_xml, @uc_soap_security_token_tag, @uc_soap_login_token )
+            |
+            do ossi http request
+            where uc_soap_action = @uc_soap_action
+            and  body = @uc_request_xml
+            |
+            filter data
+            where moca_filter_level = 1
+            and uc_request_xml = @uc_request_xml
+            and uc_soap_login_token = @uc_soap_login_token
+            and uc_token_src_login = @uc_token_src_login
+            and uc_elapsed_login = @uc_elapsed_login
+        } /* have uc_request_xml */
+    }
+}
+
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This command may be used to process complete SOAP requests.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

@@ -1,0 +1,195 @@
+<command>
+<name>list ossi object dependencies for rollout</name>
+<description>If a rollout is to be created, given a bug# this will find if there are any dependency issues.</description>
+
+<argument name="uc_lookup_bug_id" required="yes" datatype="string">Bug for which we want to create the rollout - Multiple can be provided as coma-separted</argument>
+<argument name="uc_svn_log_file_path" required="yes" datatype="string">Log file we are processing</argument>
+<argument name="uc_bugzilla_product_name" required="yes" datatype="string">product name in bugzilla</argument>
+<argument name="uc_rollout_in_pd" required="yes" datatype="string">Rollout in PD already - issue is that if objects in this new bug have rollouts that are not in PD yet</argument>
+<argument name="uc_show_dep_issue_only" required="yes" datatype="string">Only show dependency violations</argument>
+
+<type>Local Syntax</type>
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+publish data
+where uc_svn_log_file_path = nvl (@uc_svn_log_file_path, @@LESDIR || '/log/svn_log.out' )
+and uc_bugzilla_product_name = nvl(@uc_bugzilla_product_name, 'ALCON' )
+and uc_show_dep_issue_only = nvl(@uc_show_dep_issue_only, 1 )
+|
+{
+    convert list where string = @uc_lookup_bug_id and type = 'S' and separator = ','
+    |
+    publish data
+    where uc_lookup_bug_id_list_sql = @retstr
+}
+|
+try
+{
+    /*
+     * Create a recordset of all bugs
+     */
+    publish data
+    where uc_select = " select distinct bugs.bug_id, bugs.version, products.name, bugs.bug_status, bugs.resolution, bugs.cf_rollout "
+                   || " from ossi_bug_ckin_data"
+                   || "      join bugs on bugs.bug_id =  ossi_bug_ckin_data.bug_id"
+                   || "      join products on products.id =  bugs.product_id"
+                   || " where products.name = '" || @uc_bugzilla_product_name || "'"
+                   || " and upper(short_desc) not like '%NOT ROLLED OUT%'"
+                   || " order by 1,2,3"
+    |
+    execute ossi bugzilla select
+    where uc_select_stmt = @uc_select
+    >> res_bugs
+    |
+    create internal table
+    where table_name = 'uc_bug_rollout'
+    and res = @res_bugs
+    ;
+    /*
+     * From bugzilla get the objets in 9044
+     */
+    publish data
+    where uc_select = " select *"
+                   || " from ossi_bug_ckin_data"
+                   || " where bug_id in ( " || @uc_lookup_bug_id_list_sql || ")"
+                   || " order by 1,2,3"
+    |
+    execute ossi bugzilla select
+    where uc_select_stmt = @uc_select
+    |
+    if ( @ossi_file_path is not null )
+    {
+        publish data
+        where uc_lookup_file_path = substr ( @ossi_file_path, instr(@ossi_file_path, '/') )
+        and uc_lookup_bug_id = string(@bug_id)
+        | 
+        {
+            /*
+             * See the list of objects in desc order
+             */
+            {
+                [
+                select x.*
+                from
+                (
+                    select uc_bugzilla_id, max(to_number(replace(uc_svn_rev,'r',''))) uc_svn_rev
+                    from usr_ossi_svn_hist_log 
+                    where uc_svn_object_path = @uc_lookup_file_path 
+                    and uc_bugzilla_id not in ( @uc_lookup_bug_id_list_sql:raw )
+                    group by uc_bugzilla_id
+                ) x
+                order by uc_svn_rev desc
+                ]
+                catch (-1403,510)
+                |
+                if ( @? = 0 )
+                {
+                    select from internal table
+                    where select_stmt = "select *"
+                    and table_name = 'uc_bug_rollout'
+                    and where_clause = 'where bug_id = ' || @uc_bugzilla_id
+                    catch (-1403,510)
+                    |
+                    if ( @? = 0  )
+                    {
+                        publish data
+                        where uc_dep_bug_id = @bug_id
+                        and uc_dep_rollout = @cf_rollout
+                        and uc_dep_status = @bug_status
+                        and uc_dep_resolution = @resolution
+                        and uc_num_rollout_name = float(substr(@cf_rollout, instr(@cf_rollout,'--')+2))
+                        |
+                        filter data
+                        where moca_filter_level = 1
+                        and uc_int_rollout_name = int(@uc_num_rollout_name)
+                        and uc_found_in_hist_log = 1
+                    }
+                }
+                else
+                    publish data
+                    where uc_found_in_hist_log = 0
+            }
+            |
+            if ( @uc_found_in_hist_log = 1 and 
+                 (
+                     @uc_dep_rollout is null 
+                     or
+                     (
+                         @uc_rollout_in_pd is not null and @uc_int_rollout_name > @uc_rollout_in_pd
+                     )
+                 )
+               )
+                publish data
+                where uc_dep_issue = 1
+            else
+                publish data
+                where uc_dep_issue = 0
+            |
+            if ( @uc_show_dep_issue_only != 1 or @uc_dep_issue = 1 )
+            {
+                /*
+                 * For object get the the data from the svn log
+                 */
+                publish data
+                where uc_lookup_bug_id = @uc_lookup_bug_id
+                and ossi_file_path = @ossi_file_path
+                and uc_lookup_file_path = @uc_lookup_file_path
+                and ossi_rev = @ossi_rev
+                and ossi_author = @ossi_author
+                and uc_dep_bug_id = @uc_dep_bug_id
+                and uc_dep_rollout = @uc_dep_rollout
+                and uc_num_rollout_name = @uc_num_rollout_name
+                and uc_int_rollout_name = @uc_int_rollout_name
+                and uc_dep_status = @uc_dep_status
+                and uc_dep_resolution = @uc_dep_resolution
+                and uc_dep_issue = @uc_dep_issue
+                and uc_found_in_hist_log = @uc_found_in_hist_log
+            }
+        }
+    }
+}
+finally
+{
+    release internal tables
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+Get all rollouts
+</remarks>
+
+<retcol name="uc_lookup_bug_id" type="String"></retcol>
+<retcol name="ossi_file_path" type="String"></retcol>
+<retcol name="uc_lookup_file_path" type="String">File path as known in SVN</retcol>
+<retcol name="ossi_rev" type="String"></retcol>
+<retcol name="ossi_author" type="String"></retcol>
+
+<retcol name="uc_dep_bug_id" type="String">Dependent bug</retcol>
+<retcol name="uc_dep_rollout" type="String">Rollout on dependent bug</retcol>
+<retcol name="uc_num_rollout_name" type="String">Numeric part of the rollout name</retcol>
+<retcol name="uc_int_rollout_name" type="String">Integer part of rollout name</retcol>
+<retcol name="uc_dep_status" type="String">Status of the bug</retcol>
+<retcol name="uc_dep_resolution" type="String">Resolution of the dependent bug</retcol>
+
+<retcol name="uc_dep_issue" type="String">Do we have an issue 1/0</retcol>
+<retcol name="uc_found_in_hist_log" type="String">Did we find this in history for any other bug</retcol>
+
+
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

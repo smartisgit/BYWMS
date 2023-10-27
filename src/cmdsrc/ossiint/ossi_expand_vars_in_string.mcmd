@@ -1,0 +1,58 @@
+<command>
+<name>ossi expand vars in string</name>
+<description>Analyze the passed in string and expand variables that are 
+specified with @ prefix based on MOCA stack</description>
+<type>C Function</type>
+<function>ossiExpandVarsInString</function>
+<argument name="sl_string" required="no" datatype="string">String to analyze</argument>
+
+<documentation>
+
+<remarks>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+This command may be used to expand the moca variables within a string.  Anything
+in the string that starts with a @ preix is considered to be a stack variable.
+<br/>
+The string that immediately follows the @ is looked up in the MOCA stack and its 
+value is used to replace the token as follows:
+<br/>
+If variable is found and is a string, value is enclosed in quotes when expanded
+<br/>
+If variable is found and is a number, value is not enclosed in quotes when expanded
+<br/>
+If variable is not found, the token is left as-is.
+<br/>
+If the variable has a suffix of :raw, then the value is replaced without quotes
+]]>
+</remarks>
+
+<retcol name="sl_expanded" type="string">String with variables expanded</retcol>
+
+<retrows>One row is returned.</retrows>
+
+<example>
+publish data where a='test_str' and b=2 and c='test_str2'
+|
+ossi expand vars in string
+where sl_string = 'test string @a @b @c:raw'
+
+will return
+
+sl_expanded
+----------------------------------
+test string 'test_str' 2 test_str2
+
+</example>
+
+<exception value="eOK">Normal successful completion</exception>
+</documentation>
+
+
+</command>

@@ -1,0 +1,35 @@
+<command>
+<name>ossi get_part_replication_sess_var</name>
+<description>Get session variable for part replication</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+publish data
+where prtnum = @moca_farg1
+and prt_client_id = nvl(@moca_farg2,'----')
+|
+publish data
+where sess_var = 'uc_repl_sess_var_wh_id_' || @prtnum || '_' || @prt_client_id
+   
+]]>
+</local-syntax>
+
+<documentation>
+
+<remarks>
+This command is used to get session variable against part replication.
+</remarks>
+
+<retcol name="sess_var" type="String"></retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

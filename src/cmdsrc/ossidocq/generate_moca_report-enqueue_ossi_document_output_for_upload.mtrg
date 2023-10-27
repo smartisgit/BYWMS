@@ -1,0 +1,27 @@
+<trigger>
+<name>enqueue ossi document output for upload</name>
+<on-command>generate moca report</on-command>
+<fire-sequence>100000</fire-sequence>
+
+
+<argument name="@*" required="yes" datatype="integer">Whatever is available</argument>
+
+
+<local-syntax>
+<![CDATA[
+
+
+{
+    enqueue ossi document output for upload
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<seealso cref="enqueue ossi document output for upload"></seealso>
+
+</documentation>
+
+</trigger>

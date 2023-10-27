@@ -1,0 +1,127 @@
+<command>
+<name>move ossi rule based condition expression</name>
+<description>Move up or down by srtseq</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+publish data
+where to_seqnum = null
+and to_srtseq = null
+|
+[
+select srtseq this_srtseq
+from usr_rule_engine_cond_expr
+where uc_rule_grp_id = @uc_rule_grp_id
+and uc_rule_subgrp_id = @uc_rule_subgrp_id
+and uc_rule_id = @uc_rule_id
+and seqnum = @seqnum
+]
+catch (-1403,510)
+|
+if ( @? = 0 )
+{
+    /*
+     * If moving up find the previous row by srtseq
+     */
+    if ( @up = '1' )
+        publish data
+        where srtseq_clause = "srtseq < " || @this_srtseq
+        and order_by_clause = "srtseq desc"
+    else
+        publish data
+        where srtseq_clause = "srtseq > " || @this_srtseq
+        and order_by_clause = "srtseq"
+    |
+    [
+    select x.*
+    from
+    (
+        select seqnum to_seqnum, srtseq to_srtseq
+        from usr_rule_engine_cond_expr
+        where uc_rule_grp_id = @uc_rule_grp_id
+        and uc_rule_subgrp_id = @uc_rule_subgrp_id
+        and uc_rule_id = @uc_rule_id
+        and @srtseq_clause:raw
+        /*#nobind*/ 
+        and rownum < 999999
+        order by @order_by_clause:raw
+    ) x
+    where rownum < 2
+    ]
+    catch (-1403,510)
+    |
+    if ( @? = 0 )
+    {
+        /*
+         * We are going to change both rows.  the passed in seqnum gets to_srtseq
+         * and to_seqnum gets passed in srtseq
+         */
+        [[
+        moca.executeCommand ( " change ossi rule based condition expression" +
+                              " where uc_rule_grp_id = @uc_rule_grp_id" +
+                              " and uc_rule_subgrp_id = @uc_rule_subgrp_id" +
+                              " and uc_rule_id = @uc_rule_id" +
+                              " and seqnum = @seqnum" +
+                              " and srtseq = @to_srtseq" +
+                              " and uc_verify_srtseq = 0",
+                              [uc_rule_grp_id:uc_rule_grp_id,
+                               uc_rule_subgrp_id:uc_rule_subgrp_id,
+                               uc_rule_id:uc_rule_id,
+                               seqnum:seqnum,
+                               to_srtseq:to_srtseq]
+                             );
+        moca.executeCommand ( " change ossi rule based condition expression" +
+                              " where uc_rule_grp_id = @uc_rule_grp_id" +
+                              " and uc_rule_subgrp_id = @uc_rule_subgrp_id" +
+                              " and uc_rule_id = @uc_rule_id" +
+                              " and seqnum = @seqnum" +
+                              " and srtseq = @to_srtseq" +
+                              " and uc_verify_srtseq = 0",
+                              [uc_rule_grp_id:uc_rule_grp_id,
+                               uc_rule_subgrp_id:uc_rule_subgrp_id,
+                               uc_rule_id:uc_rule_id,
+                               seqnum:to_seqnum,
+                               to_srtseq:this_srtseq]
+                             );
+    
+        ]]
+        ;
+        publish data
+        where uc_move_dir = iif ( @up = '1', 'UP', 'DOWN' )
+    }
+    else
+    {
+        publish data
+        where uc_move_dir = ''
+    }
+    |
+    publish data
+    where uc_rule_grp_id = @uc_rule_grp_id
+    and uc_rule_subgrp_id = @uc_rule_subgrp_id
+    and uc_rule_id = @uc_rule_id
+    and seqnum = @seqnum
+    and old_srtseq = @this_srtseq
+    and new_srtseq = @to_srtseq
+    and to_seqnum = @to_seqnum
+    and uc_move_dir = @uc_move_dir
+    and srtseq_clause = @srtseq_clause
+    and order_by_clause = @order_by_clause
+}
+
+]]>
+</local-syntax>
+<argument name="polcod" required="yes" datatype="string"></argument>
+<argument name="polvar" required="yes" datatype="string"></argument>
+<argument name="wh_id" required="yes" datatype="string"></argument>
+<argument name="rtnum1" required="no" datatype="integer"></argument>
+
+<documentation>
+<remarks>
+This command is used to move rule up or down by condition expression.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

@@ -1,0 +1,111 @@
+<command>
+<name>get ossi mapped value</name>
+<description>Get mapped value from here to receipient</description>
+<type>Local Syntax</type>
+
+<argument name="sys_id" required="yes" datatype="string">System for which we need to do the conversion</argument>
+<argument name="value" required="yes" datatype="string">Current value</argument>
+<argument name="map_type" required="yes" datatype="string">Which Map to use</argument>
+<argument name="inhibit_default" required="no" datatype="string">Do not use default value, default 0</argument>
+<argument name="wh_id" required="no" datatype="string"></argument>
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+publish data 
+where sys_id = @sys_id
+and   value  = @value
+and   map_type = @map_type
+and   fld_pos = @fld_pos
+and   inhibit_default = nvl ( @inhibit_default, '0' )
+and   wh_id = nvl(nvl(@wh_id,@whse_id),'----')
+|
+publish data
+where polcod = ossi__get_polcod_by_sys_id(@sys_id)
+|
+publish data
+where uc_cache_name = 'get_ossi_mapped_value_' || @sys_id || '_' || @wh_id || '_' || @map_type || '_' || @value || '_' || @inhibit_default
+|
+{
+   get ossi data from cache
+   catch (-1403,510)
+   |
+   if ( @? = 0 )
+   {
+      publish data
+      where mapped_value = @uc_cache_value
+   }   
+   else
+   {
+      [select rtstr1 mapped_value
+      from
+      (
+         select y.*
+         from
+         (
+            select 1 ord,
+                   rtstr1
+            from poldat_view pv 
+            where polcod = @polcod
+            and polvar = @map_type
+            and polval like nvl(@value,'----')
+            and rtnum1 = 1
+            and wh_id = @wh_id
+            union all
+            select 2 ord,
+                   rtstr1
+            from poldat_view pv 
+            where polcod = @polcod
+            and polvar = @map_type
+            and polval = '%'
+            and rtnum1 = 1
+            and @inhibit_default = '0'
+            and wh_id = @wh_id
+            union all
+            select 3 ord,
+                   @value
+            from dual
+            where @inhibit_default = '0'
+         ) y
+         where rownum < 999999
+         order by 1
+      ) x
+      where rownum < 2
+      ]
+      catch (-1403,510)
+      |
+      if ( @? != 0 )
+         publish data where mapped_value = ''
+      |
+      save ossi data to cache
+      where uc_cache_value = @mapped_value
+      |
+      publish data
+      where mapped_value = @mapped_value
+   }
+   |
+   if ( int(@fld_pos) > 0 )
+      publish data
+      where mapped_value = ossi__get_fld_from_list ( @mapped_value, @fld_pos, '\|' )
+   else
+      publish data 
+      where mapped_value = @mapped_value
+}
+
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This command may be used to get mapped values.
+</remarks>
+
+<retcol name="sys_grp_id" type="String"></retcol>
+
+</documentation>
+</command>

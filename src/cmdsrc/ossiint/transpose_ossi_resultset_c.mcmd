@@ -1,0 +1,34 @@
+<command>
+<name>transpose ossi resultset c</name>
+<description>
+Transpose a resultset
+</description>
+<type>C Function</type>
+<function>usrOssiTransposeResult</function>
+<argument name="colnam"    required="yes" datatype="string">Column whose data forms column header</argument>
+<argument name="attr_expr" required="yes" datatype="string">Expression for the row that makes the resukt</argument>
+
+<documentation>
+
+
+<remarks>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+
+??
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+<example>
+??
+</example>
+
+<exception value="eOK">Normal successful completion</exception>
+</documentation>
+</command>

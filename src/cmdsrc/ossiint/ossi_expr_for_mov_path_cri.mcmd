@@ -1,0 +1,95 @@
+<command>
+<name>ossi expr_for_mov_path_cri</name>
+<description>Convert the move path to an expression</description>
+<type>Local Syntax</type>
+
+
+<argument datatype="string" name="moca_farg1">wh_id</argument>
+<argument datatype="string" name="moca_farg2">Criteria Id</argument>
+<argument datatype="string" name="moca_farg3">Use moca stack variabales</argument>
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+publish data
+where wh_id   = @moca_farg1
+and   cri_id  = @moca_farg2
+and   use_moca_stack = nvl(@moca_farg3,'1' )
+|
+publish data
+where uc_cache_grp = 'OSSI_MOV_PATH_CRI'
+and   uc_inline = 1
+and   uc_cache_key = @wh_id || '__' || @cri_id || '__' || @use_moca_stack
+|
+{
+   execute ossi moca and cache
+   where uc_moca_cmd = "[
+      select *
+      from mov_path_cri
+      where wh_id = @wh_id
+      and cri_id = @cri_id
+      order by seqnum] catch(-1403,510)"
+   >> res
+   |
+   if ( rowcount(@res) > 0 )
+   {
+      [[
+      StringBuffer ret = new StringBuffer();
+      String this_fld; 
+      boolean first = true;
+      //
+      while ( res.next() )
+      {
+         if ( res.getString("field_name") != null )
+         {
+            if ( use_moca_stack == "1" )
+               this_fld = "@" + res.getString("field_name");
+            else
+               this_fld = res.getString("table_nam") + "." +  res.getString("field_name");
+         }
+         else
+            this_fld = "";
+         //
+         if ( !first)
+            ret.append ( " " );
+         //
+         ret.append ( res.getString("grpopr") );
+         ret.append ( " " );
+         if ( this_fld != "" )
+         {
+            ret.append ( this_fld );
+            ret.append ( " " );
+            ret.append ( res.getString("operator") );
+            ret.append ( " '" );
+            ret.append ( res.getString("value") );
+            ret.append ( "'" );
+         }
+         first = false;
+      }
+      [ret:ret.toString()]
+      ]]
+   }
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+MOCA Function to get the movement path criteria expression so that it can be evaluated
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+
+</command>

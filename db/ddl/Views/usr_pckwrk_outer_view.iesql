@@ -1,0 +1,91 @@
+#use $DCSDIR/include
+#include <dcsddl.h>
+#include <dcscolwid.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+#use $SALDIR/include
+
+#include <salcolwid.h>
+
+mset command on
+
+/*
+ * This view provides pckwrk data and its outer carton data.  Standard BY pckwrk data can be such that
+ * it can have cartons within cartons.  And for somc queries we are interested in outer carton stuff.
+ * This has all of that complexity in it
+ */
+[drop view usr_pckwrk_outer_view] catch(@?)
+;
+[
+create view usr_pckwrk_outer_view
+as
+select x.*,
+       case
+           when x.uc_is_outer_flg = 1 and 
+                x.uc_outer_ctnnum_tmp is null and 
+                x.uc_outer_lodlvl = 'S' and 
+                x.uc_outer_uc_area_proc_cd like 'MHE%'
+           then 1
+           else 0
+       end uc_mhe_case_flg
+from
+(
+    select 
+           case 
+               when (outer_pw_hdr.wrkref is null or outer_pw_hdr.wrkref = pckwrk_hdr.wrkref) and pckwrk_hdr.ctnnum is null  then 1
+               else 0
+           end uc_is_outer_flg,
+           case 
+               when (outer_pw_hdr.wrkref != pckwrk_hdr.wrkref) or pckwrk_hdr.ctnnum is not null then 1
+               else 0
+           end uc_is_inner_flg,
+           nvl( outer_pw_hdr.wrkref, pckwrk_hdr.wrkref ) uc_outer_wrkref,
+           nvl( outer_pw_hdr.ctncod, pckwrk_hdr.ctncod ) uc_outer_ctncod,
+           nvl( outer_pw_dtl.subnum, pckwrk_dtl.subnum ) uc_outer_subnum,
+           nvl( outer_pw_hdr.lodlvl, pckwrk_hdr.lodlvl ) uc_outer_lodlvl,
+           nvl( outer_pw_hdr.prtnum, pckwrk_hdr.prtnum ) uc_outer_prtnum,
+           nvl( outer_pw_hdr.wrktyp, pckwrk_hdr.wrktyp ) uc_outer_wrktyp,
+           nvl( outer_pw_dtl.subucc, pckwrk_dtl.subucc ) uc_outer_subucc,
+           nvl( outer_pw_dtl.cur_cas,     pckwrk_dtl.cur_cas) uc_outer_cur_cas,
+           nvl( outer_pw_dtl.tot_cas_cnt, pckwrk_dtl.tot_cas_cnt) uc_outer_tot_cas_cnt,
+           nvl( outer_pw_hdr.srcloc, pckwrk_hdr.srcloc ) uc_outer_srcloc,
+           nvl( outer_lt.loc_typ,   loc_typ.loc_typ ) uc_outer_loc_typ,
+           decode ( outer_pw_hdr.wrkref, null, loc_typ.uc_area_proc_cd, outer_lt.uc_area_proc_cd) uc_outer_uc_area_proc_cd,
+           nvl( outer_pw_hdr.ctnnum, pckwrk_hdr.ctnnum ) uc_outer_ctnnum_tmp,
+           pckwrk_hdr.wrkref  uc_inner_wrkref,
+           pckwrk_hdr.wrktyp  uc_inner_wrktyp,
+           pckwrk_hdr.lodlvl  uc_inner_lodlvl,
+           pckwrk_hdr.prtnum  uc_inner_prtnum,
+           pckwrk_hdr.ctnnum  uc_inner_ctnnum,
+           pckwrk_hdr.ctncod  uc_inner_ctncod,
+           pckwrk_dtl.subnum  uc_inner_subnum,
+           pckwrk_hdr.srcloc  uc_inner_srcloc,
+           loc_typ.loc_typ    uc_inner_loc_typ,
+           loc_typ.uc_area_proc_cd uc_inner_uc_area_proc_cd,
+           outer_pw_dtl.subnum uc_tmp_subnum,
+           outer_pw_hdr.wrkref uc_tmp_wrkref,
+           outer_pw_hdr.ctncod uc_tmp_ctncod,
+           outer_pw_hdr.ctnnum uc_tmp_ctnnum,
+           outer_pw_hdr.srcloc uc_tmp_srcloc,
+           outer_lt.loc_typ    uc_tmp_loc_typ,
+           outer_lt.uc_area_proc_cd uc_tmp_uc_area_proc_cd
+    from pckwrk_hdr
+         left outer join pckwrk_dtl on pckwrk_dtl.wrkref = pckwrk_hdr.wrkref
+         join locmst on locmst.wh_id = pckwrk_hdr.wh_id and locmst.stoloc = pckwrk_hdr.srcloc
+         join loc_typ on loc_typ.loc_typ_id = locmst.loc_typ_id
+         left outer join pckwrk_dtl parent_pw_dtl 
+             on parent_pw_dtl.subnum = pckwrk_dtl.subnum
+             and parent_pw_dtl.wrktyp in ( 'P', 'B' )
+         left outer join pckwrk_hdr parent_pw_hdr 
+             on parent_pw_hdr.wrkref = parent_pw_dtl.wrkref
+         left outer join pckwrk_dtl outer_pw_dtl 
+             on outer_pw_dtl.subnum = parent_pw_hdr.ctnnum
+         left outer join pckwrk_hdr outer_pw_hdr 
+             on outer_pw_hdr.wrkref = outer_pw_dtl.wrkref
+         left outer join locmst outer_loc on outer_loc.wh_id =outer_pw_hdr.wh_id and outer_loc.stoloc = outer_pw_hdr.srcloc
+         left outer join loc_typ outer_lt on outer_lt.loc_typ_id = outer_loc.loc_typ_id
+) x
+]
+RUN_DDL
+
+mset command on

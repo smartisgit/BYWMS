@@ -1,0 +1,63 @@
+<command>
+<name>change ossi default settings for auto wave rule</name>
+<description>This command will list the default settings for auto wave rule</description>
+ 
+<argument name="wh_id" required="yes"   datatype="string"></argument>
+<argument name="uc_parm_id"   required="yes" datatype="string">Auto wave rule id</argument>
+<argument name="uc_parm_val_expr"   required="no"  datatype="string">Auto wave detail context code</argument>
+<argument name="uc_parm_enabled"    required="no"  datatype="string">Auto wave detail column name</argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+   [
+    select min(srtseq) srtseq
+    from poldat
+    where polcod = 'USR-WAVE-PLANNING'
+    and polvar = 'DEFAULT-AUTO-WAVE-ALLOC-PARAMS'
+    and polval = @uc_parm_id
+    and wh_id_tmpl = '----'
+   ]
+   |
+   change policy
+      where polcod = 'USR-WAVE-PLANNING'
+        and polvar = 'DEFAULT-AUTO-WAVE-ALLOC-PARAMS'
+        and polval = @uc_parm_id
+        and srtseq = @srtseq
+        and wh_id_tmpl = '----'
+        and rtstr1 = @uc_parm_val_expr
+        and rtnum1 = @uc_parm_enabled
+   
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This will update the default settings for auto wave rule
+</p>
+]]>
+</remarks>
+
+<retrows>0</retrows>
+
+
+<example>
+<![CDATA[
+<p>
+</p>
+]]>
+
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+<seealso cref="list ossi default settings for auto wave rule"></seealso>
+
+</documentation>
+
+
+</command>

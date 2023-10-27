@@ -1,0 +1,29 @@
+<trigger>
+<name>execute ossi conditional commands</name>
+<on-command>remove appointment</on-command>
+<fire-sequence>20000</fire-sequence>
+
+<argument name="appt_id" required="yes" datatype="string"></argument>
+
+
+<local-syntax>
+<![CDATA[
+
+{
+    execute ossi conditional commands for trailer
+	where uc_rule_grp_id = 'OSSI-APPT-CREATED'
+	and uc_rule_subgrp_id ='GLOBAL-MAP'
+    and uc_transaction_action = 'D'
+    catch (-1403,510)
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<seealso cref="change appointment"></seealso>
+
+</documentation>
+
+</trigger>

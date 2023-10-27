@@ -1,0 +1,18 @@
+<project name="ossi-conrulmnt" default="build">
+ 
+  <property environment="env" />
+  <import file="${env.REFSDIR}/buildfiles/client.xml" />
+
+  <property name="appId" value="ossi-conrulmnt" />
+  <property name="configFile" value="ossi-conrulmnt.xml" />
+ 
+
+  <target name="build" description="build the app" depends="clean">
+    <csbuilder-macrodef configFile="${configFile}" appId="${appId}" />
+  </target>
+ 
+  <target name="clean" description="clean admin app">
+      <delete dir='${env.REFSDIR}/web/${appId}'/>
+	  <delete dir='${env.REFSDIR}/deploy/${appId}'/>
+  </target>
+</project>

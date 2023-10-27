@@ -1,0 +1,25 @@
+#use $DCSDIR/include
+#include <dcsddl.h>
+#include <dcscolwid.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+
+#use $SALDIR/include
+#include <salcolwid.h>
+
+mset command on
+[
+ALTER_TABLE_TABLE_INFO(invsub)
+ALTER_TABLE_ADD_COLUMN_START(uc_packcmpdt)
+     DATE_TY
+ALTER_TABLE_ADD_COLUMN_END
+] catch (-2705,-1430 )
+RUN_DDL
+
+create db column comment 
+where table_name   = 'invsub' 
+and column_name    = 'uc_packcmpdt'
+and column_comment = 'When pack station user indicates that packing is completed for a carton, this date is set'
+RUN_DDL
+
+mset command off

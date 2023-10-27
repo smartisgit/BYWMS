@@ -1,0 +1,29 @@
+<command>
+<name>ossi_sl_unload sl_retr_mthd_impl</name>
+<description>Sl unload sl retr method implementation</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ */
+sl_unload gen_maint where table_name = 'sl_retr_mthd_impl_def'
+;
+sl_unload gen_maint where table_name = 'sl_retr_mthd_impl_alg_bnd_data'
+
+]]>
+</local-syntax>
+<argument name="retr_mthd_id" required="yes" datatype="string"></argument>
+<argument name="retr_mthd_impl_genid" required="yes" datatype="string"></argument>
+<documentation>
+
+<remarks>
+This command is used for Sl unload sl retr method implementation
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

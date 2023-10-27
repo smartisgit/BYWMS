@@ -1,0 +1,66 @@
+<command>
+<name>change usr issue</name>
+<description>Change an issue. If activating, checks that the user is not already assigned to another active issue.</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ */
+if (@uc_ossi_stat_cd = 'A')
+{
+  [select uc_ossi_issue_id uc_assigned_issue,
+          uc_ossi_issue_assign_seq uc_assigned_seq
+     from usr_ossi_issue_assign
+    where uc_ossi_user_id = @uc_ossi_user_id
+      and uc_ossi_stat_cd = 'A'
+  ] catch (-1403)
+  |
+  if (@? = 0 and to_number(@uc_assigned_seq) != to_number(@uc_ossi_issue_assign_seq)
+    and @uc_assigned_issue != @uc_ossi_issue_id)
+  {
+    set return status 
+    where status = ossi__e ( "eUSR_OSSI_ISSUE_USER_ALREADY_ASSIGNED" )
+    and usr_id = @uc_ossi_user_id
+    and uc_ossi_issue_id = @uc_assigned_issue
+  }
+  /* Allow multiple users to work on the same issue now, 
+     maybe control with policy later */
+  /*
+  |
+  [select uc_ossi_user_id
+     from usr_ossi_issue_assign
+   where uc_ossi_issue_id = @uc_ossi_issue_id
+     and uc_ossi_stat_cd = 'A'
+  ] catch (-1403)
+  |
+  if (@? = 0)
+  {
+    set return status 
+    where status = ossi__e ( "eUSR_OSSI_ISSUE_ALREADY_ASSIGNED" )
+    and uc_ossi_issue_id = @uc_ossi_issue_id
+    and usr_id = @uc_ossi_user_id
+  }  
+  */
+  }
+|
+sl_change gen_maint where table_name = 'usr_ossi_issue_assign'
+                      and uc_ossi_upd_dt = sysdate
+                      and uc_ossi_upd_usr_id = @@USR_ID
+]]>
+</local-syntax>
+<argument datatype="integer" name="uc_ossi_issue_assign_seq" required="yes">Issue Assignment Sequence</argument>
+<argument datatype="integer" name="uc_ossi_issue_id" required="yes">Issue ID</argument>
+<argument datatype="string" name="uc_ossi_user_id" required="yes">User</argument>
+<documentation>
+
+<remarks>
+This command can be used to change user issue.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

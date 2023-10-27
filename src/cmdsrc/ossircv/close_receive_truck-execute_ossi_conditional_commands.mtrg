@@ -1,0 +1,36 @@
+<trigger>
+<name>execute ossi conditional commands</name>
+<on-command>close receive truck</on-command>
+<description>Execute the conditional rules post master receipt close</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+if ( @trknum is not null and @uc_inhibit_change_hook != '1')
+{
+    if ( ossi__polval ( 'USR-OSSI-DATA-CHANGE-HOOK', 'CMD_CLOSE_RECEIVE_TRUCK_POST', 'ENABLED', '', 'rtnum1', nvl(@wh_id,@@WH_ID)) != 0 )
+    {
+        execute ossi les_cmd
+        where les_cmd_id = 'uc_ctxt_post_action_cmd_rcvtrk_closed'
+        and uc_les_cmd_inline = 1
+        and exec_uc_les_cmd_cust_lvl = null
+        and uc_inhibit_return_extra_columns = 1
+        catch (-1403,510)
+        |
+        if ( @? = 0 )
+        {
+            execute ossi all conditional rules
+            where uc_rule_grp_id = 'OSSI-RCVTRK-CLOSED'
+            and uc_rule_subgrp_id = 'GLOBAL-MAP'
+            and uc_cache_key= null
+            catch (-1403,510)
+        }
+    }
+}
+
+
+]]>
+</local-syntax>
+<fire-sequence>100000</fire-sequence>
+<enable>yes</enable>
+</trigger>

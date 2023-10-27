@@ -1,0 +1,40 @@
+<command>
+<name>ossi int_decrypt</name>
+<description>Decrypt a value for integration</description>
+
+<argument datatype="string" name="moca_farg1">encrypted value</argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+/*
+ * Change Log
+ * Initial Check In
+ * 20210418 saad.ahmad - 11989 - Autostore project
+ */
+manage ossi encrypted values for integration
+where uc_data = @moca_farg1
+and uc_enc_mode = 'D'
+|
+publish data
+where usr_pswd = @usr_pswd
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+This is to simplify call to decrypt the values.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+
+<retrows>1</retrows>
+<retcol name="usr_pswd" type="COMTYP_CHAR">This is the encrypted or decrypted.  Name is this because this is black-listed arg typically so this will not show in trace</retcol>
+
+<seealso cref="manage ossi encrypted values for integration"></seealso>
+
+</documentation>
+</command>

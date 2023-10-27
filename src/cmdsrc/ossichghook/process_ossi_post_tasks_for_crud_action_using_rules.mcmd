@@ -1,0 +1,215 @@
+<command>
+<name>process ossi post tasks for crud action using rules</name>
+<description>For several type of CRUD operations we have a set of hooks that run before and then some that run after.
+This command encapsulates that logic</description>
+
+<argument name="uc_table_list_set_defaults" required="no" datatype="string">Optionally passed in to indicate which tables we want to default here</argument>
+<argument name="uc_set_default_rule_grp_id" required="no" datatype="string">The rule group for defaulting may be passed in</argument>
+
+<argument name="uc_table_rule_typ" required="no" datatype="string">When setting defaults, what is our prefix
+of the rules in usr_rule_engine_expr.  Default is SET.  PLN is passed when same is called after shipment is planned</argument>
+
+
+
+<argument name="uc_rule_grp_id" required="no" datatype="string">This is the rule group for actions</argument>
+<argument name="uc_rule_subgrp_id" required="no" datatype="string">This is the rule sub-group for actions</argument>
+
+<argument name="uc_les_cmd_cond_rules" required="no" datatype="string">This is the transaction action passed to conditional rules.  If nukk
+then for the first table in uc_table_list_set_defaults it will be uc_ctxt_table_data_set-[table]</argument>
+<argument name="uc_transaction_action" required="no" datatype="string"></argument>
+
+
+
+<type>Local Syntax</type>
+
+<local-syntax>
+<![CDATA[
+
+/*
+ * Revision Log
+ * 2021-11-30 saad.ahmad 12539 - Change Hook
+ */
+publish data
+where uc_sess_var_need_rules = 'process_ossi_post_tasks_need_action'
+and uc_sess_var_cmd_cond_rules = 'process_ossi_post_tasks_need_action_cond_rule_cmd'
+and uc_table_rule_typ = nvl(@uc_table_rule_typ, 'SET' )
+|
+if ( @uc_les_cmd_cond_rules is not null )
+    save session variable
+    where name = @uc_sess_var_cmd_cond_rules
+    and value = @uc_les_cmd_cond_rules
+else
+    save session variable
+    where name = @uc_sess_var_cmd_cond_rules
+    and value = ''
+|
+save session variable
+where name = @uc_sess_var_need_rules
+and value = '0'
+|
+{
+    /*
+     * We want to first see if there is anything to do.  That is important so that if there is nothing to do, we can get out
+     * and dont run the context command etc.
+     * Idea is to look up all rules and if we have anything then set session variable definde above to 1
+     */
+    if ( @uc_table_list_set_defaults is not null and @uc_set_default_rule_grp_id is not null )
+    {
+        convert list
+        where string = @uc_table_list_set_defaults
+        and type = 'L'
+        and separator = ','
+        |
+        {
+            publish data
+            where my_table_name = lower(@retstr)
+            |
+            /*
+             * If we do not have an les command for conditional rules then we will use the first table command as it
+             */
+            if ( ossi__sess_var ( @uc_sess_var_cmd_cond_rules, '', 'Y' ) is null )
+            {
+                save session variable
+                where name = @uc_sess_var_cmd_cond_rules
+                and value = lower('uc_ctxt_table_data_' || @uc_table_rule_typ || '-' || @my_table_name)
+            }
+            |
+            publish ossi default values for rule grp for table data
+            where uc_rule_grp_id = @uc_set_default_rule_grp_id
+            and uc_rule_subgrp_id_prefix = @uc_table_rule_typ
+            and uc_mode_get_table_list_only = 1
+            and uc_get_ctxt_cmd = "noop"
+            |
+            if ( @uc_set_default_table_list is not null and rowcount(@uc_set_default_table_list) > 0 )
+                save session variable
+                where name = @uc_sess_var_need_rules
+                and value = '1'
+        }
+    }
+    ;
+    /* Now see if we have any conditional rules to run */
+    if ( @uc_rule_grp_id is not null )
+        execute ossi all conditional rules
+        where uc_rule_grp_id = @uc_rule_grp_id
+        and uc_rule_subgrp_id =@uc_rule_subgrp_id
+        and uc_cache_key= null
+        and uc_mode_get_action_cmds = 1
+        catch (-1403,510)
+        >> uc_res_actions
+    else
+        noop >> uc_res_actions
+    |
+    if ( @? = 0 and rowcount(@uc_res_actions) > 0 )
+        save session variable
+        where name = @uc_sess_var_need_rules
+        and value = '1'
+    ;
+    if ( ossi__sess_var ( @uc_sess_var_need_rules, '0', 'Y' ) = '1' )
+    {
+        if ( @uc_table_list_set_defaults is not null and @uc_set_default_rule_grp_id is not null )
+        {
+            convert list
+            where string = @uc_table_list_set_defaults
+            and type = 'L'
+            and separator = ','
+            |
+            {
+                publish data
+                where my_table_name = lower(@retstr)
+                |
+                publish data
+                where uc_get_data_les_cmd = lower('uc_ctxt_table_data_' || @uc_table_rule_typ || '-' || @my_table_name)
+                |
+                execute ossi les_cmd
+                where les_cmd_id = @uc_get_data_les_cmd
+                and uc_les_cmd_inline = 1
+                and exec_uc_les_cmd_cust_lvl = null
+                and uc_inhibit_return_extra_columns = 1
+                catch (-1403,510)
+                >> ctxt_res
+                |
+                if ( @? = 0 and rowcount(@ctxt_res) > 0 )
+                {
+                    publish data combination
+                    where res = @ctxt_res
+                    |
+                    process ossi default values for rule grp for table data
+                    where uc_rule_grp_id = @uc_set_default_rule_grp_id
+                    and uc_table_name = @my_table_name
+                    and uc_get_ctxt_cmd = "noop" /* since we have data in context already */
+                } /* have data */
+            } /* convert list scope */
+        } /* need to do defaulting logic since  */
+        ;
+        if ( @uc_rule_grp_id is not null )
+        {
+            if ( ossi__sess_var ( @uc_sess_var_cmd_cond_rules, '', 'Y' ) is not null )
+                execute ossi les_cmd
+                where les_cmd_id = ossi__sess_var ( @uc_sess_var_cmd_cond_rules, '', 'Y' )
+                and uc_les_cmd_inline = 1
+                and exec_uc_les_cmd_cust_lvl = null
+                and uc_inhibit_return_extra_columns = 1
+                catch (-1403,510)
+            |
+            execute ossi all conditional rules
+            where uc_rule_grp_id = @uc_rule_grp_id
+            and uc_rule_subgrp_id =@uc_rule_subgrp_id
+            and uc_cache_key= null
+            and uc_transaction_action = @uc_transaction_action
+            catch (-1403,510)
+        }
+        ;
+        publish data
+        where uc_post_action_done = 1
+    } /* have something to do */
+    else
+    {
+        publish data
+        where uc_post_action_done = 0
+    } /* nothing to do */
+    |
+    publish data
+    where uc_post_action_done = @uc_post_action_done
+    and uc_table_list_set_defaults = @uc_table_list_set_defaults
+    and uc_set_default_rule_grp_id = @uc_set_default_rule_grp_id
+    and uc_table_rule_typ = @uc_table_rule_typ
+    and uc_rule_grp_id = @uc_rule_grp_id
+    and uc_rule_subgrp_id = @uc_rule_subgrp_id
+    and uc_cond_rule_les_cmd_used = ossi__sess_var ( @uc_sess_var_cmd_cond_rules, '', 'Y' )
+}
+  
+]]>
+
+</local-syntax>
+
+<documentation>
+
+<remarks>
+<![CDATA[
+  <p>
+  For the crud components the code pattern there is very similar across objects. This perfoms the typical post action which include
+  1. process the SET rule for the list of tables
+  2. execution conditional actions
+  </p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+<retcol name="uc_post_action_done" type="integer">1 means some work was done.  0 means no work was done</retcol>
+<retcol name="uc_table_list_set_defaults" type="String">Input echoed</retcol>
+<retcol name="uc_set_default_rule_grp_id" type="String">Input echoed</retcol>
+<retcol name="uc_table_rule_typ" type="String">Input echoed</retcol>
+
+<retcol name="uc_rule_grp_id" type="String">Input echoed</retcol>
+<retcol name="uc_rule_subgrp_id" type="String">Input echoed</retcol>
+<retcol name="uc_cond_rule_les_cmd_used" type="String">LES Command used for conditional rules</retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+
+<seealso cref="execute ossi all conditional rules"></seealso>
+<seealso cref="process ossi default values for rule grp for table data"></seealso>
+<seealso cref="register ossi object created core">See trigger [execute ossi conditional commands] to see how it is caleld</seealso>
+
+
+</documentation>
+</command>

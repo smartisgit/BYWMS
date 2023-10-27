@@ -1,0 +1,2 @@
+polcod,polvar,polval,wh_id_tmpl,srtseq,rtstr1,rtstr2,rtnum1,rtnum2,rtflt1,rtflt2,grp_nam
+USR-OSSI-APP-MONITOR,SETUP,MAX-TRIES-READ-MSGLOG,----,1,set rtnum1,Default is assumed to be 10,10,0,0.0,0.0,OSSISVN_10731

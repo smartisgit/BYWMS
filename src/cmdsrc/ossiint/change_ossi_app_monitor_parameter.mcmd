@@ -1,0 +1,49 @@
+<command>
+<name>change ossi app monitor parameter</name>
+<description>change an application monitor parameter</description>
+
+<argument name="uc_monitor_id" required="yes" datatype="string"></argument>
+<argument name="srtseq" required="yes" datatype="string"></argument>
+<argument name="uc_monitor_param_id" required="yes" datatype="string"></argument>
+<argument name="uc_monitor_param_val_str" required="yes" datatype="string"></argument>
+<argument name="uc_monitor_param_val_num1" required="yes" datatype="string"></argument>
+<argument name="uc_monitor_param_val_num2" required="yes" datatype="string"></argument>
+<argument name="uc_monitor_param_val_flt1" required="yes" datatype="string"></argument>
+<argument name="uc_monitor_param_val_flt2" required="yes" datatype="string"></argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+change policy
+where polcod = 'USR-OSSI-APP-MONITOR'
+and polvar = @uc_monitor_id
+and polval = 'PARAMETERS'
+and wh_id = '----'
+and srtseq = @srtseq
+and rtstr1 = @uc_monitor_param_id
+and rtstr2 = @uc_monitor_param_val_str
+and rtnum1 = @uc_monitor_param_val_num1
+and rtnum2 = @uc_monitor_param_val_num2
+and rtflt1 = @uc_monitor_param_val_flt1
+and rtflt2 = @uc_monitor_param_val_flt2
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<remarks>
+This command is used to change ossi app monitor parameters.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

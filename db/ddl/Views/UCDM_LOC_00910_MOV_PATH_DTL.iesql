@@ -1,0 +1,42 @@
+#use $DCSDIR/include
+
+#include <dcsddl.h>
+
+#include <dcscolwid.h>
+
+#include <dcstbldef.h>
+
+#include <sqlDataTypes.h>
+
+
+#use $SALDIR/include
+
+#include <salcolwid.h>
+
+mset command on
+
+[
+DROP_VIEW(UCDM_LOC_00910_MOV_PATH_DTL)
+] catch (ERR_CANNOT_DROP_TABLE_NOT_FOUND)
+RUN_DDL
+
+mset command off
+
+CREATE_VIEW(UCDM_LOC_00910_MOV_PATH_DTL)
+select mov_path_dtl.*,
+        mz_src.mov_zone_cod src_mov_zone_cod,
+		mz_src.wh_id src_mov_zone_cod_wh_id,
+        mz_dst.mov_zone_cod dst_mov_zone_cod,
+		mz_dst.wh_id dst_mov_zone_cod_wh_id,
+        mz_hop.mov_zone_cod hop_mov_zone_cod,
+		mz_hop.wh_id hop_mov_zone_cod_wh_id
+   from mov_path_dtl
+   left join mov_zone mz_src
+     on mz_src.mov_zone_id = mov_path_dtl.src_mov_zone_id
+   left join mov_zone mz_dst
+     on mz_dst.mov_zone_id = mov_path_dtl.dst_mov_zone_id
+   left join mov_zone mz_hop
+     on mz_hop.mov_zone_id = mov_path_dtl.hop_mov_zone_id
+RUN_DDL
+
+mset command on

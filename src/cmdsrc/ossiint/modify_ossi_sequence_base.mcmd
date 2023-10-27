@@ -1,0 +1,104 @@
+<command>
+<name>modify ossi sequence base</name>
+<description>Modify the base of the sequence</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="sequence_name">Sequence name - must exist</argument>
+<argument datatype="string" name="new_btsflg">New base 36 flag</argument>
+<argument datatype="string" name="new_prefix">New prefix</argument>
+<argument datatype="string" name="new_suffix">New Suffix</argument>
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161212 saad.ahmad - 7026 - core ossi
+ * 20170930 ossi\saad.ahmad - 8004 - ossiint foundation
+ */
+publish data
+where new_prefix_passed = @new_prefix#onstack
+and new_suffix_passed = @new_suffix#onstack
+|
+if ( @new_prefix is null )
+   publish data
+   where new_prefix_len =  0
+else
+   publish data
+   where new_prefix_len = len(@new_prefix)
+|
+if ( @new_suffix is null )
+   publish data
+   where new_suffix_len = 0
+else
+   publish data
+   where new_suffix_len = len(@new_suffix)
+|
+[
+select *
+from sysctl
+where numcod = @sequence_name
+]
+catch (-1403,510)
+|
+if ( @? = 0 )
+{
+   if ( @new_prefix_passed != 1 )
+      publish data
+      where new_prefix = @prefix
+      and new_prefix_len = @prelen
+   |
+   if ( @new_suffix_passed != 1 )
+      publish data
+      where new_suffix = @suffix
+      and new_suffix_len = @suflen
+   |
+   if ( @prefix != @new_prefix or @btsflg != @new_btsflg or @suffix != @new_suffix or
+        @prelen != @new_prefix_len or @suflen != @new_suffix_len )
+   {
+      publish data
+      where uc_sequence_digits = @seqlen - @new_prefix_len - @suflen
+      and uc_base = decode ( @new_btsflg, 1, 36, 10 )
+      |
+      sl_power
+      where num = @uc_base
+      and power = @uc_sequence_digits
+      |
+      publish data
+      where new_max_value = @o_value
+      |
+      {
+         [
+         update sysctl
+         set prefix = decode ( @new_prefix_passed, 1, @new_prefix,     prefix ),
+             prelen = decode ( @new_prefix_passed, 1, @new_prefix_len, prelen ),
+             btsflg = @new_btsflg,
+             suffix = decode ( @new_suffix_passed, 1, @new_suffix,     suffix ),
+             suflen = decode ( @new_suffix_passed, 1, @new_suffix_len, suflen )
+         where numcod = @numcod
+         ]
+         ;
+         create or replace sequence
+         where min_value = 1
+         and increment_by = 1
+         and start_with = 1
+         and cache_size = 10
+         and max_value = @new_max_value
+      }
+   } 
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+Reseed a sequence.  Useful to change prefix and then also adjust max
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

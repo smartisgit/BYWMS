@@ -1,0 +1,2 @@
+mls_id,locale_id,prod_id,appl_id,frm_id,vartn,srt_seq,cust_lvl,mls_text,grp_nam
+uc_resume_diff_demingle_lbl,US_ENGLISH,LES,LES,LES,LES,0,10,Demingling is currently in process for this tote AND ON A DIFFERENT MACHINE for this tote. Do you want to resume AND MOVE demingling to your workstation?,DEF_GRP_NAM

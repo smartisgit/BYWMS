@@ -1,0 +1,8 @@
+LESDIR=..\..\..
+
+TARGET=OSSIIssue
+TARGETTYPE=.dll
+
+OFILES=MOCAlicense.obj 
+
+!include $(LESDIR)\makefiles\ntstd.mk

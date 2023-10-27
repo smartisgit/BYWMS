@@ -1,0 +1,2 @@
+mls_id,locale_id,prod_id,appl_id,frm_id,vartn,srt_seq,cust_lvl,mls_text,grp_nam
+uc_packstation_zero_weight_error,US_ENGLISH,LES,LES,LES,LES,0,10,You must enter a weight greater than 0.,OSSISVN_CW-TEST

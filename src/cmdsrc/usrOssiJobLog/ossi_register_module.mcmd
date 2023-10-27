@@ -1,0 +1,68 @@
+<command>
+<name>ossi register_module</name>
+<description>FUNCTION: Register a new module in uc_ossi_job_log table</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+publish data
+where uc_ossi_job_seq   = @moca_farg1
+and   uc_ossi_module_id = @moca_farg2
+and   uc_ossi_data      = @moca_farg3
+and   uc_ossi_who       = nvl ( @moca_farg4, @uc_ossi_who )
+and   uc_ossi_action_id = '%'
+|
+if ( @uc_ossi_job_seq > 0 )
+{
+   create ossi job log
+   where uc_ossi_get_new = 'UC_OSSI_MODULE_SEQ'
+   |
+   publish data where ret = @uc_ossi_module_seq
+}
+else
+   publish data where ret = -1
+
+]]>
+</local-syntax>
+
+<argument name="moca_farg1" required="yes" datatype="Integer">Job# returned earlier</argument>
+<argument name="moca_farg2" required="yes" datatype="String">Description of the module</argument>
+<argument name="moca_farg3" required="no" datatype="String">Some additional data for uc_ossi_data field </argument>
+<argument name="moca_farg4" required="no" datatype="String">
+Some additional data for uc_ossi_who field.  If not passed in, get uc_ossi_who from stack.
+</argument>
+
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+
+Register a module in uc_ossi_job_log table.  See "usr ossi register_job" for more details
+
+</p>
+]]>
+</remarks>
+
+<retrows>MOCA Function - So one row is returned</retrows>
+
+<exception value="eOK">The command completed successfully.</exception>
+<exception value="510">If variable was not passed and no default was passed.</exception>
+
+<seealso cref="test usr ossi create job log"></seealso>
+<seealso cref="test usr ossi change job log"></seealso>
+<seealso cref="test usr ossi complete job "></seealso>
+<seealso cref="test usr ossi complete job  log"></seealso>
+<seealso cref="usr_ossi register_action"></seealso>
+<seealso cref="usr_ossi register_module"></seealso>
+<seealso cref="usr_ossi register_job"></seealso>
+<seealso cref="test usr ossi list job log"></seealso>
+
+</documentation>
+
+</command>

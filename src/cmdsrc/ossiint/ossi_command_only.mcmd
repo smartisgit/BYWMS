@@ -1,0 +1,45 @@
+<command>
+<name>ossi_command_only</name>
+<description>FUNCTION: Return the command portion of the passed in full command</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+publish data 
+where my_full_command  = lower(@moca_farg1)
+|
+publish data
+where my_pos = instr(@my_full_command, 'where')
+|
+if ( @my_pos > 0 )
+   publish data where my_ret=trim(substr(@my_full_command,1,@my_pos-1))
+else
+   publish data where my_ret=trim(substr(@my_full_command))
+]]>
+</local-syntax>
+<argument name="moca_farg1" required="no" datatype="string">Command that is executing - usually command function</argument>
+<documentation>
+<remarks>
+<![CDATA[
+Commands are typically "verb noun where xxx".  If passed like that, this would return the portion of 
+the string till the where
+]]>
+</remarks>
+
+<example>
+publish data where my_command = 'create item where itemnum = 123' 
+|
+publish data where x=ossi_command(@my_command)
+</example>
+
+<retcol name="my_ret" type="string">Only command portion (before where)</retcol>
+<retrows>One row is returned.</retrows>
+<exception value="eOK">Normal successful completion</exception>
+</documentation>
+</command>

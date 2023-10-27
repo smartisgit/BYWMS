@@ -1,0 +1,149 @@
+<command>
+<name>list ossi pick data</name>
+<description>Show all the pick data.  This is mainly needed for rules engine</description>
+
+<argument name="wrkref" required="yes" datatype="string"></argument>
+<argument name="list_id" required="yes" datatype="string"></argument>
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+if ( @list_id is null ) hide stack variable where name = 'list_id'
+|  
+if ( @wrkref is null ) hide stack variable where name = 'wrkref'
+|
+{
+    execute ossi les_cmd
+    where les_cmd_id = 'uc_ctxt_cmd_list_ossi_pick_data'
+    and uc_les_cmd_inline = 1
+    and exec_uc_les_cmd_cust_lvl = null
+    and uc_inhibit_return_extra_columns = 1
+    catch (-1403,510)
+}
+
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This lists all the data for pick when called from pick release 
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+<retcol name="wh_id" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_mhe_case_flg" type="COMTYP_CHAR">1 or 0.  if 1 a typical case level MHE system should get this pick</retcol>
+<retcol name="uc_is_outer_flg" type="COMTYP_CHAR">is it an outer pick.  This is 1 for anything not in a carton and also the K pick itself which is outermost</retcol>
+<retcol name="uc_is_inner_flg" type="COMTYP_CHAR">is it an innerter pick.  For sensitive carton picks this is 1</retcol>
+<retcol name="wrkref" type="COMTYP_CHAR">From pckwrk_hdr.  This is the pick work being released</retcol>
+<retcol name="wrktyp" type="COMTYP_CHAR">Work type of the record being released, e.g. K,P,B.  B is for bulk picks</retcol>
+<retcol name="srcloc" type="COMTYP_CHAR">Source location of the pick being released</retcol>
+<retcol name="ctncod" type="COMTYP_CHAR">Carton code for K picks.  This tells what type of carton was used</retcol>
+<retcol name="uc_pckwrk_prtnum" type="COMTYP_CHAR">Part Number of the pick being released</retcol>
+<retcol name="uc_prtmst_prtfam" type="COMTYP_CHAR">Part Family of the pick being released</retcol>
+<retcol name="loc_typ" type="COMTYP_CHAR">location type of the source location of the pick</retcol>
+<retcol name="uc_area_proc_cd" type="COMTYP_CHAR">loc_typ.uc_area_proc_cd for the source location of the pick.  This tells type of source location.  This is where we have MHE in the text to indicate that it is an MHE location</retcol>
+<retcol name="vc_drpcde_mst columns" type="COMTYP_CHAR">All significant columns in vc_drpcde_mst.  The columns have alias prefix of uc_drpcde_.  MOCA Function usr__get_drop_code_select_list_for_rules(1) is used to get list of columns  </retcol>
+
+
+<retcol name="ctnnum" type="COMTYP_CHAR">pckwrk_hdr.ctnnum.  For cartonized cases this is the refrence to K pick subnum</retcol>
+<retcol name="srcare" type="COMTYP_CHAR">Source Area of the pick being released.  Note that in 2020 we should not use this as pick zone is more suitable</retcol>
+<retcol name="pck_zone_cod" type="COMTYP_CHAR">Pick Zone Code of the source location on the pick being released</retcol>
+<retcol name="lodlvl" type="COMTYP_CHAR">lodlvl of pick being released, e.g. L,S,D</retcol>
+<retcol name="uc_srcloc_devcod" type="COMTYP_CHAR">devcod on source location record.  This is often used to define printers for locations</retcol>
+<retcol name="pckqty" type="COMTYP_CHAR">This is the quantity to be picked of the pick being released</retcol>
+<retcol name="appqty" type="COMTYP_CHAR">This is quantity that has been picked already.  At pick release time this is expected to be 0</retcol>
+<retcol name="uc_enable_area_for_rpt_flg" type="COMTYP_CHAR">loc_typ.uc_enable_area_for_rpt_flg of the source location of the pick</retcol>
+<retcol name="uc_force_status_change_trx_flg" type="COMTYP_CHAR">loc_typ.uc_force_status_change_trx_flg of the source location of the pick</retcol>
+<retcol name="uc_inhibit_rf_attach_flg" type="COMTYP_CHAR">loc_typ.uc_inhibit_rf_attach_flg of the source location of the pick</retcol>
+<retcol name="uc_area_lbl_prtadr" type="COMTYP_CHAR">Label printer of the source location of the pick.  Defined at pick zone level</retcol>
+<retcol name="uc_area_prtadr" type="COMTYP_CHAR">Report printer of the source location of the pick.  Defined at pick zone level</retcol>
+<retcol name="pck_uom" type="COMTYP_CHAR">UOM that is being picked.  As listed on the pick being released</retcol>
+<retcol name="pck_mthd_id" type="COMTYP_CHAR">Identifier for the pick method used for released</retcol>
+<retcol name="pck_mthd_nam" type="COMTYP_CHAR">Name for the pick method used for released</retcol>
+<retcol name="uc_prtftp_dtl_cas_flg" type="COMTYP_CHAR">Based on the footprint of the pick being released and considering pick pck_uom - is that a case?</retcol>
+<retcol name="uc_prtftp_dtl_pal_flg" type="COMTYP_CHAR">Based on the footprint of the pick being released and considering pick pck_uom - is that a pallet?</retcol>
+<retcol name="uc_prtftp_dtl_layer_flg" type="COMTYP_CHAR">Based on the footprint of the pick being released and considering pick pck_uom - is that a layer?</retcol>
+<retcol name="uc_prtftp_dtl_pak_flg" type="COMTYP_CHAR">Based on the footprint of the pick being released and considering pick pck_uom - is that an inner pack?</retcol>
+<retcol name="uc_prtftp_dtl_stk_flg" type="COMTYP_CHAR">Based on the footprint of the pick being released and considering pick pck_uom - is that an each?</retcol>
+
+
+<retcol name="subnum" type="COMTYP_CHAR">For the pick being released, any value from pckwrk_dtl.  For K record this is subnum which will then have the child records</retcol>
+<retcol name="ship_id" type="COMTYP_CHAR">For the pick being released, any value from pckwrk_dtl.  If we ever have glommed pick for multiple shipments this will be any one of them</retcol>
+<retcol name="ship_line_id" type="COMTYP_CHAR">For the pick being released, any value from pckwrk_dtl.  If we ever have glommed pick for multiple shipments this will be any one of them</retcol>
+<retcol name="ordnum" type="COMTYP_CHAR">For the pick being released, any value from pckwrk_dtl.  If we ever have glommed pick for multiple orders this will be any one of them</retcol>
+<retcol name="ordtyp" type="COMTYP_CHAR">The order type (drop code) of the pick being released.  Since it is based on order number as recorded in pckwrk_dtl, if there are multiple orders - this is for any one of them</retcol>
+<retcol name="client_id" type="COMTYP_CHAR">For the pick being released, any value from pckwrk_dtl.  If we ever have glommed pick for multiple orders this will be any one of them</retcol>
+<retcol name="ordlin" type="COMTYP_CHAR">For the pick being released, any value from pckwrk_dtl.  If we ever have glommed pick for multiple orders this will be any one of them</retcol>
+<retcol name="ordsln" type="COMTYP_CHAR">For the pick being released, any value from pckwrk_dtl.  If we ever have glommed pick for multiple orders this will be any one of them</retcol>
+<retcol name="wkonum" type="COMTYP_CHAR">For the pick being released, any value from pckwrk_dtl.  If we ever have glommed pick for multiple work orders this will be any one of them</retcol>
+<retcol name="wkorev" type="COMTYP_CHAR">For the pick being released, any value from pckwrk_dtl.  If we ever have glommed pick for multiple work orders this will be any one of them</retcol>
+<retcol name="wkolin" type="COMTYP_CHAR">For the pick being released, any value from pckwrk_dtl.  If we ever have glommed pick for multiple work orders this will be any one of them</retcol>
+
+<retcol name="uc_dst_mov_zone_id" type="COMTYP_CHAR">This is the destination move zone id of the pick being released</retcol>
+<retcol name="uc_dst_mov_zone_cod" type="COMTYP_CHAR">This is the destination move zone name of the pick being released</retcol>
+<retcol name="dstloc" type="COMTYP_CHAR">If we have a destination location defined for the pick - this is any of the values from pckwrk_dtl.  If one pick has multiple details with different locations - this is any one of them</retcol>
+<retcol name="uc_shp_carcod" type="COMTYP_CHAR">We get it from shipment as recorded in pckwrk_dtl.  If we have multiple for a pick, this is for any one of them</retcol>
+<retcol name="uc_shp_srvlvl" type="COMTYP_CHAR">We get it from shipment as recorded in pckwrk_dtl.  If we have multiple for a pick, this is for any one of them</retcol>
+
+<retcol name="locale_id" type="COMTYP_CHAR">This is locale_id from adrmst of the ship to address of the pick.  If there are multiple orders, it is for any one of them</retcol>
+
+<retcol name="uc_dtl_lodlvl" type="COMTYP_CHAR">This is from pckwrk_dtl.  Any one of the values are returned</retcol>
+<retcol name="cmbcod" type="COMTYP_CHAR">This is from pckwrk_dtl.  Any one of the values are returned</retcol>
+
+
+<retcol name="uc_outer_wrkref" type="COMTYP_CHAR">Outer wrkref.  When releasing an inner (sensitive carton) pick, this is the wrkref of the outer pick. Also set for outer pick itself</retcol>
+<retcol name="uc_outer_subnum" type="COMTYP_CHAR">Outer pick subnnum.  When releasing an inner (sensitive carton) pick, this is the subnum of the outer pick. Also set for outer pick itself</retcol>
+<retcol name="uc_outer_lodlvl" type="COMTYP_CHAR">Outer pick lodlvl.  When releasing an inner (sensitive carton) pick, this is for the outer pick. Also set for outer pick itself</retcol>
+<retcol name="uc_outer_prtnum" type="COMTYP_CHAR">Outer pick part number.  When releasing an inner (sensitive carton) pick, this is for the outer pick. Also set for outer pick itself</retcol>
+<retcol name="uc_outer_wrktyp" type="COMTYP_CHAR">Outer pick work type.  When releasing an inner (sensitive carton) pick, this is for the outer pick. Also set for outer pick itself</retcol>
+<retcol name="uc_outer_vc_capnum" type="COMTYP_CHAR">Outer pick vc_capnum.  When releasing an inner (sensitive carton) pick, this is for the outer pick. Also set for outer pick itself</retcol>
+<retcol name="uc_outer_subucc" type="COMTYP_CHAR">Outer pick subucc.  When releasing an inner (sensitive carton) pick, this is for the outer pick. Also set for outer pick itself</retcol>
+<retcol name="uc_outer_srcloc" type="COMTYP_CHAR">Outer pick source location.  When releasing an inner (sensitive carton) pick, this is for the outer pick. Also set for outer pick itself</retcol>
+<retcol name="uc_outer_loc_typ" type="COMTYP_CHAR">Outer pick source location - location type.  When releasing an inner (sensitive carton) pick, this is for the outer pick. Also set for outer pick itself</retcol>
+<retcol name="uc_outer_uc_area_proc_cd" type="COMTYP_CHAR">Outer pick source location - location type uc_area_proc_cd.  When releasing an inner (sensitive carton) pick, this is for the outer pick. Also set for outer pick itself</retcol>
+
+<retcol name="uc_inner_wrkref" type="COMTYP_CHAR">Inner pick wrkref.  When releasing an inner (sensitive carton) pick, this is for the inner pick. Also set for outer pick itself</retcol>
+<retcol name="uc_inner_wrktyp" type="COMTYP_CHAR">Inner pick work type.  When releasing an inner (sensitive carton) pick, this is for the inner pick. Also set for outer pick itself</retcol>
+<retcol name="uc_inner_lodlvl" type="COMTYP_CHAR">Inner pick load level.  When releasing an inner (sensitive carton) pick, this is for the inner pick. Also set for outer pick itself</retcol>
+<retcol name="uc_inner_prtnum" type="COMTYP_CHAR">Inner pick part number.  When releasing an inner (sensitive carton) pick, this is for the inner pick. Also set for outer pick itself</retcol>
+<retcol name="uc_inner_ctnnum" type="COMTYP_CHAR">Inner pick carton number.  When releasing an inner (sensitive carton) pick, this is for the inner pick. Also set for outer pick itself</retcol>
+<retcol name="uc_inner_ctncod" type="COMTYP_CHAR">Inner pick carton code.  When releasing an inner (sensitive carton) pick, this is for the inner pick. Also set for outer pick itself</retcol>
+<retcol name="uc_inner_subnum" type="COMTYP_CHAR">Inner pick subnum.  When releasing an inner (sensitive carton) pick, this is for the inner pick. Also set for outer pick itself</retcol>
+<retcol name="uc_inner_srcloc" type="COMTYP_CHAR">Inner pick source location.  When releasing an inner (sensitive carton) pick, this is for the inner pick. Also set for outer pick itself</retcol>
+<retcol name="uc_inner_loc_typ" type="COMTYP_CHAR">Inner pick source location type.  When releasing an inner (sensitive carton) pick, this is for the inner pick. Also set for outer pick itself</retcol>
+<retcol name="uc_inner_uc_area_proc_cd" type="COMTYP_CHAR">Inner pick source location uc_area_proc_cd.  When releasing an inner (sensitive carton) pick, this is for the inner pick. Also set for outer pick itself</retcol>
+
+<retcol name="uc_use_pck_tarwgt" type="COMTYP_CHAR">Tare weight of the whole pick.  For K pick this is the carton weight of the outer carton.  For normal case pick this is gross weight - net weight</retcol>
+<retcol name="uc_use_pck_grswgt" type="COMTYP_CHAR">Gross weight of the whole pick.  For K pick this is includes the carton weight of the outer carton.  For normal case pick this is gross weight</retcol>
+<retcol name="uc_use_pck_netwgt" type="COMTYP_CHAR">net weight of the whole pick.  For K pick this is excludes the carton weight of the outer carton.  For normal case pick this is net weight</retcol>
+
+
+
+
+
+<example>
+<![CDATA[
+<p>
+</p>
+]]>
+
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+<seealso cref="list usr shipments for full release registration"></seealso>
+
+</documentation>
+
+
+</command>

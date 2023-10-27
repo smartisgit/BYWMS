@@ -1,0 +1,85 @@
+<command>
+<name>list ossi bugzilla objects</name>
+<description>List the objects in bugzilla</description>
+
+<argument name="uc_env_name" required="yes" datatype="string">Environment</argument>
+<argument name="uc_bug_id" required="yes" datatype="string">Environment</argument>
+<argument name="uc_rollout_name" required="yes" datatype="string">Environment</argument>
+
+<type>Local Syntax</type>
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+if ( @uc_rollout_name is null )
+   publish data
+   where uc_rollout_name_clause = " and 1=2"
+else
+   publish data
+   where uc_rollout_name_clause = " and ossi_rollout.rollout_name = @uc_rollout_name"
+|
+if ( nvl(@uc_bug_id,0) = 0 )
+   publish data
+   where uc_bug_id_clause = " and 1=1"
+else
+   publish data
+   where uc_bug_id_clause = " and 1=1"
+   /*
+   publish data
+   where uc_bug_id_clause = " and bugs.bug_id = @uc_bug_id"
+   */
+|
+{
+   publish data
+   where uc_select = " select ossi_rollout.rollout_name uc_rollout_name,"
+                  || "        bugs.bug_id         uc_bug_id,"
+                  || "        ckin.ossi_seqnum    uc_ossi_seqnum,"
+                  || "        ckin.ossi_action    uc_ossi_action,"
+                  || "        ckin.ossi_file_path uc_ossi_file_path,"
+                  || "        ckin.ossi_author    uc_ossi_author,"
+                  || "        ckin.ossi_rev       uc_ossi_rev,"
+                  || "        ckin.ossi_ckin_dt   uc_ossi_ckin_dt"
+                  || " from ossi_rollout"
+                  || "      join ossi_bugs_in_rollout on ossi_bugs_in_rollout.rollout_name = ossi_rollout.rollout_name"
+                  || "      join bugs on bugs.bug_id =  ossi_bugs_in_rollout.bug_id"
+                  || "      join ossi_bug_ckin_data ckin on ckin.bug_id = bugs.bug_id"
+                  || " where 1=1"
+                  || @uc_bug_id_clause
+                  || @uc_rollout_name_clause
+                  || " order by 1,2,3"
+   |
+   execute ossi bugzilla select
+   where uc_select_stmt = @uc_select
+}
+
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+Get all rollouts and bugzilla objects
+</remarks>
+
+<retcol name="uc_rollout_name" type="String"></retcol>
+<retcol name="uc_bug_id" type="String"></retcol>
+<retcol name="uc_ossi_seqnum" type="String"></retcol>
+<retcol name="uc_ossi_action" type="String"></retcol>
+<retcol name="uc_ossi_file_path" type="String"></retcol>
+<retcol name="uc_ossi_author" type="String"></retcol>
+<retcol name="uc_ossi_rev" type="String"></retcol>
+<retcol name="uc_ossi_ckin_dt" type="String"></retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

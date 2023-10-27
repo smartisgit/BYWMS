@@ -1,0 +1,195 @@
+<command>
+<name>check ossi time to run job</name>
+<description>Is it time to run the job based on min time elapsed</description>
+<type>Local Syntax</type>
+
+<argument name="uc_ossi_job_id"    required="no" datatype="Integer">Job Number</argument>
+<argument name="uc_min_secs_since_last" required="no" datatype="Integer">Job Number</argument>
+
+<argument name="uc_inibit_time_range_start" required="no" datatype="Integer">Job Number</argument>
+<argument name="uc_inibit_time_range_end" required="no" datatype="Integer">Job Number</argument>
+
+<argument name="uc_test_dt" required="no" datatype="Integer">Job Number</argument>
+<argument name="uc_bypass_elapsed_check" required="no" datatype="Integer">Job Number</argument>
+
+
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+if ( @uc_test_dt is not null )
+   publish data
+   where uc_now_dt = @uc_test_dt
+else
+   publish data
+   where uc_now_dt = sysdate
+|
+publish data
+where uc_min_secs_since_last= nvl(@uc_min_secs_since_last, 0)
+and uc_now_time = to_char(@uc_now_dt, 'HH24:MI:SS' )
+and uc_bypass_elapsed_check = nvl(@uc_bypass_elapsed_check,'0')
+|
+if ( @uc_inibit_time_range_start is not null and @uc_inibit_time_range_end is not null and 
+     @uc_inibit_time_range_start != @uc_inibit_time_range_end
+   )
+{
+   /*
+    * 1. end time is > strat time, e.g. 18:00:00 - 23:00:00
+    * 2. end time is < start time.  e.g. 22:00:00 - 07:00:00.  Then we are checking overnight
+    */
+   if ( @uc_inibit_time_range_end > @uc_inibit_time_range_start )
+   {
+      if ( @uc_now_time > @uc_inibit_time_range_start and @uc_now_time < @uc_inibit_time_range_end )
+         publish data
+         where uc_in_inhibit_time = '1'
+      else
+         publish data
+         where uc_in_inhibit_time = '0'
+   }
+   else
+   {
+      if ( @uc_now_time > @uc_inibit_time_range_start or @uc_now_time < @uc_inibit_time_range_end )
+         publish data
+         where uc_in_inhibit_time = '1'
+      else
+         publish data
+         where uc_in_inhibit_time = '0'
+   }
+}
+else
+   publish data
+   where uc_in_inhibit_time = '0'
+|
+if ( @uc_in_inhibit_time = '1' )
+{
+   publish data
+   where uc_job_run_now = '0'
+   and last_uc_ossi_job_seq = -1
+   and last_uc_ossi_start_dt = null
+   and last_uc_ossi_end_dt = null
+   and last_uc_ossi_err_code = null
+   and last_uc_ossi_err_descr = null
+   and uc_elapsed_secs_since_last = null
+   and uc_in_inhibit_time = '1'
+}
+else
+{
+   /*
+    * Get last run of this job
+    */
+   [
+   select nvl(max(uc_ossi_job_seq),-1) last_uc_ossi_job_seq
+   from usr_ossi_job_log
+   where uc_ossi_job_id = @uc_ossi_job_id
+   and @uc_bypass_elapsed_check = '0'
+   ]
+   |
+   if ( @last_uc_ossi_job_seq < 0 )
+      publish data
+      where uc_job_run_now = '1'
+      and last_uc_ossi_job_seq = @last_uc_ossi_job_seq 
+      and last_uc_ossi_start_dt = null
+      and last_uc_ossi_end_dt = null
+      and last_uc_ossi_err_code = null
+      and last_uc_ossi_err_descr = null
+      and uc_elapsed_secs_since_last = null
+      and uc_in_inhibit_time = '0'
+   else
+   {
+      [
+      select uc_ossi_start_dt,
+             uc_ossi_end_dt,
+             uc_ossi_err_code,
+             uc_ossi_err_descr
+      from usr_ossi_job_log
+      where uc_ossi_job_seq = @last_uc_ossi_job_seq
+      and uc_ossi_module_id = '%'
+      and uc_ossi_action_id = '%'
+      and rownum < 2 /* not really needed but prevent against bad data */
+      ]
+      catch (-1403,510)
+      |
+      if ( @? = 0 )
+      {
+         if ( @uc_ossi_end_dt is not null )
+         {
+            publish data
+            where uc_elapsed_secs_since_last = (@uc_now_dt - @uc_ossi_end_dt)*24*3600
+            |
+            if ( @uc_elapsed_secs_since_last > @uc_min_secs_since_last )
+            {
+               publish data
+               where uc_job_run_now = '1'
+               and uc_elapsed_secs_since_last = @uc_elapsed_secs_since_last
+            }
+            else
+               publish data
+               where uc_job_run_now = '0'
+               and uc_elapsed_secs_since_last = @uc_elapsed_secs_since_last
+         }
+         else
+            publish data
+            where uc_job_run_now = '0'
+            and uc_elapsed_secs_since_last = -1
+         |
+         publish data
+         where uc_job_run_now = @uc_job_run_now 
+         and last_uc_ossi_job_seq = @last_uc_ossi_job_seq
+         and last_uc_ossi_start_dt = @uc_ossi_start_dt
+         and last_uc_ossi_end_dt = @uc_ossi_end_dt
+         and last_uc_ossi_err_code = @uc_ossi_err_code
+         and last_uc_ossi_err_descr = @uc_ossi_err_descr
+         and uc_elapsed_secs_since_last = @uc_elapsed_secs_since_last 
+         and uc_in_inhibit_time = '0'
+      }
+      else
+         publish data
+         where uc_job_run_now = '1'
+         and last_uc_ossi_job_seq = @last_uc_ossi_job_seq 
+         and last_uc_ossi_start_dt = null
+         and last_uc_ossi_end_dt = null
+         and last_uc_ossi_err_code = null
+         and last_uc_ossi_err_descr = null
+         and uc_elapsed_secs_since_last = null
+         and uc_in_inhibit_time = '0'
+   }
+}
+
+]]>
+</local-syntax>
+
+
+
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+
+??
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+<retcol name="uc_job_run_now"      type="COMTYP_STRING">If 1 time to run job</retcol>
+<retcol name="last_uc_ossi_job_seq"      type="COMTYP_STRING"></retcol>
+<retcol name="last_uc_ossi_start_dt"      type="COMTYP_STRING"></retcol>
+<retcol name="last_uc_ossi_end_dt"      type="COMTYP_STRING"></retcol>
+<retcol name="last_uc_ossi_err_code"      type="COMTYP_STRING"></retcol>
+<retcol name="last_uc_ossi_err_descr"      type="COMTYP_STRING"></retcol>
+<retcol name="uc_elapsed_secs_since_last"      type="COMTYP_STRING"></retcol>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+</documentation>
+
+</command>

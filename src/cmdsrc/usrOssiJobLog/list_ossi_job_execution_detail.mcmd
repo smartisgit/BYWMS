@@ -1,0 +1,109 @@
+<command>
+<name>list ossi job execution detail</name>
+<description>list the job execution detail</description>
+
+<argument name="uc_ossi_job_id" required="no" datatype="String"></argument>
+<argument name="uc_ossi_job_seq" required="no" datatype="String"></argument>
+<argument name="uc_ord_dir" required="no" datatype="String">A or D</argument>
+<argument name="uc_src_table" required="no" datatype="String">A or D</argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ * Muhammad.Haris - 11125
+ */
+ 
+publish data
+where uc_ord_dir = nvl (@uc_ord_dir, 'D' )
+|
+publish data
+where uc_order_by_clause = decode( @uc_ord_dir, 'A', 'uc_ossi_module_seq, uc_ossi_action_seq', 'uc_ossi_module_seq desc, uc_ossi_action_seq desc' )
+  and uc_src_table = nvl(@uc_src_table, 'usr_ossi_job_log' )
+|
+{
+   if ( @uc_src_table = 'usr_ossi_job_log' )
+      [
+      select uc_ossi_module_seq,
+             uc_ossi_module_id,
+             uc_ossi_action_seq,
+             uc_ossi_action_id,
+             uc_ossi_data,
+             uc_ossi_who,
+             uc_ossi_start_dt,
+             uc_ossi_end_dt,
+             (uc_ossi_end_ts - uc_ossi_start_ts)/1000 uc_ossi_dur,
+             uc_ossi_err_code,
+             uc_ossi_err_descr
+      from usr_ossi_job_log
+      where uc_ossi_job_seq = @uc_ossi_job_seq
+      order by @uc_order_by_clause:raw
+      ]
+   else
+      [
+      select 0 uc_ossi_module_seq,
+             '' uc_ossi_module_id,
+             0 uc_ossi_action_seq,
+             '' uc_ossi_action_id,
+             '' uc_ossi_data,
+             node_url uc_ossi_who,
+             start_dte uc_ossi_start_dt,
+             end_dte uc_ossi_end_dt,
+             moca_util.date_diff_days(end_dte, start_dte)*24*3600 uc_ossi_dur,
+             status uc_ossi_err_code,
+             message uc_ossi_err_descr
+      from job_definition_exec
+      where 1=1
+        and not exists (
+                          select 1
+                          from usr_ossi_job_log
+                          where usr_ossi_job_log.uc_ossi_job_id =job_definition_exec.job_id
+                       )
+        and start_dte = @uc_ossi_job_seq:date
+        and job_id = @uc_ossi_job_id
+      ]
+}
+
+
+]]>
+</local-syntax>
+
+
+<documentation>
+
+<remarks>
+	<![CDATA[
+	<p>
+	This command reports all steps in a job sequence
+	</p>
+	]]>
+</remarks>
+
+<retrows>n</retrows>
+
+<retcol name="uc_ossi_module_seq" type="COMTYP_INT"></retcol>
+<retcol name="uc_ossi_module_id" type="COMTYP_INT"></retcol>
+<retcol name="uc_ossi_action_seq" type="COMTYP_INT"></retcol>
+<retcol name="uc_ossi_action_id" type="COMTYP_INT"></retcol>
+<retcol name="uc_ossi_data" type="COMTYP_STRING"></retcol>
+<retcol name="uc_ossi_who" type="COMTYP_STRING"></retcol>
+<retcol name="uc_ossi_start_dt" type="COMTYP_STRING"></retcol>
+<retcol name="uc_ossi_end_dt" type="COMTYP_STRING"></retcol>
+<retcol name="uc_ossi_dur" type="COMTYP_FLOAT">Duration in seconds</retcol>
+<retcol name="uc_ossi_err_code" type="COMTYP_INT">Error Code, 0 means success </retcol>
+<retcol name="uc_ossi_err_descr" type="COMTYP_INT">Error Code, 0 means success </retcol>
+
+
+<exception value="eOK">The command completed successfully.</exception>
+<exception value="510">If variable was not passed and no default was passed.</exception>
+
+<seealso cref="list usr job log"></seealso>
+<seealso cref="list ossi job repository"></seealso>
+
+
+</documentation>
+
+</command>

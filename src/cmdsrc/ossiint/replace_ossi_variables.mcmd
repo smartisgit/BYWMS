@@ -1,0 +1,56 @@
+<command>
+<name>replace ossi variables</name>
+<description>Replace @var with the value from the stack</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+
+publish data
+  where pattern = nvl(@pattern, "@([\+\-\\%])?(\w+\.)?(\w+)(\^\w+)?(:raw)?")
+    and name_index = int(iif(@name_index is null, 3, @name_index))
+|
+[[
+  import java.util.regex.*;
+
+  Binding binding = getBinding();
+  Matcher m = Pattern.compile(pattern).matcher(input_string);
+  while (m.find())
+  {
+    moca.trace("Matched " + m.group());
+    String name = m.group(name_index);
+    moca.trace("Found var " + name);
+    Object value = binding.getVariable(name);
+    String replacement = "";
+    if (value != null)
+    {
+      replacement = value.toString();
+    }
+    input_string = m.replaceFirst(replacement);
+    m.reset(input_string);
+  }
+[result_string:input_string]
+]]
+
+]]>
+</local-syntax>
+<argument name="input_string" required="yes" datatype="string"></argument>
+<argument name="pattern" required="no" datatype="string"></argument>
+<argument name="name_index" required="no" datatype="integer"></argument>
+<retcol name="result_string" type="COMTYP_CHAR"></retcol>
+
+<documentation>
+
+<remarks>
+This command may be used to replace variables.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

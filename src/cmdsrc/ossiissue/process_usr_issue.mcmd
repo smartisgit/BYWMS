@@ -1,0 +1,98 @@
+<command>
+<name>process usr issue</name>
+<description>This is called from the various triggers to process a change to a table row</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ * 20161220 saad.ahmad - 7026 - core ossi
+ * 20170130 ossi\saad.ahmad - 7026 - core ossi
+ * 20170711 ossi\saad.ahmad - 7026 - Bring the core Oracular components
+ */
+publish data
+where uc_inhibit_version_control=nvl(@uc_force_inhibit_version_control, @@UC_INHIBIT_VERSION_CONTROL )
+/*
+ * Post 2017 projects should set this environment variable to WMD1.  This says that some data may be exported if it
+ * is in WMD1.  In those cases idea is that dev environment will have WMD1 warehouse to represent all warehouses
+ */
+and uc_do_only_wh_id = ossi__replace(upper(@@UC_VERSION_DO_ONLY_WH_ID),'"','')
+and uc_this_wh_id = upper(nvl(@wh_id#keep, @@WH_ID))
+and uc_this_table = upper(@uc_table_name#keep)
+|
+if ( @uc_inhibit_version_control = '1' or  ossi__running_in_server_mode(null) = '1' )
+   noop
+else
+{
+   /* A pre-trigger may set a session variable to disable this */
+   if (@uc_action = 'REMOVE')
+   {
+     get session variable 
+       where name = @uc_this_table || '_issue_logging' 
+     catch (@?)
+     |
+     if (@? = 0 and @value = 0)
+     {
+       publish data 
+         where uc_vc_enabled = @value
+     }
+   }
+   |
+   if (@uc_vc_enabled is null)
+   {
+     publish data
+       where uc_vc_enabled = ossi__polval ( 'USR-OSSI-VERSION-CONTROL', 'SETUP', 'ENABLED','','rtnum1' )
+         and uc_specific_wh_enabled = ossi__polval ( 'USR-OSSI-VERSION-CONTROL', 'SETUP', 'ENABLED','','rtnum2' )
+   }
+   |
+   if ( @uc_vc_enabled = 1 )
+   {
+      /*
+       * The first if of uc_do_only_wh_id is an environment level check.  i.e. do we have special logic of wh specific
+       * exports or not.  Typically post 2017 projects will have it - because idea is to have a dev environment where some
+       * setup is always done in WMD1 warehouse and that does get exported with version control and when applying it
+       * in target environments the corresponding ctl files will load WMD1 data to all warehouses
+       * So going inside first if will be common to post 2017.  Then we are saying that something like pcklst_rule e.g. will
+       * have rtnum2 = 1 so we will check to make sure that wh_id on stack in that case is in the environment variable list
+       */
+      if ( @uc_do_only_wh_id is not null )
+      {
+         if ( @uc_specific_wh_enabled = 1 )
+         {
+            if ( @uc_this_wh_id is not null and instr( ','||@uc_do_only_wh_id||',', ','||@uc_this_wh_id||',') > 0 )
+            {
+               process usr issue base 
+               where @*
+            }
+         }
+         else
+         {
+            process usr issue base 
+            where @*
+         }
+      }
+      else
+      {
+         process usr issue base 
+         where @*
+      }
+   } /* enabled */
+}
+
+]]>
+</local-syntax>
+
+<argument name="@*" required="yes">See process usr issue base</argument>
+<seealso cref="process usr issue base"></seealso>
+<documentation>
+
+<remarks>
+This command is used to process a change in record.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

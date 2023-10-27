@@ -1,0 +1,94 @@
+<command>
+<name>list ossi data for surgery</name>
+<description>Used in OSSI Surgery By load</description>
+
+<argument name="uc_adhoc_filter_file" required="yes" datatype="string"></argument>
+<argument name="uc_surg_colnam" required="yes" datatype="string">What column are we talking about.  e.g. lodnum</argument>
+<argument name="uc_surg_les_cmd_id_issue" required="yes" datatype="string">Command Id that detects issue</argument>
+<argument name="uc_surg_les_cmd_id_main" required="yes" datatype="string">Command Id that has main SQL </argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+publish data
+where uc_surg_colnam = nvl(@uc_surg_colnam, 'lodnum')
+and uc_surg_les_cmd_id_issue = nvl(@uc_surg_les_cmd_id_issue, 'uc_load_surgery_issue' )
+and uc_surg_les_cmd_id_main = nvl(@uc_surg_les_cmd_id_main, 'uc_load_surgery_main')
+|
+{
+    if (@uc_adhoc_filter_file is not null)
+    {
+        get ossi clause from adhoc filter file
+        where column = @uc_surg_colnam
+    }
+    else
+    {
+        publish data
+        where clause = '1=1'
+    }
+    |
+    get ossi issue filter for surgery
+    where @*
+    |
+    get ossi les command
+    where les_cmd_id = @uc_surg_les_cmd_id_issue
+    catch (-1403,510)
+    |
+    if (@? != 0)
+    {
+        publish data 
+        where syntax = null
+    }
+    |
+    [
+    select syntax uc_main_sql
+    from les_cmd
+    where les_cmd_id = @uc_surg_les_cmd_id_main
+    and cust_lvl = (select max(cust_lvl) from les_cmd c2 where c2.les_cmd_id = les_cmd.les_cmd_id)
+    ]
+    |
+    ossi expand vars in string
+    where sl_string = @uc_main_sql
+    |
+    [
+    select qqq.*
+    from
+    (
+        @sl_expanded:raw
+    ) qqq
+    where wh_id = @wh_id
+    and @clause:raw
+    and @*
+    ]
+    catch (-1403,510)
+    >> res
+    |
+    add ossi issue for surgery
+    where res = @res
+    and syntax = @syntax
+    and uc_issue_filter_value = nvl(@uc_issue_filter_value, @uc_issue_filter)
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<remarks>
+This command is used to get data for surgery for load
+</remarks>
+
+<retcol name="uc_main_sql" type="String"></retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

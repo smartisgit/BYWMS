@@ -1,0 +1,7 @@
+<component-level>
+<name>OSSIint</name>
+<description>OSSI (Smart IS) Intrinsic Server all Functions</description>
+<sort-sequence>8001</sort-sequence>
+<library>OSSIint</library>
+<editable>true</editable>
+</component-level>

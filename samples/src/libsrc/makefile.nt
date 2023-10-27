@@ -1,0 +1,18 @@
+SUBDIR=projbase
+
+all: $(SUBDIR)
+
+$(SUBDIR) : FRC
+	cd "$(MAKEDIR)\$@"
+	$(MAKE) -nologo -fmakefile.nt $(TARGET)
+
+clean : 
+	$(MAKE) -nologo -fmakefile.nt TARGET=clean
+
+install: hinstall
+	$(MAKE) -nologo -fmakefile.nt TARGET=install
+
+hinstall :
+	$(MAKE) -nologo -fmakefile.nt TARGET=hinstall
+
+FRC:

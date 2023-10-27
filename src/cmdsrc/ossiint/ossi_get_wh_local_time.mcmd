@@ -1,0 +1,79 @@
+<command>
+<name>ossi get_wh_local_time</name>
+<description>FUNCTION: Gets a Warehouse TimeZone for passed in WH_ID</description>
+
+<argument name="moca_farg1" required="no" datatype="string">Warehouse Id</argument>
+<argument name="moca_farg2" required="no" datatype="string">Optionally pass in the date/time format per SimpleDateFormat protocols.  For example yyyyMMddhhmmss is for MOCA string equivalent</argument>
+<argument name="moca_farg3" required="no" datatype="string">Optionally pass in date/time.  if not passed in current date/time is used.  Pass in MOCA date type or string in YYYYMMDDHH2MISS format.  Hours in 24 hour</argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+publish data
+where wh_id = @moca_farg1
+and date_time_format = nvl(@moca_farg2, 'yyyy-MM-dd hh:mm a')
+and check_dt = date(@moca_farg3)
+|
+[select adrmst.tim_zon_cd
+   from wh
+   join adrmst
+     on adrmst.adr_id = wh.adr_id
+  where wh_id = nvl(@wh_id, @@wh_id)
+] catch(-1403, 510)
+|
+[[
+    import com.redprairie.moca.*;
+    import com.redprairie.moca.MocaException;
+    import com.redprairie.moca.util.*;
+    import java.text.SimpleDateFormat;
+    import java.text.DateFormat;
+    import java.util.Date;
+   
+    Date currentTime;
+    //
+    if ( check_dt == null )
+        currentTime = new Date();
+    else
+        currentTime = check_dt;
+    final SimpleDateFormat sdf = new SimpleDateFormat(date_time_format);
+  
+    if(tim_zon_cd != null)
+    {
+        sdf.setTimeZone(TimeZone.getTimeZone(tim_zon_cd))
+    }
+    local_time = sdf.format(currentTime);
+]]
+|
+publish data
+where local_time = @local_time
+
+
+]]>
+</local-syntax>
+
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This function will convert the time to warehouse format
+
+Example:
+MSQL> publish data where x = ossi__get_wh_local_time ('80090')
+
+should return '2017-11-21 02:18 PM'
+</p>
+]]>
+</remarks>
+
+<retrows>MOCA Function - So one row is returned</retrows>
+
+<exception value="eOK">The command completed successfully.</exception>
+<exception value="510">If variable was not passed and no default was passed.</exception>
+
+<seealso cref="get session variable"></seealso>
+</documentation>
+
+</command>

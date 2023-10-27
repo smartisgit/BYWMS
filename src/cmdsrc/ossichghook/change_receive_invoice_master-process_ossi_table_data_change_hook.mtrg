@@ -1,0 +1,25 @@
+<trigger>
+<name>process ossi table data change hook</name>
+<on-command>change_receive_invoice_master</on-command>
+<fire-sequence>100000</fire-sequence>
+
+<local-syntax>
+<![CDATA[
+
+if ( @uc_inhibit_change_hook != '1' )
+{
+    process ossi table data change hook
+    where table_name = 'RIMHDR'
+    and uc_update_where_clause = null
+}
+    
+]]>
+</local-syntax>
+
+<documentation>
+
+<seealso cref="process ossi table data change hook"></seealso>
+
+</documentation>
+
+</trigger>

@@ -1,0 +1,68 @@
+<command>
+<name>ossi wh_in_list</name>
+<description>For integration blocking algorithms, we have lists defined in policy USR-INTEGRATION / WH-LISTS.  Here by passing in the ID of the list
+we can easily check that wh exists in that.  Makes blocking algs easier to manager</description>
+<type>Local Syntax</type>
+
+<argument name="moca_farg1" required="yes" datatype="string">List id</argument>
+<argument name="moca_farg2" required="yes" datatype="string">wh_id</argument>
+
+<argument name="moca_farg3" required="yes" datatype="string">optionally polcod.  If not passed assume USR-INTEGRATION</argument>
+<argument name="moca_farg4" required="yes" datatype="string">optionally polvar.  If not passed assume WH-LISTS</argument>
+
+
+
+<local-syntax>
+<![CDATA[
+
+publish data
+where list_id = @moca_farg1
+and wh_id = nvl(@moca_farg2, @@WH_ID)
+and polcod = nvl(@moca_farg3, 'USR-INTEGRATION' )
+and polvar = nvl(@moca_farg4, 'WH-LISTS' )
+|
+publish data
+where list_val = ',' || ossi__polval_cat ( @polcod, @polvar, @list_id, '', 'rtstr1', 'rtnum1=1', ',', '----' ) || ','
+|
+if ( instr ( @list_val, ','||@wh_id||',' ) > 0 )
+    publish data
+    where ret  = 1
+else
+    publish data
+    where ret  = 0
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<remarks>
+<![CDATA[
+  <p>
+  For integrtaion blocking typically - but maybe in other cases too - we need to maintain lists
+  of warehouses that have certain features.  
+  This allows an easy way to then check those within integration blocking algorithms
+  </p>
+]]>
+</remarks>
+
+
+<policy 
+    polcod="USR-INTEGRATION" 
+    polvar="WH-LISTS" 
+    polval="based on situation differnt lists are created" 
+    rtnum1="1 to enable a row"
+    rtstr1="wh_id 1 per row"
+>
+</policy>
+
+<example>
+publish data where x = ossi__wh_in_list ( 'LIST-USES-UC_INV_ADJ', @wh_id )
+</example>
+
+<seealso cref="ossi polval_cat"> </seealso>
+
+</documentation>
+
+
+</command>

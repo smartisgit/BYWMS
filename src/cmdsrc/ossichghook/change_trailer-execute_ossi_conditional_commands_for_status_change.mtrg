@@ -1,0 +1,35 @@
+<trigger>
+<name>execute ossi conditional commands for status change</name>
+<on-command>change trailer</on-command>
+<fire-sequence>20000</fire-sequence>
+
+<argument name="trlr_id" required="yes" datatype="string"></argument>
+<argument name="trlr_stat" required="yes" datatype="string">Published by change command itself</argument>
+<argument name="uc_old_trlr_stat" required="yes" datatype="string">Published by change command override</argument>
+<argument name="uc_old_trlr_id" required="yes" datatype="string">Published by change command override</argument>
+
+
+<local-syntax>
+<![CDATA[
+
+publish data
+where trlr_id = nvl(@trlr_id, @uc_old_trlr_id )
+|
+if ( @trlr_stat is not null and @trlr_stat != @uc_old_trlr_stat and @trlr_id is not null )
+{
+    execute ossi conditional commands for trailer
+    where uc_rule_grp_id = 'OSSI-TRAILER-STATUS-CHANGED'
+    and uc_rule_subgrp_id ='GLOBAL-MAP'
+    catch (-1403,510)
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<seealso cref="execute ossi conditional commands for trailer"></seealso>
+
+</documentation>
+
+</trigger>

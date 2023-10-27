@@ -1,0 +1,74 @@
+<command>
+<name>list ossi policy list values</name>
+<description>List policy list values</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+list ossi policy lists
+  where polvar = @polvar
+|
+if (@uc_polval_multi_flg = 1)
+{
+  publish data where select_list = 'polval,'
+}
+|
+if (@uc_rtstr1_enabled = 1)
+{
+  publish data where select_list = @select_list || 'rtstr1,'
+}
+|
+if (@uc_rtstr2_enabled = 1)
+{
+  publish data where select_list = @select_list || 'rtstr2,'
+}
+|
+if (@uc_rtnum1_enabled = 1)
+{
+  publish data where select_list = @select_list || 'rtnum1,'
+}
+|
+if (@uc_rtnum2_enabled = 1)
+{
+  publish data where select_list = @select_list || 'rtnum2,'
+}
+|
+publish data where select_list = substr(@select_list, 1, len(@select_list)-1)
+|
+[select @select_list:raw
+   from poldat_view
+  where @%polcod
+    and @%polvar  
+    and @%polval
+    and wh_id = nvl(@wh_id, '----')   
+  order by 
+     case when polval like '\_HELP%' escape '\' or rtstr1 like '\_HELP%' escape '\' then 1 else 2 end,
+     srtseq
+]  
+
+]]>
+</local-syntax>
+<argument name="polvar" required="yes" datatype="string"></argument>
+
+<documentation>
+
+<remarks>
+This command is used to get policy list values.
+</remarks>
+
+<retcol name="srtseq" type="String"></retcol>
+<retcol name="polvar" type="String"></retcol>
+<retcol name="rtstr1" type="String"></retcol>
+<retcol name="rtstr2" type="String"></retcol>
+<retcol name="trnum1" type="String"></retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

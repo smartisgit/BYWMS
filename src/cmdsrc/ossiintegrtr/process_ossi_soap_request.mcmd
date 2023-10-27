@@ -1,0 +1,54 @@
+<command>
+<name>process ossi soap request</name>
+<description>Process a complete SOAP request</description>
+
+<argument name="url" datatype="string"></argument>
+<argument name="sys_id" datatype="string"></argument>
+<argument name="uc_soap_request_envelope" datatype="string"></argument>
+
+<argument name="uc_soap_request_payload" datatype="string"></argument>
+<argument name="uc_soap_security_token_tag" datatype="string">This value within XML is blindly replaced with login token we have</argument>
+<argument name="uc_soap_action" datatype="string"></argument>
+<argument name="uc_soap_request_namespace_tag" datatype="string"></argument>
+
+
+<argument name="uc_soap_request_userid" datatype="string"></argument>
+<argument name="uc_soap_request_password" datatype="string"></argument>
+<argument name="uc_soap_action_login" datatype="string"></argument>
+<argument name="uc_soap_request_namespace_tag_login" datatype="string"></argument>
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+process ossi soap request core
+where uc_force_relogin = 0
+|
+if ( @uc_relogin_needed = 1 )
+{
+    process ossi soap request core
+    where uc_force_relogin = 1
+    |
+    filter data
+    where moca_filter_level = 1
+    and uc_relogin_done = 1
+}
+else
+    filter data
+    where moca_filter_level = 1
+    and uc_relogin_done = 0
+
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This command is used to perform SOAP requests.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

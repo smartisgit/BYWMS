@@ -1,0 +1,56 @@
+<command>
+<name>remove ossi rule engine expression</name>
+<description>Remove data in usr_rule_engine_expr</description>
+
+<argument name="uc_rule_grp_id" required="yes" datatype="string"></argument>
+<argument name="uc_rule_subgrp_id" required="yes" datatype="string"></argument>
+<argument name="uc_rule_id" required="yes" datatype="string"></argument>
+<argument name="uc_rule_value" required="yes" datatype="string"></argument>
+<argument name="seqnum" required="yes" datatype="string">This user does not see.  Ever ascending value based on max and add 1</argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+/*Note:Since we are migrating legacy code and dont know if it was called from somewhere as uc_rule_id*/
+publish data
+where uc_rule_value = nvl(@uc_rule_value, @uc_rule_id)
+|
+capture ossi table data for history logging
+where uc_log_table_name = 'usr_rule_engine_expr'
+|
+remove record
+where table = 'usr_rule_engine_expr'
+|
+filter data 
+where moca_filter_level = 1
+and old_uc_captured_table_data = @uc_captured_table_data
+
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+Remove record in this table
+</p>
+]]>
+</remarks>
+
+<retrows>0</retrows>
+
+
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+
+<seealso cref="get ossi commands for condition"></seealso>
+
+</documentation>
+
+
+</command>

@@ -1,0 +1,85 @@
+<command>
+<name>ossi user_has_access_to_opt_nam</name>
+<description> Does user have access to an option.  0 means no 1 means yes </description>
+<type>Local Syntax</type>
+
+<local-syntax>
+<![CDATA[
+
+publish data
+where i_opt_nam = @moca_farg1
+and   usr_id  = nvl(@moca_farg2, @@USR_ID )
+|
+{
+    /* If option does not exists at all - it means access is allowed */
+    [
+    select count(*) cnt_opt
+    from les_mnu_opt
+    where opt_nam = @i_opt_nam
+    ]
+    |
+    if ( @cnt_opt = 0 )
+        publish data
+        where ret = '1'
+    else
+    {
+        /*
+         * If user does not exist - assume it is allowed.  That should happen only in integrations or other low level ops
+         */
+        [
+        select 1
+        from les_usr_ath
+        where usr_id = @usr_id
+        ]
+        catch (-1403,510)
+        |
+        if ( @? != 0 )
+            publish data
+            where ret = '1'
+        else
+        {
+            {
+                list user role options
+                where usr_id = @usr_id
+                and opt_nam = @i_opt_nam
+                catch (-1403,510)
+                |
+                if ( @? = 0 and @opt_nam = @i_opt_nam and @ena_flg = 1) 
+                    filter data where moca_filter_level = '1'
+            }
+            >> res
+            |
+            if ( rowcount(@res) > 0 )
+                publish data
+                where ret = '1'
+            else
+                publish data
+                where ret = '0'
+        }
+    }
+}
+
+]]>
+
+</local-syntax>
+
+<documentation>
+
+
+<remarks>
+<![CDATA[
+See if user has access to an option.  if option does not exists or user does not exist - it means access is allowed
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+<example>
+??
+</example>
+
+<retcol name="ret" type="float">Number of miliseconds since midnight</retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+</documentation>
+</command>

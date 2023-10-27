@@ -1,0 +1,23 @@
+<trigger>
+<name>mark ossi parent table as needing register</name>
+<on-command>create order line</on-command>
+<fire-sequence>100000</fire-sequence>
+
+<local-syntax>
+<![CDATA[
+
+mark ossi parent table as needing register
+where table_name = 'ORD'
+and uc_reg_reacod = 'DA'
+and uc_parent_update_clause = null
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<seealso cref="mark ossi parent table as needing register"></seealso>
+
+</documentation>
+
+</trigger>

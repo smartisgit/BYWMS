@@ -1,0 +1,172 @@
+<command>
+<name>list ossi bugzilla rollouts</name>
+<description>List the rollouts in bugzilla</description>
+
+<argument name="uc_env_name" required="yes" datatype="string">Environment</argument>
+<argument name="uc_bug_id" required="yes" datatype="string">Environment</argument>
+<argument name="uc_rollout_name" required="yes" datatype="string">Environment</argument>
+<argument name="uc_rollout_bug_status" required="yes" datatype="string">Environment</argument>
+<argument name="uc_rollout_deploy_status_cd" required="yes" datatype="string">Environment</argument>
+<argument name="uc_major_rev" required="yes" datatype="string">Environment</argument>
+
+<type>Local Syntax</type>
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+publish data
+where uc_global_min_major_rev = nvl ( @@UC_GLOBAL_MIN_MAJOR_REV, '3' )
+and uc_get_max_minor_rev = nvl ( @@UC_BUGZILLA_GET_MAX_MINOR_REV, '1' )
+and uc_rollout_name = @-uc_rollout_name
+|
+if ( @uc_get_max_minor_rev = '1' )
+   publish data 
+   where uc_select_rev = "major_rev, max(minor_rev) minor_rev, count(*) uc_cnt_minor_rev"
+   and uc_group_by_rev = "group by  major_rev"
+else
+   publish data 
+   where uc_select_rev = "major_rev, minor_rev, 1 uc_cnt_minor_rev"
+   and uc_group_by_rev = ""
+|
+if ( nvl(@uc_bug_id,0) != 0 )
+   publish data
+   where uc_bug_id_clause = " and y.uc_bug_id  = @uc_bug_id"
+else
+   publish data
+   where uc_bug_id_clause = " and 1=1"
+|
+if ( @uc_rollout_name is null )
+   publish data
+   where uc_rollout_name_clause = " and 1=1"
+else
+   publish data
+   where uc_rollout_name_clause = " and rollout_name like @uc_rollout_name"
+|
+if ( @uc_rollout_bug_status is null )
+   publish data
+   where uc_rollout_bug_status_clause = " and 1=1"
+else
+   publish data
+   where uc_rollout_bug_status_clause = " and y.uc_rollout_bug_status = @uc_rollout_bug_status"
+|
+if ( nvl(@uc_major_rev,0) = 0 )
+   publish data
+   where uc_major_rev_clause = " and 1=1"
+else
+   publish data
+   where uc_major_rev_clause = " and major_rev = @uc_major_rev"
+|
+if ( @uc_env_name is null )
+   publish data
+   where uc_env_name_clause = " and 1=2"
+else
+   publish data
+   where uc_env_name_clause = " and 1=1"
+|
+if ( @uc_initialize_rollout_dda = '1' )
+{
+   [
+   select cast('' as varchar2(100)) uc_rollout_name,
+          cast('' as varchar2(10)) uc_major_rev,
+          cast('' as varchar2(10)) uc_minor_rev,
+          cast('' as varchar2(10)) uc_bug_id,
+          cast('' as varchar2(30)) uc_bug_status,
+          cast('' as varchar2(100)) uc_env_name,
+          cast(null as date ) beg_uc_rollout_install_dt,
+          cast(null as date ) end_uc_rollout_install_dt
+   from dual
+   where 1=2
+   ]
+}
+else
+{
+   publish data
+   where uc_select = " select y.*, @uc_env_name uc_env_name"
+                  || " from"
+                  || " ("
+                  || "    select x.uc_rollout_name, ifnull(x.uc_rollout_descr, x.uc_bug_desc) uc_rollout_descr,"
+                  || "           x.major_rev uc_major_rev, x.minor_rev uc_minor_rev, x.uc_cnt_minor_rev, x.uc_bug_cnt, "
+                  || "    case when x.uc_bug_cnt <= 1 then x.uc_bug_id else 0 end uc_bug_id, uc_bug_status uc_rollout_bug_status"
+                  || "    from "
+                  || "    ("
+                  || "       select"
+                  || "              rr.rollout_name  uc_rollout_name,"
+                  || "              rr.rollout_description uc_rollout_descr,"
+                  || "              rr.major_rev, rr.minor_rev, rr1.uc_cnt_minor_rev,"
+                  || "              max(bugs.bug_id) uc_bug_id,"
+                  || "              max(bugs.bug_status) uc_bug_status,"
+                  || "              max(bugs.short_desc) uc_bug_desc,"
+                  || "              count(*) uc_bug_cnt"
+                  || "       from ("
+                  || "               select " || @uc_select_rev
+                  || "               from ossi_rollout"
+                  || "               where 1=1"
+                  ||                 @uc_env_name_clause
+                  ||                 @uc_rollout_name_clause
+                  ||                 @uc_major_rev_clause
+                  || "               and major_rev > @uc_global_min_major_rev " 
+                  ||                 @uc_group_by_rev
+                  || "            ) rr1"
+                  || "            join ossi_rollout rr on rr.major_rev = rr1.major_rev and rr.minor_rev = rr1.minor_rev" 
+                  || "            join ossi_bugs_in_rollout on ossi_bugs_in_rollout.rollout_name = rr.rollout_name"
+                  || "            join bugs on bugs.bug_id = ossi_bugs_in_rollout.bug_id"
+                  || "       group by"
+                  || "              rr.rollout_name,"
+                  || "              rr.rollout_description"
+                  || "    ) x"
+                  || " ) y"
+                  || " where 1=1" 
+                  || @uc_rollout_bug_status_clause
+                  || @uc_bug_id_clause
+                  || " order by y.uc_major_rev desc, y.uc_minor_rev, y.uc_rollout_name"
+   |
+   execute ossi bugzilla select
+   where uc_select_stmt = @uc_select
+   |
+   filter data 
+   where moca_filter_level = '1'
+   and uc_rollout_install_dt = ossi__get_rollout_install_dt ( @uc_env_name, @uc_rollout_name )
+   |
+   if ( @beg_uc_rollout_install_dt is not null )
+      publish data where uc_beg_filter_ok = iif ( @uc_rollout_install_dt is not null and @uc_rollout_install_dt >= @beg_uc_rollout_install_dt, '1', '0' )
+   else
+      publish data where uc_beg_filter_ok = '1'
+   |
+   if ( @end_uc_rollout_install_dt is not null )
+      publish data where uc_end_filter_ok = iif ( @uc_rollout_install_dt is not null and @uc_rollout_install_dt <= @end_uc_rollout_install_dt, '1', '0' )
+   else
+      publish data where uc_end_filter_ok = '1'
+   |
+   if ( @uc_beg_filter_ok = '1' and @uc_end_filter_ok = '1' )
+      filter data
+      where moca_filter_level = 3
+}
+
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+Get all rollouts
+</remarks>
+
+<retcol name="uc_rollout_name" type="String"></retcol>
+<retcol name="uc_rollout_descr" type="String"></retcol>
+<retcol name="uc_major_rev" type="String"></retcol>
+<retcol name="uc_minor_rev" type="String"></retcol>
+<retcol name="uc_bug_id" type="String"></retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

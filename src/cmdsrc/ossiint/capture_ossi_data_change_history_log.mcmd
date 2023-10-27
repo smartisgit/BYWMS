@@ -1,0 +1,211 @@
+<command>
+<name>capture ossi data change history log</name>
+<description>Record the data in history log</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="uc_log_table_name">Table for which we are recording data</argument>
+<argument datatype="string" name="uc_history_table_name">table that has history</argument>
+<argument datatype="string" name="uc_log_oper_cd"></argument>
+<argument datatype="string" name="old_uc_captured_table_data"></argument>
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+ 
+/*
+ * if we are in middle of part replication then we want to log only for wh_id of ----
+ */
+if ( ossi__is_part_being_replicated (@prtnum, @prt_client_id) = '1' and nvl(@wh_id,@wh_id_tmpl) != '----' )
+    noop
+else
+{
+    /*
+     * in dlytrn I want to log the logged in wh_id if avilable
+     */
+    publish data
+    where sess_wh_id = nvl(@@WH_ID, @wh_id)
+    |
+    publish data
+    where uc_set_to_null = ossi__polval ( 'USR-OSSI-CHANGE-CAPTURE', 'MISCELLANEOUS', 'INIT-TO-NULL', '', 'rtnum1', @sess_wh_id )
+    |
+    /*
+     * Make sure our stack is not polluted by smae column names as in our log table
+     */
+    if ( @uc_set_to_null = 1 )
+    {
+        execute ossi moca and cache
+        where uc_cache_key = 'UC_HLOG_TABLE_COLS_usr_data_change_hist_log'
+        and uc_cache_grp = 'UC_HLOG'
+        and uc_inline = 1
+        and uc_moca_cmd = "
+        {
+            {
+                list primary key for table where table_name = @uc_log_table_name
+                >> res_pk
+                |
+                if ( rowcount(@res_pk) > 0 )
+                {
+                    convert column results to string where res = @res_pk and colnam = 'column_name' and separator = ','
+                    |
+                    publish data
+                    where uc_log_table_pk = ',' || lower(@result_string) || ','
+                }
+            }
+            |
+            list table columns where table_name = 'usr_data_change_hist_log'
+            |
+            if ( instr(',wh_id,uc_log_table_name,uc_log_oper_cd,uc_log_usr_id,uc_log_devcod,prtnum,bomnum,serv_id,serv_ins_id,orgcod,lotnum,revlvl,' , ','||lower(@column_name)||',') = 0 
+                 and instr(@uc_log_table_pk, ','||lower(@column_name)||',') = 0 )
+                filter data 
+                where moca_filter_level = 1 
+                and uc_publish_clause = @column_name || ' = null'
+        }
+        >> res_to_null
+        |
+        convert column results to string where res = @res_to_null and colnam = 'uc_publish_clause' and separator = ' and '"
+        |
+        execute server command 
+        where cmd = "publish data where " || @result_string
+        and inline = 1
+    }
+    |
+    publish data
+    where uc_history_table_name = nvl(@uc_history_table_name, 'usr_data_change_hist_log' )
+    and uc_log_usr_id = nvl(@uc_log_usr_id, @@USR_ID)
+    and uc_log_devcod = nvl(@uc_log_devcod, @@DEVCOD)
+    and wh_id = nvl( nvl(@wh_id, @wh_id_tmpl), @@WH_ID)
+    and uc_data_change_hist_id = ossi__next_number ( 'uc_data_change_hist_id' )
+    and uc_logged_from = null
+    and uc_logged_to = null
+    and trndte = sysdate
+    and fr_value = substr(nvl(@bomnum, @uc_rule_grp_id), 1, 200)
+    and to_value = substr(@uc_rule_subgrp_id, 1, 200)
+    and trnqty = nvl(@trnqty, @seqnum)
+    and var_nam = substr(@uc_rule_id, 1, 200)
+    and adj_ref2 = @bomlin
+    |
+    {
+        /*
+         * Capture the new values
+         */
+        capture ossi table data for history logging
+        where uc_capture_call_point = 'POST'
+        |
+        publish data
+        where new_uc_captured_table_data = @uc_captured_table_data
+    }
+    |
+    if ( @uc_log_oper_cd is null )
+    {
+        if ( rowcount(@old_uc_captured_table_data) > 0 and rowcount(@new_uc_captured_table_data) > 0 )
+            publish data
+            where uc_log_oper_cd = 'C'
+        else if ( rowcount(@old_uc_captured_table_data) > 0 and rowcount(@new_uc_captured_table_data) = 0 )
+            publish data
+            where uc_log_oper_cd = 'D'
+        else if ( rowcount(@old_uc_captured_table_data) = 0 and rowcount(@new_uc_captured_table_data) > 0 )
+            publish data
+            where uc_log_oper_cd = 'A'
+        else
+            publish data
+            where uc_log_oper_cd = null
+    }
+    |
+    /*
+     * When it is a change, we create history only if some non audit columns were actually differnt between old and new
+     */
+    if ( @uc_log_oper_cd = 'C' )
+    {
+        compare ossi result set rows
+        where rs1 = @old_uc_captured_table_data
+        and rs2 = @new_uc_captured_table_data
+        and uc_ignore_audit_columns = 1
+        |
+        if ( @data_same = 1 )
+            publish data
+            where uc_create_history = 0
+        else
+            publish data
+            where uc_create_history = 1
+    }
+    else
+        publish data
+        where uc_create_history = 1
+    |
+    if ( @uc_create_history = 1 )
+    {
+        write daily transaction
+        where actcod = 'UC_HISLOG'
+        and trndtl_id = @uc_data_change_hist_id
+        and trndtl_table = @uc_history_table_name
+        and reacod = @uc_log_oper_cd
+        and var_nam = 'table_name'
+        and to_value = @uc_log_table_name
+        and wh_id = @sess_wh_id
+        and movref = @serv_id
+        and adj_ref1 = @serv_ins_id 
+        ;
+        /*
+         * record from values
+         */
+        if ( rowcount(@old_uc_captured_table_data) > 0 )
+        {
+            publish data combination
+            where res = @old_uc_captured_table_data
+            |
+            create record
+            where table = @uc_history_table_name
+            and uc_data_change_typ_cd = 'F'
+            and wh_id = nvl(@wh_id, @wh_id_tmpl)
+            ;
+            publish data
+            where uc_logged_from = '1'
+        } 
+        |
+        if ( rowcount(@new_uc_captured_table_data) > 0 )
+        {
+            publish data combination
+            where res = @new_uc_captured_table_data
+            |
+            create record
+            where table = @uc_history_table_name
+            and uc_data_change_typ_cd = 'T'
+            and wh_id = nvl(@wh_id, @wh_id_tmpl)
+            ;
+            publish data
+            where uc_logged_to = '1'
+        }
+        |
+        publish data
+        where uc_log_table_name = @uc_log_table_name
+        and uc_history_table_name = @uc_history_table_name
+        and uc_log_usr_id = @uc_log_usr_id
+        and uc_log_devcod = @uc_log_devcod
+        and wh_id = @wh_id
+        and uc_data_change_hist_id = @uc_data_change_hist_id
+        and uc_logged_from = @uc_logged_from
+        and uc_logged_to = @uc_logged_to
+        and uc_log_oper_cd = @uc_log_oper_cd
+    }
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+This command record the history change
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

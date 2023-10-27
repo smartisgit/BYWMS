@@ -1,0 +1,30 @@
+<trigger>
+<name>process usr issue</name>
+<on-command>remove service instruction</on-command>
+<description></description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ */
+process usr issue
+  where uc_table_name = 'SERV_INS_MST'
+    and uc_action = 'REMOVE'
+
+]]>
+</local-syntax>
+<fire-sequence>10000</fire-sequence>
+<enable>yes</enable>
+<documentation>
+
+<remarks>
+This trigger process issue for deleting service instruction.
+</remarks>
+
+<seealso cref="process usr issue"></seealso>
+
+</documentation>
+</trigger>

@@ -1,0 +1,58 @@
+<command>
+<name>free ossi moca execute cache</name>
+<description>
+Free the MOCA Execute cache
+</description>
+
+<type>C Function</type>
+<function>ossiExecuteMOCAAndCacheFree</function>
+
+<documentation>
+
+
+<remarks>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+Free the moca cache
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+<example>
+
+execute ossi moca and cache
+where uc_cache_grp = "XXX"
+and uc_moca_cmd = "publish data where a=1"
+and uc_cache_key = 'EXEC1'
+;
+execute ossi moca and cache
+where uc_cache_grp = "XXX1"
+and uc_moca_cmd = "publish data where a=2"
+and uc_cache_key = 'EXEC1'
+;
+execute ossi moca and cache
+where uc_cache_grp = "XXX1"
+and uc_moca_cmd = "publish data where a=2"
+and uc_cache_key = 'EXEC1'
+;
+execute ossi moca and cache
+where uc_cache_grp = "XXX1"
+and uc_moca_cmd = "publish data where a=2"
+and uc_cache_key = 'EXEC2'
+;
+free ossi moca execute cache
+
+</example>
+
+<retcol name="@*" type="string">Variable</retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+</documentation>
+</command>

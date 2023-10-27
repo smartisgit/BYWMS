@@ -1,0 +1,115 @@
+<command>
+<name>list ossi policy lists</name>
+<description>Get Policy lists</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+publish data 
+  where polcod = 'USR-POLMNT' 
+    and polval = 'POLDAT-NODE' 
+    and wh_id = nvl(@wh_id, '----') 
+|
+[select srtseq, 
+        polvar, 
+        rtstr1, 
+        rtstr2, 
+        rtnum1 
+   from poldat_view 
+  where polcod = @polcod 
+    and @+polvar 
+    and polval = @polval 
+    and wh_id = @wh_id 
+  order by srtseq 
+] 
+|
+publish data 
+  where uc_poldat_node = @polvar
+|
+[select rtstr1 mls_id
+   from poldat_view 
+  where polcod = @polcod 
+    and polvar = @polvar 
+    and polval = 'MLS_ID'
+    and wh_id = @wh_id 
+] catch (-1403)
+|
+if (@mls_id is not null)
+{
+  get mls text 
+    where locale_id = nvl(@locale_id, 'US_ENGLISH')
+  catch (-1403,510)
+}
+|
+[select rtstr1 uc_help_text
+   from poldat_view 
+  where polcod = @polcod 
+    and polvar = @polvar 
+    and polval = 'HELP'
+    and wh_id = @wh_id 
+] catch (-1403)
+|
+[[
+  String[] arr = rtstr1.split("\\|");
+[polcod:arr[0],polvar:arr[1],polval:arr[2],
+uc_polval_multi_flg:arr[2].equals("%"),
+uc_rtstr1_multi_flg:arr[3].equals("%"),
+uc_rtstr1_enabled:(arr[3].equals("%")||arr[3].equals("1")),
+uc_rtstr2_enabled:arr[4].equals("1"),
+uc_rtnum1_enabled:arr[5].equals("1"),
+uc_rtnum2_enabled:arr[6].equals("1"),
+uc_rtflt1_enabled:false,
+uc_rtflt2_enabled:false
+]  
+]]
+|
+if (@uc_polval_multi_flg = 1)
+{
+  publish data where uc_list_column = 'polval'
+}
+else if (@uc_rtstr1_enabled = 1)
+{
+  publish data where uc_list_column = 'rtstr1'
+}
+else if (@uc_rtnum1_enabled = 1)
+{
+  publish data where uc_list_column = 'rtnum1'
+}
+|
+filter data 
+  where moca_filter_level = 2
+    and srtseq = @srtseq 
+    and polvar = @polvar 
+    and rtstr1 = @rtstr1
+    and rtstr2 = @rtstr2
+    and rtnum1 = @rtnum1
+    and mls_id = @mls_id
+    and mls_text = nvl(@mls_text, @mls_id)
+    and uc_help_text = @uc_help_text
+    and uc_list_column = @uc_list_column
+    and uc_poldat_node = @uc_poldat_node
+]]>
+</local-syntax>
+
+<documentation>
+
+<remarks>
+This command is used to get policy list.
+</remarks>
+
+<retcol name="srtseq" type="String"></retcol>
+<retcol name="polvar" type="String"></retcol>
+<retcol name="rtstr1" type="String"></retcol>
+<retcol name="rtstr2" type="String"></retcol>
+<retcol name="trnum1" type="String"></retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

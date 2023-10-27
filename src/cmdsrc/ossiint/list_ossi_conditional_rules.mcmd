@@ -1,0 +1,76 @@
+<command>
+<name>list ossi conditional rules</name>
+<description>Get the data for conditional rules</description>
+
+<argument name="uc_rule_grp_id" required="yes" datatype="string"></argument>
+<argument name="uc_rule_subgrp_id" required="yes" datatype="string"></argument>
+<argument name="uc_rule_id" required="yes" datatype="string"></argument>
+<argument name="seqnum" required="yes" datatype="string">This user does not see.  Ever ascending value based on max and add 1</argument>
+
+<argument name="srtseq" required="yes" datatype="string">This is what user sees during sorting</argument>
+<argument name="ena_flg" required="yes" datatype="string">This is what user sees during sorting</argument>
+<argument name="uc_rule_expr" required="yes" datatype="string"></argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+publish data
+  where uc_rule_grp_id = @uc_rule_grp_id
+    and uc_rule_subgrp_id = @uc_rule_subgrp_id
+    and uc_rule_id = @uc_rule_id
+    and ena_flg = @ena_flg
+|
+if (@uc_rule_id is null)
+   hide stack variable
+     where name = 'uc_rule_id'
+|
+if (@ena_flg is null)
+   hide stack variable
+     where name = 'ena_flg'
+|
+[select *
+   from usr_rule_engine_cond_expr
+  where uc_rule_grp_id = @uc_rule_grp_id
+    and uc_rule_subgrp_id = @uc_rule_subgrp_id
+    and @+uc_rule_id
+    and @+ena_flg
+  order by srtseq
+]
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This command is used to get the conditional rules data
+</p>
+]]>
+</remarks>
+
+<retrows>n</retrows>
+
+<retcol name="uc_rule_grp_id" type="String">Rule Group Id</retcol>
+<retcol name="uc_rule_subgrp_id" type="String">Rule Subgroup ID</retcol>
+<retcol name="uc_rule_id" type="String">Rule ID</retcol>
+<retcol name="seqnum" type="String">Sequence Number</retcol>
+<retcol name="srtseq" type="String">SRT Sequence</retcol>
+<retcol name="ena_flg" type="flag">Enabled</retcol>
+<retcol name="uc_condition_expr" type="String">Conditional Expression</retcol>
+<retcol name="uc_execute_expr" type="String">Execute Command</retcol>
+<retcol name="uc_rule_catg_cd" type="String">Rule Category</retcol>
+<retcol name="uc_rule_comment" type="String">Rule Comment</retcol>
+<retcol name="uc_cust_flg" type="flag">Cust Flag</retcol>
+<retcol name="ins_dt" type="String"></retcol>
+<retcol name="ins_user_id" type="String"></retcol>
+<retcol name="last_upd_dt" type="date">Last Update Date</retcol>
+<retcol name="last_upd_user_id" type="String">Last Update User ID</retcol>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+
+<seealso cref="list ossi conditional rules"></seealso>
+
+</documentation>
+</command>

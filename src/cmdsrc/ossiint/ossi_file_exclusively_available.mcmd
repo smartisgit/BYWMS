@@ -1,0 +1,49 @@
+<command>
+<name>ossi file_exclusively_available</name>
+<description>Checks to see if a file is currently being written to and attempts to change the suffix</description>
+<argument datatype="string" name="moca_farg1">filename</argument>
+<argument datatype="string" name="moca_farg2">tmpsfx</argument>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+publish data
+ where filename = @moca_farg1
+   and tmpsfx = nvl(@moca_farg2, '.tmp')
+|
+move file
+  where from = @filename
+    and to = @filename || @tmpsfx
+catch(@?)
+|
+publish data
+  where success_flg = iif(@? = 0, 1, 0)
+|
+/* Move it back to the original name */
+move file
+  where from = @filename || @tmpsfx
+	and to = @filename
+catch(@?)    
+|
+publish data
+  where success_flg = @success_flg
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<remarks>
+This command may be used to see that whether a file is written to currently and then attempts to change the suffix.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

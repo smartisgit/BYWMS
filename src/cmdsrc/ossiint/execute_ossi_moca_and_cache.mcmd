@@ -1,0 +1,44 @@
+<command>
+<name>execute ossi moca and cache</name>
+<description>Wrapper for executing moca command and cache </description>
+<type>Local Syntax</type>
+
+<argument name="uc_cache_grp" required="yes" datatype="string"></argument>
+<argument name="uc_moca_cmd" required="no" datatype="string"></argument>
+<argument name="uc_inline" required="yes" datatype="Integer"></argument>
+<argument name="uc_cache_key" required="yes" datatype="string"></argument>
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ */
+/*
+ * Assume it is inhibited by default.  Must set to 0 to enable it
+ */
+publish data
+where uc_inhibit_ossi_cache = iif(@uc_inhibit_ossi_cache is not null, @uc_inhibit_ossi_cache, @@UC_INHIBIT_OSSI_CACHE)
+|
+if ( @uc_inhibit_ossi_cache = '1' or  ossi__running_in_server_mode(null) = '1' )
+   execute server command
+   where cmd = @uc_moca_cmd
+   and inline = @uc_inline
+else
+   execute ossi moca and cache core
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+Wrapper command to call moca command and cache
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

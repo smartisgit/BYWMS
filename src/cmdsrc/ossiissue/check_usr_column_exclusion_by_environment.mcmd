@@ -1,0 +1,130 @@
+<command>
+<name>check usr column exclusion by environment</name>
+<description>Returns 510 if the column should be excluded (per environment)</description>
+
+<argument name="table" required="yes" datatype="string"></argument>
+<argument name="column" required="yes" datatype="string"></argument>
+<argument name="wh_id" required="yes" datatype="string">If available</argument>
+
+<argument name="polcod" required="yes" datatype="string">If available</argument>
+<argument name="polvar" required="yes" datatype="string">If available</argument>
+<argument name="polval" required="yes" datatype="string">If available</argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ */
+if ( @table is null and upper(@column) like 'POL%' )
+   publish data
+   where table = 'POLDAT'
+|
+publish data
+where table = upper(@table)
+and column = upper(@column)
+and wh_id = nvl(@wh_id, @wh_id_tmpl)
+and uc_inhibit_polcod_polvar_polval = ossi__replace(upper(@@UC_VERSION_CONTROL_INHIBIT_POLDAT_POLCOD_POLVAR_POLVAL),'"','' )
+and uc_inhibit_polvar=ossi__replace(upper(@@UC_VERSION_CONTROL_INHIBIT_POLDAT_POLVAR),'"','' )
+and uc_do_poldat_wh_id=ossi__replace(upper(@@UC_VERSION_CONTROL_DO_POLDAT_WH_ID_LIST),'"','' )
+/**/
+and uc_inhibit_codmst_colnam=ossi__replace(upper(@@UC_VERSION_CONTROL_INHIBIT_CODMST),'"','')
+/**/
+and uc_sess_var = 'uc_polcod_polvar_polval_passed'
+|
+{
+   if ( @table = 'POLDAT' )
+   {
+      publish data
+      where uc_inhibit = '0'
+      |
+      if ( @uc_do_poldat_wh_id is not null and instr( ';'||@uc_do_poldat_wh_id||';', ';'||@wh_id||';') = 0 )
+         publish data
+         where uc_inhibit = '1'
+         and uc_inhibit_reason = 'wh not controlled'
+      |
+      if ( @uc_inhibit != '1' and ( upper(@polvar) like '_HELP%' or upper(@polval) like '_HELP%' ) )
+         publish data
+         where uc_inhibit = '0'
+         and uc_inhibit_reason = '_HELP node'
+      else
+      {
+         if ( @uc_inhibit != '1' and @uc_inhibit_polvar is not null and instr( ';'||@uc_inhibit_polvar||';', ';'||@polvar||';') > 0 )
+            publish data
+            where uc_inhibit = '1'
+            and uc_inhibit_reason = 'inhibit polvar'
+         |
+         if ( @uc_inhibit != '1' and @uc_inhibit_polcod_polvar_polval is not null )
+         {
+            save session variable where name = @uc_sess_var and value = '0'
+            ;
+            convert list
+            where string = @uc_inhibit_polcod_polvar_polval
+            and type = 'L'
+            and separator = ";"
+            catch (-1403,510)
+            | 
+            if ( @? = 0 and @retstr )
+            {
+               if ( ossi__sess_var ( @uc_sess_var ) != '1' )
+               {
+                  if ( @polcod || '|' || @polvar || '|' || @polval like @retstr )
+                  {
+                     save session variable where name = @uc_sess_var and value = '1'
+                     ;
+                     publish data
+                     where uc_inhibit = '1'
+                     and uc_inhibit_reason = 'inhibit polcod-polvar-polval.  matched' || @retstr
+                  }
+               }
+            }
+         }
+         |
+         publish data
+         where uc_inhibit = @uc_inhibit
+         and uc_inhibit_reason = @uc_inhibit_reason
+      }
+      |
+      publish data
+      where uc_inhibit = @uc_inhibit
+      and uc_inhibit_reason = @uc_inhibit_reason
+   }
+   else if ( @table = 'CODMST' or @table = 'DSCMST' )
+   {
+      publish data
+      where uc_inhibit = '0'
+      |
+      if ( @uc_inhibit_codmst_colnam is not null and instr(';'||@uc_inhibit_codmst_colnam||';' , ';' || upper(@rtstr1) || ';' ) > 0 )
+         publish data
+         where uc_inhibit = '1'
+         and uc_inhibit_reason  = 'excluding this colnam in codnmst'
+   }
+   else
+      publish data
+      where uc_inhibit = '0'
+      and uc_inhibit_reason  = 'n/a'
+   |
+   publish data
+   where uc_inhibit = @uc_inhibit
+   and uc_inhibit_reason = @uc_inhibit_reason
+   and uc_inhibit_polcod_polvar_polval = @uc_inhibit_polcod_polvar_polval
+   and uc_inhibit_polvar = @uc_inhibit_polvar
+   and uc_do_poldat_wh_id = @uc_do_poldat_wh_id
+   and uc_inhibit_codmst_colnam=@uc_inhibit_codmst_colnam
+}
+
+    
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This command is used to check user column exclution by environment.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

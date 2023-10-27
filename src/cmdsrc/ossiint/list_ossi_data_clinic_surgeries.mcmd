@@ -1,0 +1,118 @@
+<command>
+<name>list ossi data clinic surgeries</name>
+<description>List the surgery metadata defined for data clinic</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="uc_data_surg_id">Surgery Id</argument>
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+publish data
+where polcod = 'USR-OSSI-DATA-CLINIC'
+and polval = 'MAIN-COMMAND-IDS'
+|
+{
+    if ( @init = 1 )
+    {
+        [
+        select /*#nobind*/
+               cast(null as varchar(100)) uc_data_surg_id,
+               cast(null as varchar(100)) uc_data_surg_cmd_id_more,
+               cast(null as varchar(100)) uc_data_surg_cmd_id_more_cmd,
+               cast(null as number)       uc_data_surg_cmd_id_more_cl,
+               cast(null as varchar(100)) uc_data_surg_cmd_id_dtl,
+               cast(null as varchar(100)) uc_data_surg_cmd_id_dtl_cmd,
+               cast(null as number)       uc_data_surg_cmd_id_dtl_cl,
+               cast(null as varchar(100)) uc_data_surg_cmd_id_issue,
+               cast(null as varchar(100)) uc_data_surg_cmd_id_issue_cmd,
+               cast(null as number)       uc_data_surg_cmd_id_issue_cl,
+               cast(null as varchar(100)) uc_data_surg_cmd_id_action_prf,
+               cast(null as number)       uc_data_surg_cmd_id_action_min,
+               cast(null as number)       uc_data_surg_cmd_id_action_max,
+               cast(null as varchar(100)) uc_data_surg_cmd_id_tab_prf,
+               cast(null as number)       uc_data_surg_cmd_id_tab_min,
+               cast(null as number)       uc_data_surg_cmd_id_tab_max
+        from dual
+        where 1=2
+        ]
+    }
+    else
+    {
+        [
+        select distinct
+               polvar uc_data_surgery_id
+        from poldat
+        where 1=1
+        and wh_id_tmpl = '----'
+        and polcod = @polcod
+        and @+polvar^uc_data_surg_id
+        ]
+        |
+        publish data
+        where uc_data_surgery_cmd_id_more = ossi__polval_nc ( @polcod, @uc_data_surgery_id, @polval, 'MORE', 'rtstr2', '----' )
+        and uc_data_surgery_cmd_id_dtl = ossi__polval_nc ( @polcod, @uc_data_surgery_id, @polval, 'DETAIL', 'rtstr2', '----' )
+        and uc_data_surgery_cmd_id_issue = ossi__polval_nc ( @polcod, @uc_data_surgery_id, @polval, 'ISSUE', 'rtstr2', '----' )
+        and uc_data_surgery_cmd_id_action_prefix = ossi__polval_nc ( @polcod, @uc_data_surgery_id, @polval, 'ACTION-PREFIX', 'rtstr2', '----' )
+        and uc_data_surgery_cmd_id_action_min = ossi__polval_nc ( @polcod, @uc_data_surgery_id, @polval, 'ACTION-PREFIX', 'rtnum1', '----' )
+        and uc_data_surgery_cmd_id_action_max = ossi__polval_nc ( @polcod, @uc_data_surgery_id, @polval, 'ACTION-PREFIX', 'rtnum2', '----' )
+        and uc_data_surgery_cmd_id_tab_prefix = ossi__polval_nc ( @polcod, @uc_data_surgery_id, @polval, 'TAB-PREFIX', 'rtstr2', '----' )
+        and uc_data_surgery_cmd_id_tab_min = ossi__polval_nc ( @polcod, @uc_data_surgery_id, @polval, 'TAB-PREFIX', 'rtnum1', '----' )
+        and uc_data_surgery_cmd_id_tab_max = ossi__polval_nc ( @polcod, @uc_data_surgery_id, @polval, 'TAB-PREFIX', 'rtnum2', '----' )
+        |
+        get ossi les command where les_cmd_id = @uc_data_surgery_cmd_id_more catch(-1403,510) 
+        | 
+        publish data where uc_data_surgery_cmd_id_more_cmd = @syntax and uc_data_surg_cmd_id_more_cl = @cust_lvl
+        |
+        get ossi les command where les_cmd_id = @uc_data_surgery_cmd_id_dtl catch(-1403,510) 
+        | 
+        publish data where uc_data_surgery_cmd_id_dtl_cmd = @syntax and uc_data_surg_cmd_id_dtl_cl = @cust_lvl
+        |
+        get ossi les command where les_cmd_id = @uc_data_surgery_cmd_id_issue  catch(-1403,510) 
+        | 
+        publish data where uc_data_surgery_cmd_id_issue_cmd = @syntax and uc_data_surg_cmd_id_issue_cl = @cust_lvl
+        |
+        publish data
+        where uc_data_surg_id = @uc_data_surgery_id
+        and uc_data_surg_cmd_id_more = @uc_data_surgery_cmd_id_more
+        and uc_data_surg_cmd_id_more_cmd = @uc_data_surgery_cmd_id_more_cmd
+        and uc_data_surg_cmd_id_more_cl = @uc_data_surg_cmd_id_more_cl
+        and uc_data_surg_cmd_id_dtl = @uc_data_surgery_cmd_id_dtl
+        and uc_data_surg_cmd_id_dtl_cmd = @uc_data_surgery_cmd_id_dtl_cmd
+        and uc_data_surg_cmd_id_dtl_cl = @uc_data_surg_cmd_id_dtl_cl
+        and uc_data_surg_cmd_id_issue = @uc_data_surgery_cmd_id_issue
+        and uc_data_surg_cmd_id_issue_cmd = @uc_data_surgery_cmd_id_issue_cmd
+        and uc_data_surg_cmd_id_issue_cl = @uc_data_surg_cmd_id_issue_cl
+        and uc_data_surg_cmd_id_action_prf = @uc_data_surgery_cmd_id_action_prefix
+        and uc_data_surg_cmd_id_action_min = @uc_data_surgery_cmd_id_action_min
+        and uc_data_surg_cmd_id_action_max = @uc_data_surgery_cmd_id_action_max
+        and uc_data_surg_cmd_id_tab_prf = @uc_data_surgery_cmd_id_tab_prefix
+        and uc_data_surg_cmd_id_tab_min = @uc_data_surgery_cmd_id_tab_min
+        and uc_data_surg_cmd_id_tab_max = @uc_data_surgery_cmd_id_tab_max
+    }
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+List the meta data for surgeries
+</remarks>
+
+<retrows>1</retrows>
+
+<retcol name="@* " type="COMTYP_CHAR">See command</retcol>
+
+
+<exception value="eOK">The command completed successfully.</exception>
+
+</documentation>
+
+
+</command>

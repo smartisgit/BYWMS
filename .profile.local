@@ -1,0 +1,19 @@
+#-------------------------------------------------------------------------------
+#
+# SOURCE FILE: .profile.local
+#
+# DESCRIPTION: Local LES environment's setup script.
+#
+# NOTE(S): This script is called by the LES environment's setup script.
+#          Any customzations to this LES environment should be made in 
+#          this script.
+#
+#-------------------------------------------------------------------------------
+
+# ------------------------------------------------------------------------------
+# Setup any local ksh options.
+# ------------------------------------------------------------------------------
+
+if [ -r ${LESDIR}/.kshrc.local ]; then
+    . ${LESDIR}/.kshrc.local
+fi

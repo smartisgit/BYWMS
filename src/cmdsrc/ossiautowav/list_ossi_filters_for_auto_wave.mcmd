@@ -1,0 +1,41 @@
+<command>
+<name>list ossi filters for auto wave</name>
+<description>List all filters for auto wave</description>
+<type>Local Syntax</type>
+<local-syntax>
+
+<![CDATA[
+publish data
+where usr_id = nvl(@usr_id, @@USR_ID)
+and opt_nam = 'optUsrMaintainAutoWaveFilters'
+|
+[
+select polval prefix
+from poldat_view
+where polcod = 'USR-WAVE-PLANNING'
+and polvar = 'MISCELLANEOUS'
+and wh_id = nvl(@wh_id, @@wh_id)
+and rtnum1 = 1
+]
+catch (-1403,510)
+|
+if ( @? = 0 and ossi__user_has_access_to_opt_nam(@opt_nam, @usr_id) = 1 )
+{
+   [
+   select id,filter_name
+   from web_filter
+   where filter_name like @prefix||'%'
+   ] catch (-1403,510)
+}
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This command is used to get all filters for auto waves.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

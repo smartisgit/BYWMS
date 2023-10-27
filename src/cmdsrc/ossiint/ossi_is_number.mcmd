@@ -1,0 +1,36 @@
+<command>
+<name>ossi is_number</name>
+<description></description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+[[
+  int is_number = 0;
+  try {
+    Double.parseDouble(moca_farg1);
+    is_number = 1;
+  } catch (Exception e) {}
+[is_number:is_number]
+]]
+
+]]>
+</local-syntax>
+<argument name="moca_farg1" required="yes" datatype="string"></argument>
+
+<documentation>
+
+<remarks>
+See if this is number.
+</remarks>
+
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

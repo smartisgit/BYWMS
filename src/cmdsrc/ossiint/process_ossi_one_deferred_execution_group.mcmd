@@ -1,0 +1,160 @@
+<command>
+<name>process ossi one deferred execution group</name>
+<description>Process one deferred execution group</description>
+
+<argument name="exec_typ" datatype="string">Execution Type.</argument>
+<argument name="comflg" datatype="integer">Commit Flag.</argument>
+<argument name="delflg" datatype="integer">Delete Flag.</argument>
+
+<argument name="uc_thread_group_by_col" datatype="string">What column in deferred_exec to group by</argument>
+<argument name="uc_thread_group_by_val" datatype="string">Value of that column for this execution</argument>
+
+<argument name="uc_lock_deferred_exec" datatype="string">In process code, do we lock or not.  Default 0</argument>
+
+
+<argument name="uc_ossi_job_seq" required="yes" datatype="string"></argument>
+<argument name="uc_ossi_module_seq" required="yes" datatype="string"></argument>
+<argument name="uc_ossi_who" required="yes" datatype="string"></argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+publish data
+where i_comflg = @comflg
+|
+{
+    if ( @uc_lock_deferred_exec = 1 )
+        publish data
+        where for_update_clause = "for update of exec_sts"
+    else
+        publish data
+        where for_update_clause = ""
+    |    
+    [
+    select *
+    from deferred_exec
+    where exec_typ = @exec_typ
+    and exec_sts  is null
+    and nvl(deferred_dte, sysdate - /*=moca_util.days(*/ 1 /*=)*/ ) <= sysdate
+    and @uc_thread_group_by_col:raw = @uc_thread_group_by_val
+    @for_update_clause:raw
+    order by exec_id
+    ]
+    catch (-1403,510)
+    |
+    if ( @? = 0 )
+    {
+        set savepoint where i_savepoint = @exec_id
+        ;
+        publish data
+        where uc_ossi_action_seq = ossi__register_action ( @uc_ossi_job_seq, @uc_ossi_module_seq, 'EXECUTE', 
+                                                           @exec_id || '=>' || @deferred_cmd,
+                                                           @uc_ossi_who )
+        |
+        {
+            execute server command
+            where cmd = @deferred_cmd
+            and inline = 0
+            catch(@?)
+            >> res_exec
+            |
+            publish data
+            where uc_ossi_err_code  = @?
+            and uc_ossi_err_descr = @!
+            and uc_num_rows = rowcount(@res_exec)
+            |
+            {
+                complete ossi job log
+                ;
+                /*
+                 * Mark the row
+                 */
+                [
+                update deferred_exec
+                set exec_sts = @uc_ossi_err_code,
+                    exec_dte = sysdate,
+                    exec_rows = @uc_num_rows
+                where exec_id = @exec_id
+                ]
+                catch (-1403,510)
+                ;
+                /*
+                 * If we want to delete as we go - do it for success
+                 */
+                if ( @delflg = 1 and @uc_ossi_err_code = 0 )
+                {
+                    [
+                    delete from deferred_exec
+                    where exec_id = @exec_id
+                    ]
+                    catch (-1403,510)
+                }
+                ;
+                /*
+                 * If we want to commit as we go?
+                 */
+                if ( @i_comflg = 1 )
+                {
+                    if ( @uc_ossi_err_code = 0 )
+                        [commit] catch (@?)
+                    else
+                        rollback to savepoint 
+                        where i_savepoint = @exec_id
+                }
+                ;
+                publish data
+                where exec_id = @exec_id
+                and exec_typ = @exec_typ
+                and exec_kv1 = @exec_kv1
+                and exec_kv2 = @exec_kv2
+                and exec_kv3 = @exec_kv3
+                and my_savepoint = @exec_id
+                and comflg = @i_comflg
+                and uc_ossi_job_seq = @uc_ossi_job_seq
+                and uc_ossi_module_seq = @uc_ossi_module_seq
+                and uc_ossi_action_seq = @uc_ossi_action_seq
+                and uc_ossi_err_code = @uc_ossi_err_code
+                and uc_ossi_err_descr = @uc_ossi_err_descr
+            } /* scope */
+        } /* action */
+    } /* all deferred execs */
+} /* main scope */
+
+
+]]>
+</local-syntax>
+<documentation>
+
+<retrows>n - based on how many were in specific group, e.g exec_kv3 </retrows>
+
+<retcol name="exec_id" type="string"></retcol>
+<retcol name="exec_typ" type="string"></retcol>
+<retcol name="exec_kv1" type="string"></retcol>
+<retcol name="exec_kv2" type="string"></retcol>
+<retcol name="exec_kv3" type="string"></retcol>
+<retcol name="my_savepoint" type="string"></retcol>
+<retcol name="comflg" type="string"></retcol>
+<retcol name="uc_ossi_job_seq" type="string"></retcol>
+<retcol name="uc_ossi_action_seq" type="string"></retcol>
+<retcol name="uc_ossi_module_seq" type="string"></retcol>
+<retcol name="uc_ossi_err_code" type="string"></retcol>
+<retcol name="uc_ossi_err_descr" type="string"></retcol>
+
+
+<remarks>
+<![CDATA[
+
+This command will process one execution group
+
+]]>
+</remarks>
+
+<seealso cref="list ossi deferred execution groups ready for execution"></seealso>
+<seealso cref="process ossi one deferred execution group"></seealso>
+<seealso cref="execute ossi deferred commands async"></seealso>
+
+
+</documentation>
+</command>

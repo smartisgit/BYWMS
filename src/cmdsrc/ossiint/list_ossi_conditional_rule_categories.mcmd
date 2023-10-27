@@ -1,0 +1,60 @@
+<command>
+<name>list ossi conditional rule categories</name>
+<description>Returns a list of distinct uc_rule_grp_id</description>
+<argument name="lngdsc" required="yes" datatype="string"></argument>
+<argument name="codval" required="yes" datatype="string"></argument>
+<argument name="short_dsc" required="yes" datatype="string"></argument>
+<argument name="colnam" required="no" datatype="integer"></argument>
+<argument name="srtseq" required="no" datatype="integer"></argument>
+<argument name="rqdflg" required="no" datatype="integer"></argument>
+<argument name="img_id" required="no" datatype="integer"></argument>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20200512 Haseeb.Ahmed - 11118 - Create a new web screen to maintain rules engine where we have condition and action
+ */
+publish data
+  where usr_id = nvl(@usr_id, @@USR_ID)
+|
+{
+   [select distinct uc_rule_grp_id
+      from USR_RULE_ENGINE_COND_EXPR
+   ]
+   catch (-1403)
+   >> res
+   |
+   sort result set
+     where result_set = @res
+       and sort_list = 'uc_rule_grp_id'
+   |
+   {
+      publish data
+        where opt_nam = 'opt' || @uc_rule_grp_id
+      |
+      if (ossi__user_has_access_to_opt_nam(@opt_nam, @usr_id) = 1)
+         filter data
+           where moca_filter_level = 3
+             and opt_nam = @opt_nam
+   }
+}
+]]>
+</local-syntax>
+
+
+<documentation>
+<remarks>
+Get all conditional rule categories
+</remarks>
+
+<retcol name="uc_rule_grp_id" type="String">Rule Group ID</retcol>
+<retcol name="opt_nam" type="String">Operation Name</retcol>
+
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

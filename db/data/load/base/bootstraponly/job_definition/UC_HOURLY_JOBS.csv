@@ -1,0 +1,2 @@
+job_id,role_id,name,enabled,type,command,log_file,trace_level,overlap,schedule,start_delay,timer,grp_nam
+UC_HOURLY_JOBS,,Jobs that should run every 1 hour,1,timer,"execute ossi jobs using job manager where uc_exec_job_grp = 'HOURLY-JOBS'",$LESDIR/log/JOB-UC_HOURLY_JOBS.log,,0,,0,3600,GK

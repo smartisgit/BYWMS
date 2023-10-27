@@ -1,0 +1,83 @@
+<command>
+<name>process usr auto wave rules</name>
+<description>This component will be used as a job to run the auto wave rules</description>
+ 
+<argument name="wh_id" required="yes" datatype="string"></argument>
+<argument name="comflg" required="yes" datatype="string"></argument>
+<argument name="uc_auto_wave_rule_id" required="yes" datatype="string">Optionally pass in usr_auto_wave_rule_hdr.uc_auto_wave_rule_id</argument>
+<argument name="uc_auto_wave_rule_id_list" required="yes" datatype="string">Optionally pass in list of usr_auto_wave_rule_hdr.uc_auto_wave_rule_id</argument>
+
+<argument name="uc_ossi_job_id" required="yes" datatype="string"></argument>
+<argument name="uc_num_concurrent_calls" required="yes" datatype="string"></argument>
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+publish data
+where comflg = nvl(@comflg, 0 )
+and uc_ossi_job_id = nvl(@uc_ossi_job_id, 'UC_W_' || @wh_id || '_AUTOWAV' )
+and uc_ossi_who = nvl(@uc_ossi_who, @wh_id || '-' || @@USR_ID )
+and uc_num_concurrent_calls = nvl(@uc_num_concurrent_calls, 10)
+|
+{
+    execute ossi work using async execution
+    where uc_get_work_cmd = "list usr auto wave rules ready for processing"
+    and uc_do_work_cmd = 'process usr one auto wave rule'
+    and uc_ossi_job_id = @uc_ossi_job_id
+    and uc_ossi_who = @uc_ossi_who
+    and uc_pk_col = 'uc_pk_data'
+    and uc_num_concurrent_calls = @uc_num_concurrent_calls
+    and comflg = @comflg
+    and uc_exec_status_col = 'uc_ossi_err_code'
+    and uc_exec_message_col = 'uc_ossi_err_descr'
+    and uc_data_col = 'uc_auto_wave_rule_id'
+}
+   
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This component is scheduled to process automatic waves via rules.
+</p>
+]]>
+</remarks>
+
+<retrows>n</retrows>
+
+<retcol name="wh_id" type="COMTYP_CHAR"></retcol>
+<retcol name="schbat" type="COMTYP_CHAR"></retcol>
+<retcol name="my_savepoint" type="COMTYP_CHAR"></retcol>
+<retcol name="comflg" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_ossi_job_seq" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_ossi_module_seq" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_ossi_action_seq" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_ossi_err_code" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_ossi_err_descr" type="COMTYP_CHAR"></retcol>
+
+
+
+<example>
+<![CDATA[
+<p>
+</p>
+]]>
+
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+<seealso cref="list usr auto wave rules ready for processing"></seealso>
+<seealso cref="process usr one auto wave rule"></seealso>
+
+
+</documentation>
+
+
+</command>

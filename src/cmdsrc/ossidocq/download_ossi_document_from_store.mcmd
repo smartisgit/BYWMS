@@ -1,0 +1,281 @@
+<command>
+<name>download ossi document from store</name>
+<description>This API will download data from a specific row in usr_ossi_doc_upload_q to document store
+</description>
+<type>Local Syntax</type>
+
+<argument name="uc_doc_download_path" required="no" datatype="string">This is the identifier for upload queue</argument>
+<argument name="uc_doc_upload_q_id" required="yes" datatype="string">This is the identifier for upload queue</argument>
+<argument name="uc_convert_to_pdf" required="yes" datatype="string">1 or 0 or null</argument>
+<argument name="uc_create_media" required="yes" datatype="string">1 or 0 or null</argument>
+
+
+
+
+
+<local-syntax>
+<![CDATA[
+
+publish data
+where uc_upload_id = nvl(@uc_upload_id, @uc_doc_upload_q_id )
+and uc_doc_download_path = nvl(@uc_doc_download_path, @@UC_DOC_Q_DOWNLOAD_PATH )
+|
+publish data
+where uc_doc_download_full_filepath = @uc_doc_download_path || '/' || @uc_upload_id
+|
+{
+    execute ossi blob service
+    where uc_az_service = 'blob download'
+    and uc_download_filepath = @uc_doc_download_full_filepath
+    |
+    if ( @cmd_result is null )
+        set return status
+        where status = 999999
+        and message = 'Document Id ' || @uc_upload_id || ' could not be download to ' || @uc_doc_download_path || ' as ' || @uc_doc_download_full_filepath
+    else
+    {
+        hide stack variable where name = 'filnam'
+        |
+        hide stack variable where name = 'filename'
+        |
+        publish data
+        where uc_pdf_export_done = 0
+        |
+        /*
+         * first see if we were zipped.  If so we unzip first
+         */
+        if ( @uc_upload_id like '%.gz' )
+        {
+            publish data
+            where new_uc_doc_download_full_filepath = substr(@uc_doc_download_full_filepath, 1, len(@uc_doc_download_full_filepath)-3)
+            and new_upload_id = substr(@uc_upload_id, 1, len(@uc_upload_id)-3)
+            and orig_uc_doc_download_full_filepath = @uc_doc_download_full_filepath
+            |
+            /*
+             * when we called the API to download, it created  a file per our request.
+             * read that file back to get string so that we can unzip it
+             */
+            read file 
+            where filename = @uc_doc_download_full_filepath 
+            and mode = 'B'
+            |
+            {
+                /*
+                 * we dont need the zipped file
+                 */
+                remove file
+                where filnam = @orig_uc_doc_download_full_filepath
+                catch(@?)
+                ;
+                noop
+            }
+            |
+            [[
+            import java.io.ByteArrayOutputStream;
+            import java.io.IOException;
+            import java.util.zip.GZIPOutputStream;
+            import java.util.zip.*;
+            ByteArrayInputStream ii_str = new ByteArrayInputStream(data);
+            ByteArrayOutputStream out = new ByteArrayOutputStream(); // this is uncompressed data
+            GZIPInputStream gzip = new GZIPInputStream(ii_str);
+            //
+            // We have uncompressed stream.  Now get the buffer
+            //
+            byte[] buffer = new byte[1024];
+            int len = 0;
+            while ((len = gzip.read(buffer)) >= 0) 
+            {
+                out.write(buffer, 0, len);
+            }
+            gzip.close();
+            out.close();
+            [uncompressed_bin_data:out.toByteArray()]
+            ]]
+            |
+            /*
+             * Now write this output back but without gzip extension
+             */
+            write output file
+            where path = @uc_doc_download_path 
+            and filnam =  @new_upload_id
+            and mode = "wb"
+            and data_bin = @uncompressed_bin_data
+            and charset = null
+            and data = null
+            |
+            /*
+             * Update these variables so that it looks like a normal unzipped file now
+             */
+            publish data
+            where uc_upload_id = @new_upload_id
+            and uc_doc_download_full_filepath = @new_uc_doc_download_full_filepath
+        } /* if our file was zipped first */
+        |
+        if ( @uc_upload_id like '%.jrprint' and @uc_convert_to_pdf != 0 )
+        {
+            publish data
+            where uc_doc_download_pdf_filepath = ossi__replace ( @uc_doc_download_full_filepath, '.jrprint', '.pdf' )
+            |
+            [[
+            import net.sf.jasperreports.engine.export.JRPdfExporter;
+            import net.sf.jasperreports.export.*;
+            JRPdfExporter exporter = new JRPdfExporter();
+            exporter.setExporterInput(new SimpleExporterInput(uc_doc_download_full_filepath))
+            exporter.setExporterOutput(new SimpleOutputStreamExporterOutput(uc_doc_download_pdf_filepath));
+            exporter.exportReport();
+            [uc_pdf_export_done:1]
+            ]]
+            |
+            publish data
+            where uc_doc_download_pdf_filepath = @uc_doc_download_pdf_filepath
+            and uc_pdf_export_done = @uc_pdf_export_done
+        }
+        /* Convert RDF to PDF */
+        else if ( @uc_upload_id like '%.rdf' and @uc_convert_to_pdf != 0 )
+        {
+            publish data
+            where uc_doc_download_pdf_filepath = ossi__replace ( @uc_doc_download_full_filepath, '.rdf', '.pdf' )
+            |
+            publish data 
+            where uc_remote_url = nvl(@UC_DOC_Q_UPLOAD_RDF_CNV_URL, @@UC_DOC_Q_UPLOAD_RDF_CNV_URL)
+            |
+            if (@uc_remote_url is not null)
+            {
+                transfer ossi document to remote server
+                  where uc_remote_url = @uc_remote_url
+                    and uc_doc_download_full_filepath = @uc_doc_download_full_filepath
+                |
+                decode from base64
+                  where str = @base64_encoded
+                |
+                write output file
+                  where filnam = @uc_doc_download_pdf_filepath 
+                    and path = null
+                    and mode = "wb"
+                    and data_bin = @base64_decoded
+                    and charset = null
+                    and data = null
+            }
+            else
+            {
+                publish data
+                where converter = ossi__polval('USR-OSSI-DOC-UPLOAD-Q', 'SETUP', 'RDT-TO-PDF-PGM')
+                |
+                if (@converter is not null)
+                {
+                    publish data
+                      where converter = ossi__replace(@converter, '@rdf_file', '"' || @uc_doc_download_full_filepath || '"')
+                    |
+                    publish data
+                      where converter = ossi__replace(@converter, '@pdf_file', '"' || @uc_doc_download_pdf_filepath || '"') 
+                    |
+                    execute os command 
+                      where cmd = @converter 
+                    >> res
+                    |
+                    /* Last line of the output will contain the error if there is one */
+                    [[
+                    String message;
+                    while (res.next())
+                    {
+                        message = res.getString("result");
+                    }
+                    [message:message]
+                    ]]
+                    |
+                    if (@message like 'ERROR:%')
+                    {
+                        set return status 
+                          where status = '99999' 
+                            and message = @message
+                    }
+                    |
+                    publish data
+                      where uc_pdf_export_done = 1             
+                }
+            }
+            |
+            publish data
+            where uc_doc_download_pdf_filepath = @uc_doc_download_pdf_filepath
+            and uc_pdf_export_done = @uc_pdf_export_done
+        }         
+        else if ( @uc_upload_id like '%.pdf' )
+            publish data
+            where uc_doc_download_pdf_filepath = @uc_doc_download_full_filepath
+            and uc_pdf_export_done = 1
+        |
+        if ( @uc_create_media = 1 and @uc_pdf_export_done = 1 )
+        {
+            hide stack variable where name = 'filename'
+            |
+            read file
+            where filnam = @uc_doc_download_pdf_filepath
+            and mode = 'B'
+            catch(@?)
+            |
+            if ( @? = 0 )
+            {
+                publish data
+                where bin_data = @data
+                |
+                if ( @? = 0 and @bin_data is not null )
+                {
+                    create media
+                    where wh_id = '----'
+                    and client_id = '----'
+                    and orig_file_name = ossi__replace(@uc_upload_id, '.jrprint', '.pdf')
+                    and file_typ = 'pdf'
+                    and file_cat = 'FILE'
+                    and title = 'Download from Blob Store ' || ossi__replace(@uc_upload_id, '.jrprint', '.pdf')
+                    and media_file = @bin_data
+                }
+            }
+        }
+        |
+        publish data
+        where uc_upload_id = @uc_upload_id
+        and uc_doc_download_full_filepath = @uc_doc_download_full_filepath
+        and uc_pdf_export_done = @uc_pdf_export_done
+        and uc_doc_download_pdf_filepath = decode ( @uc_pdf_export_done, 1, @uc_doc_download_pdf_filepath, null )
+        and uc_doc_download_path = @uc_doc_download_path
+        and media_id = @media_id
+    }
+}
+
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+  Given a document id in store, this will download it to the sevrer
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+<retcol name="uc_upload_id" type="COMTYP_CHAR">name of the document on server</retcol>
+<retcol name="uc_doc_download_full_filepath" type="COMTYP_CHAR">Download path on the server</retcol>
+<retcol name="uc_doc_download_pdf_filepath" type="COMTYP_CHAR">Download path on the server for PDF file</retcol>
+<retcol name="uc_pdf_export_done" type="COMTYP_CHAR">Did we export to PDF?</retcol>
+<retcol name="uc_doc_download_path" type="COMTYP_CHAR">Directory where we should be downloading per setup</retcol>
+
+
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+<exception value="999999">if we are unable to download then this is the message that will contain context</exception>
+
+
+<seealso cref="execute ossi blob service"></seealso>
+
+
+</documentation>
+
+
+
+</command>

@@ -1,0 +1,24 @@
+<command>
+<name>reset usr oprcod on picks</name>
+<description>Fix the oprcod on picks</description>
+ 
+<type>Local Syntax</type>
+
+<local-syntax>
+<![CDATA[
+
+  /* not used by CJ */
+  noop
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+This command fix and reset user oprcod on picks.
+</remarks>
+
+<seealso cref="register usr shipment fully released"></seealso>
+
+</documentation>
+</command>

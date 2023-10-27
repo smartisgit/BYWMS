@@ -1,0 +1,24 @@
+<trigger>
+<name>clear ossi moca cache for table update</name>
+<on-command>remove policy</on-command>
+<fire-sequence>100000</fire-sequence>
+<local-syntax>
+<![CDATA[
+
+
+clear ossi cache for table update
+where table_name = 'POLDAT'
+
+]]>
+</local-syntax>
+<enable>yes</enable>
+<documentation>
+
+<remarks>
+This trigger will clear the moca cache related to policies
+</remarks>
+
+<seealso cref="clear ossi cache for table update"></seealso>
+
+</documentation>
+</trigger>

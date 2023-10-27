@@ -1,0 +1,2 @@
+job_id,role_id,name,enabled,type,command,log_file,trace_level,overlap,schedule,start_delay,timer,grp_nam
+UC_ALL_PURGE,,Execute all purge jobs,1,cron,execute ossi jobs using job manager where  uc_exec_job_grp = '%PURGE%',$LESDIR/log/JOB-UC_ALL_PURGE.log,,0,0 0 3  * * ?,,,GK

@@ -1,0 +1,44 @@
+<command>
+<name>execute ossi dda action</name>
+<description>Throw a different error than -1403, because that is Success</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+[[
+MocaResults res;
+try
+{
+  res = moca.executeInline(cmd);
+} catch (MocaException e) {
+  if (e.getErrorCode() == -1403 || e.getErrorCode() == 510)
+  {
+    throw new MocaException(99999, "No data found");
+  }
+  throw e;
+}
+[res:res]
+]]
+|
+publish data combination
+  where res = @res 
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<remarks>
+This command is used to execute a DDA action.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

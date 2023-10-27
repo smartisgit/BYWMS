@@ -1,0 +1,55 @@
+<command>
+<name>ossi data_version_url</name>
+<description>Link to version control</description>
+
+<argument name="moca_farg1" required="yes" datatype="string">Value</argument>
+<argument name="moca_farg2" required="no" datatype="string">type</argument>
+<argument name="moca_farg3" required="no" datatype="string">String to show</argument>
+
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161208 saad.ahmad - 10291 - Origial
+ */
+publish data
+where data_key = ossi__html_val ( @moca_farg1, 1 )
+and typ = @moca_farg2
+and txt = nvl(@moca_farg3, 'Change Log' )
+|
+publish data
+where data_file = ossi__translate ( @data_key, ' \/|',  '_!!!' )
+|
+publish data
+where path = '../../uc_rev_log/' || @typ || '/' || @data_file || '.html'
+|
+publish data
+where url = '<a href="' || @path || '" target="_blank">' || @txt || '</a>'
+    
+]]>
+</local-syntax>
+
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+To get a URL to change log
+</p>
+]]>
+</remarks>
+
+<retrows>MOCA Function - So one row is returned</retrows>
+
+<exception value="eOK">The command completed successfully.</exception>
+<exception value="510">If variable was not passed and no default was passed.</exception>
+
+<seealso cref="get session variable"></seealso>
+</documentation>
+
+</command>

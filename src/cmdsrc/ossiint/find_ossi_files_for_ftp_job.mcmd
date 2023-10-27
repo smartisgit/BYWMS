@@ -1,0 +1,57 @@
+<command>
+<name>find ossi files for ftp job</name>
+<description>Find the files for ftp job to work on them</description>
+
+<argument datatype="string" name="pathname">File pathname along with folder and wild card expression</argument>
+<argument datatype="string" name="sort">Sort by name Y or N (yes or no)</argument>
+<argument datatype="string" name="uc_min_age_secs">If passed in we return only if files are this old</argument>
+
+<type>Local Syntax</type>
+
+<local-syntax>
+<![CDATA[
+
+{
+    find file 
+    where pathname = @pathname
+    and sort = @sort
+    catch (-1403,510)
+    |
+    if ( @? = 0 and @filename )
+    {
+        get file info
+        |
+        publish data
+        where modified_dt = to_date ( @modified, 'YYYY-MM-DD HH24:MI:SS' )
+        catch (@?)
+        |
+        if ( @? != 0 )
+            publish data
+            where modified_dt = date('19000101000000')
+        else
+            publish data
+            where modified_dt = @modified_dt
+        |
+        if ( @uc_min_age_secs is null or @uc_min_age_secs = 0 or ((@modified_dt + @uc_min_age_secs/24/3600) <= @uc_now ) )
+            publish data
+            where filename = @filename
+            and pathname   = @pathname
+            and type       = @type
+            and modified_dt= @modified_dt
+    }
+}
+]]>
+</local-syntax>
+<documentation>
+<remarks>
+Find files in a folder and return them for ftp jobs
+</remarks>
+<retrows>n - for each file</retrows>
+<retcol name="filename" type="String">Just name of the file</retcol>
+<retcol name="pathname" type="String">Full file name with folder</retcol>
+<retcol name="type" type="String">F for files</retcol>
+<retcol name="modified_dt" type="Date">Modified date as a date</retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+</documentation>
+</command>

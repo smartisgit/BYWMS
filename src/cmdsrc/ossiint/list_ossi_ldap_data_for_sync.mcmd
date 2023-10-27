@@ -1,0 +1,130 @@
+<command>
+<name>list ossi ldap data for sync</name>
+<description>Get the LDAP users</description>
+<type>Local Syntax</type>
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+/* If we have some version control on any object - bypass that */
+save session variable
+where name = 'uc_inhibit_version_control_sess'
+and  value = '1'
+;
+publish data
+where polcod = 'USR-OSSI-LDAP-SYNC'
+and wh_id = '----'
+|
+publish data
+where url                      = nvl(@@UC_LDAP_SYNC_URL, ossi__registry_value ( 'SECURITY', 'ldap-url') )
+and   bind_dn                  = nvl(@@UC_LDAP_SYNC_BIND_DN, ossi__registry_value ( 'SECURITY', 'ldap-bind-dn' ) )
+and   bind_password            = nvl(@@UC_LDAP_SYNC_BIND_PASSWORD, ossi__registry_value ( 'SECURITY', 'ldap-bind-password' ) )
+and   auth_type                = nvl(@@UC_LDAP_SYNC_AUTH_TYPE, ossi__registry_value ( 'SECURITY', 'ldap-auth-type' ) )
+/**/
+and   usr_search_filter        = @@UC_LDAP_SYNC_LES_USR_ATH_SEARCH_FILTER
+and   usr_search_base          = @@UC_LDAP_SYNC_LES_USR_ATH_SEARCH_BASE
+and   usr_uc_ldap_pk           = ossi__polval ( @polcod, 'LES_USR_ATH', 'LDAP-PK', '', 'rtstr1', @wh_id )
+and   usr_uc_attr_name_list    = ossi__get_policy_data_as_list ( @polcod, 'LES_USR_ATH', 'ATTR_NAME_LIST', 'rtstr1', @wh_id, 1, ',' )
+and   usr_uc_emulate_ldap_file = @@UC_LDAP_SYNC_LES_USR_ATH_EMULATE_LDAP_FILE
+and   usr_uc_ena_flg_expr      = ossi__polval ( @polcod, 'LES_USR_ATH', 'ENA_FLG_EXPR', '', 'rtstr1', @wh_id)
+and   usr_query_by_base        = ossi__polval ( @polcod, 'MISCELLANEOUS', 'USR-QUERY-BY-BASE', '', 'rtnum1', @wh_id )
+/**/
+and   role_search_filter       = @@UC_LDAP_SYNC_LES_ATH_ROLE_SEARCH_FILTER
+and   role_search_base         = @@UC_LDAP_SYNC_LES_ATH_ROLE_SEARCH_BASE
+and   role_uc_ldap_pk          = ossi__polval ( @polcod, 'LES_ATH_ROLE', 'LDAP-PK', '', 'rtstr1', @wh_id )
+and   role_uc_attr_name_list   = ossi__get_policy_data_as_list ( @polcod, 'LES_ATH_ROLE', 'ATTR_NAME_LIST', 'rtstr1', @wh_id, 1, ',' )
+and   role_uc_emulate_ldap_file= @@UC_LDAP_SYNC_LES_ATH_ROLE_EMULATE_LDAP_FILE
+and   role_uc_ena_flg_expr      = ossi__polval ( @polcod, 'LES_ATH_ROLE', 'ENA_FLG_EXPR', '', 'rtstr1', @wh_id)
+and   role_query_by_base        = ossi__polval ( @polcod, 'MISCELLANEOUS', 'ROLE-QUERY-BY-BASE', '', 'rtnum1', @wh_id )
+/**/
+and   usr_role_emulate_ldap_file = @@UC_LDAP_SYNC_LES_USR_ROLE_EMULATE_LDAP_FILE
+and   use_memberof_query_for_users_in_role = ossi__polval ( @polcod, 'MISCELLANEOUS', 'USE-MEMBEROF-FOR-USERS-IN-GROUP', '', 'rtnum1', @wh_id)
+and   usr_in_role_query_by_base = ossi__polval ( @polcod, 'MISCELLANEOUS', 'USR-IN-ROLE-QUERY-BY-BASE', '', 'rtnum1', @wh_id )
+|
+{
+   /* Get users */
+   list ossi ldap attribute values
+   where search_filter      = @usr_search_filter
+   and search_base          = @usr_search_base
+   and uc_ldap_pk           = @usr_uc_ldap_pk
+   and uc_attr_name_list    = @usr_uc_attr_name_list
+   and uc_emulate_ldap_file = @usr_uc_emulate_ldap_file
+   and uc_ena_flg_expr      = @usr_uc_ena_flg_expr
+   and uc_query_by_base     = @usr_query_by_base
+   >> uc_res_les_usr_ath
+   |
+   /* Get roles */
+   list ossi ldap attribute values
+   where search_filter      = @role_search_filter
+   and search_base          = @role_search_base
+   and uc_ldap_pk           = @role_uc_ldap_pk
+   and uc_attr_name_list    = @role_uc_attr_name_list
+   and uc_emulate_ldap_file = @role_uc_emulate_ldap_file
+   and uc_ena_flg_expr      = @role_uc_ena_flg_expr
+   and uc_query_by_base     = @role_query_by_base
+   >> uc_res_les_ath_role
+   |
+   /* Get who is in a role */
+   {
+      list ossi ldap attribute values
+      where search_filter      = @role_search_filter
+      and search_base          = @role_search_base
+      and uc_ldap_pk           = @role_uc_ldap_pk
+      and uc_attr_name_list    = @role_uc_attr_name_list
+      and uc_emulate_ldap_file = @role_uc_emulate_ldap_file
+      and uc_query_by_base     = @role_query_by_base
+      |
+      {
+         if ( @use_memberof_query_for_users_in_role = 1 )
+            publish data
+            where search_filter = "(memberof=" || @uc_ldap_pk || ")"
+            and use_search_base = @role_search_base
+         else
+            publish data
+            where search_filter = "cn=" || @uc_ldap_pk
+            and use_search_base = @role_search_base
+         |
+         publish data
+         where uc_emulate_ldap_file = iif ( @usr_role_emulate_ldap_file is null, null,
+                                            @usr_role_emulate_ldap_file || '.' || lower(@uc_ldap_role_id) )
+         |
+         list ossi ldap attribute values
+         where uc_ldap_pk = @usr_uc_ldap_pk
+         and uc_attr_name_list = @usr_uc_attr_name_list
+         and search_base = @use_search_base
+         and search_filter = @search_filter
+         and uc_query_by_base = @usr_in_role_query_by_base
+         |
+         publish data
+         where role_id = upper(@uc_ldap_role_id)
+         and usr_id = upper(@uc_ldap_usr_id)
+      }
+   }
+   >> uc_res_les_usr_role
+   |
+   publish data
+   where uc_res_les_usr_ath = @uc_res_les_usr_ath
+   and uc_res_les_ath_role = @uc_res_les_ath_role
+   and uc_res_les_usr_role = @uc_res_les_usr_role
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+This component returns ldap attribute values as a recordsets
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

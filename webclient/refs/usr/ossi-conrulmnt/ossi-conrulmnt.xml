@@ -1,0 +1,25 @@
+<!-- Sets several key variables -->
+<project project-dir="."
+         js-dir="${project-dir}/ossi-conrulmnt"
+         app-id="${appId}"
+         hf-compliant="true">
+
+
+  <target name="les.ossi-conrulmnt"
+          type="js"
+          source-dir="${js-dir}">
+        <include name="store/RuleCategoryStore.js" />        
+        <include name="store/RuleSubgrpStore.js" />
+        <include name="store/RuleNamesStore.js" />
+        <include name="store/VariablesStore.js" />
+        <include name="store/HelpStore.js" />
+        <include name="store/RulesValidationStore.js" />
+        <include name="store/ValidationStore.js" />
+        <include name="store/EvaluateStore.js" />
+        <include name="store/MainGridStore.js" />
+        <include name="store/ChangeLogsStore.js" />
+        <include name="view/Main.js" />	
+	<include name="controller/MainController.js" />
+        <include name="App.js" />	
+</target>
+</project>

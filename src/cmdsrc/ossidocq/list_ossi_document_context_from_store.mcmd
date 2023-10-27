@@ -1,0 +1,57 @@
+<command>
+<name>list ossi document context from store</name>
+<description>This commands calls the API to get a single document and then parse the context resultset.  it displays it
+</description>
+<type>Local Syntax</type>
+
+<argument name="uc_upload_id" required="yes" alias="uc_doc_upload_q_id" datatype="string">Exact id that has been uploaded</argument>
+
+
+<local-syntax>
+<![CDATA[
+
+publish data
+where uc_upload_id = nvl(@uc_upload_id, @uc_doc_upload_q_id)
+|
+if ( @uc_upload_id is not null )
+{
+    list ossi documents from store
+    where uc_upload_id = @uc_upload_id
+    catch (-1403,510)
+    |
+    if ( @? = 0 and @uc_key_res is not null )
+    {
+        publish data combination where res = @uc_key_res
+    }
+}
+
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+   For a given document uploaded to document store, this fethes the document and then displays context data as name value pairs
+</p>
+]]>
+</remarks>
+
+<retrows>n</retrows>
+<retcol name="parse ossi document queue json to res/*" type="COMTYP_CHAR">All output columns from here</retcol>
+
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+<seealso cref="list ossi documents from store"></seealso>
+
+
+</documentation>
+
+
+
+</command>

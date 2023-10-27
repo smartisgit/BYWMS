@@ -1,0 +1,145 @@
+<command>
+<name>load ossi svn log to table</name>
+<description>Load SVN log to table usr_ossi_svn_hist_log for deeper analysis</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="uc_svn_log_file_path">Log file path</argument>
+<argument datatype="string" name="uc_issue_id_prefix">Prefix for issue id</argument>
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+publish data
+where uc_svn_log_file_path = nvl ( @uc_svn_log_file_path, @@LESDIR || '/log/svn_log.out' )
+and uc_issue_id_prefix = nvl ( @uc_issue_id_prefix, "ISSUE: ALCON-" )
+and uc_changed_paths_tag = "Changed paths:"
+|    
+{
+    read file 
+    where filename = @uc_svn_log_file_path
+    >> res
+    |
+    if ( rowcount(@res) > 0 )
+    {
+        [
+        delete from usr_ossi_svn_hist_log
+        where uc_svn_log_file_path = @uc_svn_log_file_path
+        ]
+        catch (-1403,510)
+        ;
+        [[
+        String uc_svn_rev = "";
+        String uc_bugzilla_id = "";
+        String uc_svn_cmnt = "";
+        String uc_svn_date_string = "";
+        String uc_svn_action_id = "";
+        String uc_svn_object_path = "";
+        Integer uc_svn_obj_seq = 0;
+        boolean found_cmnt = false;
+        boolean found_rev = false;
+        boolean found_paths = false;
+        boolean ignore_this_line = false;
+        boolean found_end_of_comment = false;
+        cond_met = 0;
+        //
+        while ( res.next() )
+        {
+            ignore_this_line = false;
+            log_line = res.getString ( "text").trim();
+            if ( log_line.length() > 0 )
+            {
+                //
+                // SVN revision tag
+                if ( !found_rev && log_line.substring(0,1) == "r"  && log_line.indexOf("|") >= 0)
+                {
+                    found_rev = true;
+                    found_cmnt = false;
+                    found_paths = false;
+                    found_end_of_comment = false;
+                    uc_svn_rev = log_line.split(" ")[0];
+                }
+                //
+                // Changed Paths
+                if ( found_rev && log_line.indexOf ( uc_changed_paths_tag ) >= 0 )
+                {
+                    found_paths = true;
+                    ignore_this_line = true;
+                    uc_svn_obj_seq = 0;
+                }
+                //
+                // objects
+                if ( found_rev && found_paths && !ignore_this_line && !found_cmnt )
+                {
+                    if ( log_line.split(" ").size() >= 2 )
+                    {
+                        uc_svn_action_id = log_line.split(" ")[0];
+                        uc_svn_object_path = log_line.split(" ")[1];
+                        uc_svn_obj_seq++;
+                        //
+                        moca.executeCommand ( " create record where table = 'usr_ossi_svn_hist_log'" + 
+                                              " and uc_svn_log_file_path = @uc_svn_log_file_path" +
+                                              " and uc_svn_rev           = @uc_svn_rev" +
+                                              " and uc_svn_date_string   = @uc_svn_date_string" +
+                                              " and uc_svn_obj_seq       = @uc_svn_obj_seq" +
+                                              " and uc_svn_action_id     = @uc_svn_action_id" +
+                                              " and uc_svn_object_path   = @uc_svn_object_path",
+                                              [uc_svn_log_file_path:uc_svn_log_file_path,
+                                               uc_svn_rev:uc_svn_rev,
+                                               uc_svn_date_string:uc_svn_date_string,
+                                               uc_svn_obj_seq:uc_svn_obj_seq,
+                                               uc_svn_action_id:uc_svn_action_id,
+                                               uc_svn_object_path:uc_svn_object_path] );
+                    } // have space
+                } // object list
+                //
+                // Issue Id
+                if ( found_rev && !found_cmnt && log_line.indexOf ( uc_issue_id_prefix ) >= 0 )
+                {
+                    found_cmnt = true;
+                    if ( log_line.split("-").size() >= 3 )
+                    {
+                        uc_svn_cmnt = log_line;
+                        uc_bugzilla_id = log_line.split("-")[2].split(" ")[0].trim();
+                        moca.executeCommand ( "[update usr_ossi_svn_hist_log" +
+                                              " set uc_bugzilla_id = @uc_bugzilla_id, uc_svn_cmnt = @uc_svn_cmnt" +
+                                              " where uc_svn_log_file_path = @uc_svn_log_file_path" +
+                                              " and uc_svn_rev = @uc_svn_rev] catch (-1403,510)",
+                                              [uc_bugzilla_id:uc_bugzilla_id,
+                                               uc_svn_cmnt:uc_svn_cmnt,
+                                               uc_svn_log_file_path:uc_svn_log_file_path,
+                                               uc_svn_rev:uc_svn_rev] );
+                    }
+                } // issue found
+                //
+                if ( log_line.indexOf ( "------------" ) >= 0 )
+                {
+                    found_end_of_comment = true;
+                    found_rev = false;
+                }
+            } // valid line
+        }
+        ]]
+    }
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+Before running this - you must first export SVN repsitory to a file.  While in LES folder of an environment run on command line
+<pre>
+svn log -r HEAD:0 -v > log\svn_log.out
+</pre>
+
+The data for both HUB and WMS are all loaded in WMS side but we can run it by pointing to this log file of hub
+</remarks>
+<exception value="eOK">Normal successful completion</exception>
+</documentation>
+</command>

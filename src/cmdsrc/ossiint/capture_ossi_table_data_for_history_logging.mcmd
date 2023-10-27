@@ -1,0 +1,127 @@
+<command>
+<name>capture ossi table data for history logging</name>
+<description>Given a table name and PK from stack - get all the data</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="uc_log_table_name">Name of the table</argument>
+<argument datatype="string" name="uc_capture_call_point">PRE or POST</argument>
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+publish data
+where uc_capture_call_point = nvl(@uc_capture_call_point, 'PRE' )
+|
+/*
+ * If in middle of part replication, i.e. called for ---- and now doing other wh we dont want to requery for other warehouses
+ */
+if ( ossi__is_part_being_replicated(@prtnum, @prt_client_id) = '1' and @uc_capture_call_point = 'PRE' )
+    noop
+else
+{
+    publish data
+    where table_name = lower(@uc_log_table_name)
+    and locale_id = nvl(nvl(@locale_id, @@LOCALE_ID), 'US_ENGLISH')
+    /*
+     * Cover situation where remove part or create part is called with wh_id but PK has wh_id_tmpl
+     */
+    and wh_id_tmpl = nvl(@wh_id, @wh_id_tmpl)
+    and grp_nam = null
+    |
+    publish data
+    where uc_sess_var_my_pk_var = 'uc_hlog_table_pk_' || @table_name
+    |
+    publish data
+    where uc_pk_where_clause = ossi__sess_var ( @uc_sess_var_my_pk_var, '', 'Y' )
+    |
+    {
+        /*
+         * If doing ---- then indicate that we are doing replication
+         */
+        if ( @wh_id_tmpl = '----' )
+            save session variable
+            where name = ossi__get_part_replication_sess_var ( @prtnum, @prt_client_id )
+            and value = @wh_id_tmpl
+        ;
+        if ( @uc_pk_where_clause is null )
+        {
+            execute ossi moca and cache
+            where uc_cache_key = 'UC_HLOG_PK_' || upper(@table_name)
+            and uc_cache_grp = 'UC_HLOG_TABLE_PK'
+            and uc_inline = 1
+            and uc_moca_cmd = "
+            {
+                list primary key for table where table_name = @table_name
+                |
+                filter data where moca_filter_level = 1 and uc_where_clause = @column_name || ' = @' || @column_name
+            }
+            >> res
+            |
+            convert column results to string where res = @res and colnam = 'uc_where_clause' and separator = ' and '"
+            |
+            save session variable
+            where name = @uc_sess_var_my_pk_var
+            and value = @result_string
+            |
+            publish data
+            where uc_where_clause = @result_string
+        }
+        else
+            publish data
+            where uc_where_clause = @uc_pk_where_clause
+        |
+        {
+            if ( @table_name = 'prtmst' )
+                [
+                select lngdsc, short_dsc
+                from prtdsc
+                where colnam = 'prtnum|prt_client_id|wh_id_tmpl'
+                and colval = @prtnum || '|' || @prt_client_id || '|' || @wh_id_tmpl
+                and locale_id = @locale_id 
+                ]
+                catch (-1403,510)
+            else if ( @table_name = 'prtftp' )
+                [
+                select lngdsc, short_dsc
+                from dscmst
+                where colnam = 'prtnum|prt_client_id|wh_id|ftpcod'
+                and colval = @prtnum || '|' || @prt_client_id || '|' || @wh_id || '|' || @ftpcod
+                and locale_id = @locale_id 
+                ]
+                catch (-1403,510)
+            else
+                publish data
+                where lngdsc = null
+                and short_dsc = null
+            |
+            execute server command
+            where cmd = "[select x.*, "
+                      ||"        @lngdsc lngdsc , @short_dsc short_dsc"
+                      ||" from " || @table_name || " x"
+                      ||" where "|| @uc_where_clause
+                      ||"] catch(@?)"
+            and inline = 1
+            >> uc_captured_table_data
+        }
+    }
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+This command should be called as a pre-trigger on the change command to create a resultset for the before image of the data.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

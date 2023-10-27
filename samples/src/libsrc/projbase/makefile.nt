@@ -1,0 +1,8 @@
+DCSDIR=..\..\..\..
+
+TARGET=PROJbase
+TARGETTYPE=.dll
+
+OFILES=projHelloWorld.obj
+
+!include $(DCSDIR)\makefiles\ntstd.mk

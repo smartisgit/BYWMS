@@ -1,0 +1,43 @@
+<command>
+<name>list ossi app monitors</name>
+<description>List the monitors</description>
+
+<argument name="uc_monitor_id" required="yes" datatype="string"></argument>
+<argument name="ena_flg" required="yes" datatype="string"></argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+if (@uc_monitor_id is null)
+   hide stack variable
+     where name = 'uc_monitor_id'
+|
+if (@ena_flg is null)
+   hide stack variable
+     where name = 'ena_flg'
+|
+[select *
+   from usr_ossi_mon
+  where 1 = 1
+    and @+uc_monitor_id
+    and @+ena_flg
+    and @*
+  order by uc_mon_srtseq
+]
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+This command is used to list monitors which are being get from table usr_ossi_mon.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

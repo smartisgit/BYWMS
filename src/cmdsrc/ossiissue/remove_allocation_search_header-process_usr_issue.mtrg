@@ -1,0 +1,27 @@
+<trigger>
+<name>process usr issue</name>
+<on-command>remove allocation search header</on-command>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ */
+process usr issue 
+  where uc_table_name = 'ALLOC_SEARCH_HDR' 
+    and uc_action = 'REMOVE' 
+]]>
+</local-syntax>
+<fire-sequence>2000</fire-sequence>
+<enable>yes</enable>
+<documentation>
+
+<remarks>
+This trigger process issue for deleting allocation search header.
+</remarks>
+
+<seealso cref="process usr issue"></seealso>
+
+</documentation>
+</trigger>

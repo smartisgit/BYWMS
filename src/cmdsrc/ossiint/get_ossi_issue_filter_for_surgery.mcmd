@@ -1,0 +1,39 @@
+<command>
+<name>get ossi issue filter for surgery</name>
+<description>Get issue fiter for surgery</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+/* If uc_issue_filter contains "%", this is the way to get value for later */
+[[
+  String uc_issue_filter_value = null;
+  MocaArgument[] args = moca.getArgs();
+  for (MocaArgument arg : args)
+  {
+    if (arg.getName().equalsIgnoreCase("uc_issue_filter"))
+    {
+      uc_issue_filter_value = arg.getValue();
+    }
+  }
+[uc_issue_filter_value:uc_issue_filter_value]
+]]
+
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This command is used to get issue fiter for surgery
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

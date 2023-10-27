@@ -1,0 +1,20 @@
+<trigger>
+<name>process usr issue</name>
+<on-command>change note type</on-command>
+<local-syntax>
+<![CDATA[
+process usr issue
+  where uc_table_name = 'NOTTYP_HDR'
+    and uc_action = 'UPDATE'
+]]></local-syntax>
+<fire-sequence>10000</fire-sequence>
+<documentation>
+
+<remarks>
+This trigger process issue for changing note type.
+</remarks>
+
+<seealso cref="process usr issue"></seealso>
+
+</documentation>
+</trigger>

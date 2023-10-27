@@ -1,0 +1,47 @@
+<command>
+<name>get ossi soap request commmand</name>
+<description>get the soap request command per our conventions</description>
+
+<argument name="les_cmd_prefix" datatype="string">Comand Prefix</argument>
+<argument name="sys_id" datatype="string">System Id</argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+{
+    get ossi les command
+    where les_cmd_id = @les_cmd_prefix || '_' || @sys_id
+    catch (-1403,510)
+    |
+    if ( @? = 0 and @syntax is not null )
+        publish data
+        where uc_use_syntax = @syntax
+    else
+    {
+        get ossi les command
+        where les_cmd_id = @les_cmd_prefix || '_default'
+        catch (-1403,510)
+        |
+        if ( @? = 0 and @syntax is not null )
+            publish data
+            where uc_use_syntax = @syntax
+        else
+            publish data
+            where uc_use_syntax = null
+    }
+}
+
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This command is used to get soap request commands.
+</remarks>
+
+<retcol name="uc_use_syntax" type="String"></retcol>
+
+</documentation>
+</command>

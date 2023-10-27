@@ -1,0 +1,62 @@
+<command>
+<name>ossi get_hash_value</name>
+<description>Get a value for hashing.  e.g. ship_id last 2 characters can be used to get a number for whatever we need</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="moca_farg1">Any string</argument>
+<argument datatype="string" name="moca_farg2">Last n digits. default 2</argument>
+<argument datatype="string" name="moca_farg3">Base defailt is 36</argument>
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+publish data
+where str = @moca_farg1
+and last_n = int(nvl(@moca_farg2,'2'))
+and src_base = int(nvl(@moca_farg3,'36'))
+|
+if ( @str is null or len(@str) < @last_n )
+   publish data
+   where ret = 0
+else
+{
+   if ( @src_base = 36 )
+      publish data
+      where str = upper(@str)
+   |
+   publish data
+   where substr_value = substr( @str, len(@str)-@last_n+1 )
+   |
+   {
+      [[
+      ret = Long.valueOf(substr_value, src_base).toString();
+      ]]
+   }
+}
+
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+We take any string value and take last n digits and convert it to a number.  Use case may be anything but it was built because
+we needed to select an allocation search path for a shipment randomly based on last n digits.
+</remarks>
+
+<retrows>1</retrows>
+
+<retcol name="ret " type="COMTYP_CHAR">Integer value</retcol>
+
+
+<exception value="eOK">The command completed successfully.</exception>
+
+</documentation>
+
+
+</command>

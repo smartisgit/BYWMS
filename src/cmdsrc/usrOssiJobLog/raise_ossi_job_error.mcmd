@@ -1,0 +1,77 @@
+<command>
+<name>raise ossi job error</name>
+<description>Raise an error and complete the job or log</description>
+<type>Local Syntax</type>
+
+<argument name="uc_ossi_job_seq" datatype="string"></argument>
+<argument name="uc_ossi_module_seq" datatype="string"></argument>
+<argument name="uc_ossi_action_seq" datatype="string"></argument>
+<argument name="uc_ossi_err_code" datatype="string">Error Code</argument>
+<argument name="uc_ossi_err_descr" datatype="string">Error Description</argument>
+<argument name="is_job_flg" datatype="string">If 1 then complete job else complete job log</argument>
+<argument name="called_form_job" datatype="string"></argument>
+<argument name="uc_created_dummy_job" datatype="string"></argument>
+<argument name="uc_raise_error" datatype="string">'1' or '0' Default '1'</argument>
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+publish data 
+where @+uc_ossi_err_code 
+and   uc_ossi_err_descr = iif(@uc_ossi_err_descr is null, null, substr(@uc_ossi_err_descr, 1, 255))
+and   is_job_flg = nvl (@is_job_flg,'0' )
+and   called_in_job = nvl ( @called_in_job, '0' )
+and   uc_created_dummy_job = nvl(@uc_created_dummy_job, '0' )
+and   uc_raise_error = nvl ( @uc_raise_error, '1' )
+and   uc_within_raise_job_error = '1'
+|
+if ( @uc_ossi_job_seq > 0 )
+{
+   /*
+    * If we have module_seq or action_seq, we need to complete it
+    */
+   if ( nvl(@uc_ossi_module_seq,0) > 0 or nvl(@uc_ossi_action_seq, 0 ) > 0 )
+      complete ossi job log
+   ;
+   if ( @is_job_flg = '1' or @uc_created_dummy_job = '1' )
+      complete ossi job
+   ;
+   if ( @uc_raise_error = '1' )
+      set return status 
+      where status = @uc_ossi_err_code 
+      and   message = @uc_ossi_err_descr
+}
+else if ( @uc_raise_error = '1' )
+   set return status 
+   where status = @uc_ossi_err_code 
+   and   message = @uc_ossi_err_descr
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<remarks>
+<![CDATA[
+<p>
+Raise the error
+
+</p>
+]]>
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+<exception value="eDB_NO_ROWS_AFFECTED">No rows found</exception>
+
+<seealso cref="test usr ossi do receiving setup"></seealso>
+<seealso cref="test usr ossi do receipt"></seealso>
+<seealso cref="test usr ossi do one receipt"></seealso>
+
+
+</documentation>
+</command>

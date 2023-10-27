@@ -1,0 +1,67 @@
+<command>
+<name>change ossi job log aut</name>
+<description>Change an entry into the job log in own commit context</description>
+<type>Local Syntax</type>
+
+<transaction>new</transaction>
+
+<argument name="uc_ossi_job_seq" required="yes" datatype="Integer">Job Number</argument>
+<argument name="uc_ossi_module_seq" required="no" datatype="Integer">Default 0</argument>
+<argument name="uc_ossi_action_seq" required="no" datatype="Integer">Default 0</argument>
+<argument name="uc_ossi_err_code" required="no" datatype="Integer">Default 0</argument>
+<argument name="uc_ossi_err_descr" required="no" datatype="String">Description of the error</argument>
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+{
+   publish data where uc_ossi_end_ts = ossi__ts ( null ) and uc_ossi_end_dt = sysdate
+   |
+   [
+   update  usr_ossi_job_log
+   set     uc_ossi_end_dt = to_date(@uc_ossi_end_dt,'YYYYMMDDHH24MISS'),
+           uc_ossi_end_ts = @uc_ossi_end_ts,
+           uc_ossi_err_code = nvl ( @uc_ossi_err_code, 0 ),
+           uc_ossi_err_descr = @uc_ossi_err_descr
+   where   uc_ossi_job_seq = @uc_ossi_job_seq
+   and     uc_ossi_module_seq = nvl ( @uc_ossi_module_seq, 0 )
+   and     uc_ossi_action_seq = nvl ( @uc_ossi_action_seq, 0 )
+   ]
+}
+
+]]>
+</local-syntax>
+
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+Do work in own commit context
+</p>
+]]>
+</remarks>
+
+<retrows>0</retrows>
+
+<exception value="eOK">The command completed successfully.</exception>
+<exception value="510">If variable was not passed and no default was passed.</exception>
+
+<seealso cref="test usr ossi create job log"></seealso>
+<seealso cref="test usr ossi change job log"></seealso>
+<seealso cref="test usr ossi complete job "></seealso>
+<seealso cref="test usr ossi complete job log"></seealso>
+<seealso cref="usr_ossi register_action"></seealso>
+<seealso cref="usr_ossi register_module"></seealso>
+<seealso cref="usr_ossi register_job"></seealso>
+<seealso cref="test usr ossi list job log"></seealso>
+
+</documentation>
+
+</command>

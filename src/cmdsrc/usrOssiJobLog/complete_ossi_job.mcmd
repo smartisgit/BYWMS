@@ -1,0 +1,79 @@
+<command>
+<name>complete ossi job</name>
+<description>Complete a job</description>
+<type>Local Syntax</type>
+
+<argument name="uc_ossi_job_seq" required="yes" datatype="Integer">Job Number</argument>
+<argument name="uc_ossi_err_code" required="no" datatype="Integer">Default 0</argument>
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+/*
+ * We are about to mark the whole job as complete.  See if we have a command to execute in this
+ * case
+ */
+if ( @uc_ossi_job_complete_cmd is not null )
+{
+   execute server command where cmd = @uc_ossi_job_complete_cmd
+   catch (@?)
+   |
+   if ( @? != 0 and @uc_within_raise_job_error != '1' )
+   {
+      raise ossi job error
+      where uc_ossi_err_code = @?
+      and   uc_ossi_err_descr= @!
+      and   is_job_flg = '1'
+   }
+   ;
+   noop
+}
+|
+publish data
+where uc_ossi_module_seq = 0
+and   uc_ossi_action_seq = 0
+and   uc_ossi_err_code   = nvl ( @uc_ossi_err_code, 0 )
+|
+change ossi job log
+
+]]>
+</local-syntax>
+
+
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+
+Mark the whole job as complete.
+See "usr_ossi register_job" for more details
+
+</p>
+]]>
+</remarks>
+
+<retrows>0</retrows>
+
+<exception value="eOK">The command completed successfully.</exception>
+<exception value="510">If variable was not passed and no default was passed.</exception>
+
+<seealso cref="test usr ossi create job log"></seealso>
+<seealso cref="test usr ossi change job log"></seealso>
+<seealso cref="test usr ossi complete job "></seealso>
+<seealso cref="test usr ossi complete job log"></seealso>
+<seealso cref="usr_ossi register_action"></seealso>
+<seealso cref="usr_ossi register_module"></seealso>
+<seealso cref="usr_ossi register_job"></seealso>
+<seealso cref="test usr ossi list job log"></seealso>
+
+
+</documentation>
+
+</command>

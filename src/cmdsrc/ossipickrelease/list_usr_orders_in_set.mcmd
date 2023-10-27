@@ -1,0 +1,101 @@
+<command>
+<name>list usr orders in set</name>
+<description>List the orders in wave, shipment, or order.  Based on context we pass in ship_id, schbat, or order information.</description>
+ 
+<argument name="schbat" datatype="string">Wave Id (if applicable)</argument>
+<argument name="ship_id" datatype="string">Shipment Id (if applicable)</argument>
+<argument name="ordnum" datatype="string">Order Number (if applicable)</argument>
+<argument name="wh_id" required="yes" datatype="string">Warehouse ID</argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+if ( @client_id is null ) hide stack variable where name = 'client_id'
+|
+if ( @schbat is not null or @ship_id is not null or @ordnum is not null )
+{
+    if ( @schbat is null ) hide stack variable where name = 'schbat'
+    |
+    if ( @ship_id is null ) hide stack variable where name = 'ship_id'
+    |
+    if ( @ordnum is null ) hide stack variable where name = 'ordnum'
+    |
+    [
+    select oo.*
+    from
+    (
+        select 
+               shipment_line.wh_id,
+               shipment_line.client_id,
+               shipment_line.ordnum,
+               ord.ordtyp,
+               mov_zone.mov_zone_cod uc_dst_mov_zone_cod,
+               ord.cponum,
+               shipment_line.ship_id,
+               shipment_line.schbat,
+               count ( distinct case when pckwrk_hdr.lodlvl = 'S' and pckwrk_hdr.wrktyp in ( 'P', 'B') then pckwrk_hdr.wrkref else null end ) uc_cnt_s_picks,
+               count ( distinct pckwrk_dtl_k.wrkref ) uc_cnt_k_picks,
+               min   ( pckwrk_hdr.ctnnum) ctnnum
+        from shipment_line
+             left outer join ord
+                 on ord.wh_id = shipment_line.wh_id
+                 and ord.client_id = shipment_line.client_id
+                 and ord.ordnum = shipment_line.ordnum
+             left outer join pckwrk_dtl on pckwrk_dtl.ship_line_id = shipment_line.ship_line_id
+             left outer join pckwrk_hdr on pckwrk_hdr.wrkref = pckwrk_dtl.wrkref
+             left outer join pckwrk_dtl pckwrk_dtl_k on pckwrk_dtl_k.subnum = pckwrk_hdr.ctnnum
+             left outer join mov_zone on mov_zone.mov_zone_id = pckwrk_dtl.dst_mov_zone_id 
+        where @+shipment_line.wh_id
+        and @+shipment_line.ship_id
+        and @+shipment_line.ordnum
+        and @+shipment_line.client_id
+        and @+shipment_line.schbat
+        and linsts not in ( 'B', 'C' )
+        group by
+               shipment_line.wh_id,
+               shipment_line.client_id,
+               shipment_line.ordnum,
+               ord.ordtyp,
+               mov_zone.mov_zone_cod,
+               ord.cponum,
+               shipment_line.ship_id,
+               shipment_line.schbat
+    ) oo
+    order by 1,2,3
+    ]
+    catch (-1403,510)
+
+
+}
+
+]]>
+</local-syntax>
+<documentation>
+<remarks>
+<![CDATA[
+
+<p>
+Based on passed in schbat or ship_id, return orders in it
+</p>
+
+]]>
+</remarks>
+
+
+<retrows>n</retrows>
+<retcol name="wh_id" type="COMTYP_CHAR"></retcol>
+<retcol name="client_id" type="COMTYP_CHAR"></retcol>
+<retcol name="ordnum" type="COMTYP_CHAR"></retcol>
+<retcol name="ordtyp" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_dst_mov_zone_cod" type="COMTYP_CHAR">Destination Move Zone Code as recorded on pckwrk_dtl</retcol>
+<retcol name="cponum" type="COMTYP_CHAR">cponum recorded on ord table</retcol>
+<retcol name="ship_id" type="COMTYP_CHAR"></retcol>
+<retcol name="schbat" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_cnt_s_picks" type="COMTYP_CHAR">Number of S picks on pckwrk (not counting K picks)</retcol>
+<retcol name="uc_cnt_k_picks" type="COMTYP_CHAR">Number of K picks</retcol>
+<retcol name="ctnnum" type="COMTYP_CHAR">One of the ctnnums recorded in pckwrk.  Meaningful only when there is a single K pick</retcol>
+
+
+</documentation>
+</command>

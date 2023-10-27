@@ -1,0 +1,7 @@
+<component-level>
+<name>ossiautowav</name>
+<description>OSSI (Smart IS) Autowave</description>
+<sort-sequence>8050</sort-sequence>
+<library>ossiint</library>
+<editable>true</editable>
+</component-level>

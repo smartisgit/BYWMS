@@ -1,0 +1,57 @@
+<command>
+<name>list ossi documents ready for upload</name>
+<description>This returns the data for documents that are ready to be uploaded to the document store</description>
+
+<argument name="uc_show_all_data" required="yes" datatype="string"></argument>
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+{
+    [
+    select uc_doc_upload_q_id
+    from usr_ossi_doc_upload_q
+    where uc_upload_stat_cd = 'U'
+    order by uc_doc_upload_q_id
+    ]
+    catch (-1403,510)
+}
+   
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This lists data from usr_ossi_doc_upload_q in U status which is ready to be uploaded
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+<retcol name="uc_doc_upload_q_id" type="COMTYP_CHAR"></retcol>
+
+<example>
+<![CDATA[
+<p>
+</p>
+]]>
+
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+<seealso cref="process ossi document upload queue"></seealso>
+<seealso cref="upload ossi one document to store"></seealso>
+
+
+</documentation>
+
+
+</command>

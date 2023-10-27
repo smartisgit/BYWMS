@@ -1,0 +1,7 @@
+<component-level>
+<name>ossitrlr</name>
+<description>Smart IS trailer Related services</description>
+<sort-sequence>8004</sort-sequence>
+<editable>true</editable>
+<library>ossiint</library>
+</component-level>

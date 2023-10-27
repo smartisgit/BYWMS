@@ -1,0 +1,77 @@
+<command>
+<name>enqueue ossi any file for doc upload</name>
+<description>This command takes any file on the file system and puts it into our document queue for eventual upload</description>
+<type>Local Syntax</type>
+
+<argument name="filnam" datatype="string">This is the file on the server</argument>
+<argument name="@*" datatype="string">See enqueue ossi document output for upload.  Several pass through parameters</argument>
+
+<local-syntax>
+<![CDATA[
+
+
+publish data
+where use_filnam = @filnam
+|
+/*
+ * Hide these because having them on stack causes issues.  We will use use_filnam
+ */
+hide stack variable where name = 'filnam'
+|
+hide stack variable where name = 'filename'
+|
+{
+    read file 
+    where filename = @use_filnam 
+    and mode = 'B'
+    catch(@?)
+    |
+    if ( @? = 0 and @data is not null )
+    {
+        enqueue ossi document output for upload
+        where page_data  = @data
+        and   filename   = @use_filnam
+    }
+}
+
+
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This will upload anything to document queue locally for eventual upload
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+<retcol name="uc_doc_upload_q_id" type="COMTYP_CHAR">Record created</retcol>
+<retcol name="uc_doc_typ_cd" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_doc_subtyp_cd" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_doc_pgm_cd" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_doc_pgm_id" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_q_dt" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_upload_stat_cd" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_doc_q_ctxt" type="COMTYP_RES">the context for this upload</retcol>
+
+
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+<seealso cref="enqueue ossi label output for upload when needed"></seealso>
+<seealso cref="enqueue ossi document output for upload"></seealso>
+<seealso cref="print file"></seealso>
+
+
+</documentation>
+
+
+
+</command>

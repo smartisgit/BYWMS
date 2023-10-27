@@ -1,0 +1,81 @@
+<command>
+<name>ossi res_to_json</name>
+
+<argument name="moca_farg1" datatype="results">MOCA result set of column_name and column_value</argument>
+<argument name="moca_farg2" datatype="String">Escape double quotes in the return string</argument>
+
+
+<description>Convert a two column MOCA result to JSON</description>
+
+<type>Local Syntax</type>
+
+<local-syntax>
+<![CDATA[
+
+publish data
+where uc_upload_metadata = @moca_farg1
+and uc_escape_double_quote = @moca_farg2
+|
+{
+    if (@uc_upload_metadata is not null and rowcount(@uc_upload_metadata) > 0)
+    {
+        [[
+            metadata_str = new StringBuffer("{");
+            while ( uc_upload_metadata.next() )
+            {
+                column_name = uc_upload_metadata.getString("column_name");
+                column_value= uc_upload_metadata.getString("column_value" );
+                if ( column_value == null )
+                    column_value = "";
+                else
+                    column_value = column_value.replaceAll('"', '');
+                if ( column_value != "" )
+                { 
+                    if(metadata_str.toString() !="{")
+                    { 
+                       metadata_str.append(',');
+                    }
+                    metadata_str.append('"');
+                    metadata_str.append( column_name );
+                    metadata_str.append( '":"' );
+                    metadata_str.append( column_value );
+                    metadata_str.append( '"' );
+                }
+            };
+            metadata_str.append("}");
+            
+            String ret_str = "";
+            if (uc_escape_double_quote == '1')
+            {
+                ret_str = metadata_str.toString().replace('"', '\\\"');
+            }
+            else
+            {
+                ret_str = metadata_str.toString(); 
+            }
+            
+            [use_metadata_str:ret_str]
+        ]]
+    }
+    else
+    {
+        [[
+            [use_metadata_str:"{}"]
+        ]]
+    }
+}
+]]>
+</local-syntax>
+
+
+<documentation>
+<remarks>
+<![CDATA[
+    <p>
+    
+    </p>
+]]>
+</remarks>
+</documentation>
+
+</command>

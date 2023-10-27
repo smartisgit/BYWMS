@@ -1,0 +1,25 @@
+<trigger>
+<name>process usr issue</name>
+<on-command>change grid display rule</on-command>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ */
+process usr issue
+  where uc_table_name = 'GRID_DSP_RULE'
+    and uc_action = 'UPDATE'
+]]></local-syntax>
+<fire-sequence>10000</fire-sequence>
+<documentation>
+
+<remarks>
+This trigger process issue for changing grid display rule.
+</remarks>
+
+<seealso cref="process usr issue"></seealso>
+
+</documentation>
+</trigger>

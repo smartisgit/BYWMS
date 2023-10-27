@@ -1,0 +1,40 @@
+<trigger>
+<name>execute_usr_conditional_commands</name>
+<on-command>register usr order fully released</on-command>
+<fire-sequence>19000</fire-sequence>
+ 
+<local-syntax>
+<![CDATA[
+
+if ( @ordnum is not null and @wh_id is not null and @uc_reldte is not null )
+{
+    /*
+     * Since shipment is releaed, first call the rules engine to indicate that all orders are released
+     */
+    list usr orders in set
+    where schbat = null
+    and ship_id = null
+    and ordnum = @ordnum
+    and client_id = @client_id
+    catch (-1403,510)
+    |
+    if ( @? = 0 )
+    {
+        execute ossi all conditional rules
+        where uc_rule_grp_id = 'OSSI-ORDER-RELEASE'
+        and uc_rule_subgrp_id = 'ORDTYP-DSTZON-RELEASE_RULE-MAP'
+        and uc_cache_key= null
+        catch (-1403,510)
+    }
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<seealso cref="register usr order fully released"></seealso>
+
+</documentation>
+
+</trigger>

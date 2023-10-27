@@ -1,0 +1,89 @@
+<command>
+<name>ossi ord_value_from_list</name>
+<description>
+FUNCTION:  Given a list first sort it and then get the 1st or 2nd or 3rd value
+</description>
+
+<argument name="moca_farg1" required="no" datatype="string">Ordinal value.  1 for highest, 2 for second, etc.</argument>
+<argument name="moca_farg2" required="no" datatype="string">1st value</argument>
+<argument name="moca_farg3" required="no" datatype="string">2nd value</argument>
+<argument name="moca_farg4" required="no" datatype="string">3rd value</argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+publish data
+where pos = @moca_farg1
+|
+{
+   {
+      if ( @moca_farg2 is not null ) publish data where val = @moca_farg2
+      &
+      if ( @moca_farg3 is not null ) publish data where val = @moca_farg3
+      &
+      if ( @moca_farg4 is not null ) publish data where val = @moca_farg4
+   }
+   >> res
+   |
+   if ( rowcount(@res) = 0 )
+   {
+      publish data
+      where v_data = null
+   }
+   else
+   {
+      sort result set
+      where result_set = @res
+      and sort_list = 'val d'
+      >> res2
+      |
+      [[
+      Integer v_row = 0;
+      //
+      while ( res2.next() )
+      {
+         v_row++;
+         v_data = res2.getDouble  ( 'val' )
+         if ( v_row == pos )
+            break;
+      }
+      [v_data:v_data]
+      ]]
+      |
+      publish data
+      where v_data = @v_data
+   }
+}
+
+]]>
+</local-syntax>
+
+
+<documentation>
+
+
+<remarks>
+This command uses the "ossi parse name value list" command to return the value of a parameter
+from a name-value list.
+</remarks>
+
+<retcol name="ret" type="string">Value of the parameter</retcol>
+
+<retrows>One or zero rows are returned</retrows>
+
+<example>
+publish data where x=ossi_value_from_list('name1=val1;name2=val2','name2')
+
+</example>
+<exception value="eOK">Normal successful completion</exception>
+
+<seealso cref="ossi parse name value list"></seealso>
+
+</documentation>
+</command>

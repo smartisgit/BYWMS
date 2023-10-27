@@ -1,0 +1,77 @@
+<command>
+<name>get ossi mapped value multi</name>
+<description>Get mapped value from here to receipient.
+</description>
+<type>Local Syntax</type>
+
+<argument name="sys_id" required="yes" datatype="string">System for which we need to do the conversion</argument>
+<argument name="value" required="yes" datatype="string">Current value</argument>
+<argument name="map_type" required="yes" datatype="string">Which Map to use</argument>
+<argument name="wh_id" required="no" datatype="string"></argument>
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+publish data 
+where sys_id = @sys_id
+and   value  = @value
+and   map_type = @map_type
+and   my_sess_var = 'uc_multi_map_result'
+and   wh_id = nvl(nvl(@wh_id,@whse_id),'----')
+|
+publish data
+where polcod = ossi__get_polcod_by_sys_id(@sys_id)
+|
+{
+   if ( @value is null )
+      publish data where mapped_value = null
+   else
+   {
+      /* Iterate through the data */
+      convert list
+      where string = @value
+      and type = 'L'
+      >> res
+      |
+      publish data where num_fields = rowcount(@res)
+      |
+      publish data combination where res = @res
+      |
+      {
+         /* This is to stop going into if when we have found the data already */
+         if ( ossi__sess_var ( @my_sess_var, '%%%') = '%%%' )
+         {
+            if ( @retstr is not null )
+            {
+               get ossi mapped value
+               where inhibit_default = decode ( @count, @num_fields, '0', '1' )
+               and value = @retstr
+               |
+               if ( @mapped_value is not null )
+                  save session variable where name = @my_sess_var and value = @mapped_value
+            }
+         }
+      }
+      ;
+      publish data where mapped_value = ossi__sess_var ( @my_sess_var, '' )
+   }
+}
+
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This command may be used to get mapped values from here to receipient.  The source value will be a coma-separated list
+and we will look up every one
+</remarks>
+
+<retcol name="sys_grp_id" type="String"></retcol>
+
+</documentation>
+</command>

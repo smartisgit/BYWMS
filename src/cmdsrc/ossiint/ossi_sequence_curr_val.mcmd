@@ -1,0 +1,52 @@
+<command>
+<name>ossi sequence_curr_val</name>
+<description>Get the current value of a sequence.  There is an issue in SQLServer where since the ident_current works across sessions that
+this may return wrong value</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="moca_farg1">Sequence Name</argument>
+
+
+<local-syntax>
+<![CDATA[
+
+publish data
+where sequence_name = @moca_farg1
+|
+if ( dbtype() = 'MSSQL' )
+{
+    [
+    select ident_current(@sequence_name)  uc_sequence_curr_val
+    from dual
+    ]
+    catch(@?)
+}
+else
+{
+    publish data where sel_column = @sequence_name || '.currval'
+    |
+    [
+    select @sel_column:raw uc_sequence_curr_val
+    from dual
+    ]
+    catch(@?)
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+Oracle and sqlserver use differnt strategies to get sequece values.  This shows what current session got as last sequence value
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+<retrows>1</retrows>
+<retcol name="uc_sequence_curr_val" type="COMTYP_INT">This is the current value if applicable</retcol>
+
+
+</documentation>
+
+
+</command>

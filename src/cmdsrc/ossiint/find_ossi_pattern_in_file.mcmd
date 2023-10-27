@@ -1,0 +1,49 @@
+<command>
+<name>find ossi pattern in file</name>
+<description>Returns every match in the file</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+[[
+  import java.util.regex.*;
+  import com.oracular.util.FastReader;
+
+  String str = FastReader.loadString(new File(filename));
+  Pattern p = Pattern.compile(pattern);
+  Matcher m = p.matcher(str);
+  SimpleResults res = new SimpleResults();
+  res.addColumn("result", MocaType.STRING);
+  while (m.find())
+  {
+    res.addRow();
+    res.setValue(0, m.group(1));
+  }
+[res:res]
+]]
+|
+publish data combination where res = @res 
+
+]]>
+</local-syntax>
+<argument name="filename" required="yes" datatype="string"></argument>
+<argument name="pattern" required="yes" datatype="string"></argument>
+<documentation>
+<remarks>
+<![CDATA[
+
+Sample Call:
+find ossi pattern in file
+  where filename = @@lesdir || "/files/timken/order/uc_cpo_header2.xml"
+    and pattern = "<MATNR>([^>]+)</MATNR>"
+
+]]>
+</remarks>
+</documentation>
+</command>

@@ -1,0 +1,96 @@
+<command>
+<name>monitor ossi list downloads in eerr to be retried</name>
+<description>See EE transactions that should be reprocessed</description>
+<type>Local Syntax</type>
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+publish data
+where polcod = 'USR-OSSI-APP-MONITOR'
+and   polvar = 'MON-DOWNLOADS-IN-EERR-TO-BE-RETRIED'
+and   polval = 'PARAMETERS'
+|
+{
+   publish data
+   where sys_id = ossi__polval_nc ( @polcod, @polvar, @polval, 'SYS_ID', 'rtstr2' )
+   |
+   {
+      [
+      select distinct
+             sl_dwnld.dwnld_seq,
+             sl_dwnld.sys_id,
+             sl_ifd_data_hdr.ifd_data_seq,
+             sl_ifd_data_hdr.ifd_id,
+             sl_ifd_data_hdr.ifd_ver,
+             poldat.rtnum2 uc_max_retries,
+             nvl(rlog.uc_num_retries,0) uc_retries_done
+      from sl_dwnld
+           join sl_ifd_data_hdr
+              on sl_ifd_data_hdr.dwnld_seq = sl_dwnld.dwnld_seq
+              and sl_ifd_data_hdr.proc_err_flg = 'T'
+           join poldat
+              on poldat.polcod = @polcod
+              and poldat.polvar = @polvar
+              and poldat.polval = @polval
+              and poldat.rtstr1 = 'IFD_ID|IFD_VER'
+              and poldat.rtstr2 = sl_ifd_data_hdr.ifd_id || '|' || sl_ifd_data_hdr.ifd_ver
+              and poldat.wh_id_tmpl = '----'
+              and rtnum1 = 1
+           left outer join usr_sl_in_ifd_data_retry_log rlog
+              on rlog.ifd_data_seq = sl_ifd_data_hdr.ifd_data_seq
+      where 1=1
+      and (rlog.uc_num_retries is null or rlog.uc_num_retries < poldat.rtnum2)
+      and sl_dwnld.dwnld_stat_cd = 'EERR'
+      and sl_dwnld.sys_id like @sys_id
+      order by 1,2,3
+      ]
+      catch (-1403,510)
+      |
+      if ( @? = 0 )
+      {
+         /* Increment the processed count for this ifd */
+         sl_change gen_maint 
+         where table_name = 'usr_sl_in_ifd_data_retry_log' 
+         and ifd_data_seq = @ifd_data_seq
+         and uc_num_retries = (@uc_retries_done + 1)
+         ;
+         [commit] catch(@?)
+         ;
+         publish data
+         where ifd_data_seq= @ifd_data_seq
+         and dwnld_seq = @dwnld_seq
+         and uc_mon_key_data = 'ifd=' || string(@ifd_data_seq) || ',dwnld=' || string(@dwnld_seq) || ',#att=' || string(@uc_retries_done)
+      }
+      else
+      {
+         /* Raise no data found */
+         [
+         select 1
+         from dual
+         where 1=2
+         ]
+      }
+   }
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+Those dwnloads that are in error need to be retried
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

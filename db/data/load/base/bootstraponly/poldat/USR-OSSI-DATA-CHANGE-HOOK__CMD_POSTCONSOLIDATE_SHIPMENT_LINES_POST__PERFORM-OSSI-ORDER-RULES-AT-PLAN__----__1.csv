@@ -1,0 +1,2 @@
+polcod,polvar,polval,wh_id_tmpl,srtseq,rtstr1,rtstr2,rtnum1,rtnum2,rtflt1,rtflt2,grp_nam
+USR-OSSI-DATA-CHANGE-HOOK,CMD_POSTCONSOLIDATE_SHIPMENT_LINES_POST,PERFORM-OSSI-ORDER-RULES-AT-PLAN,----,1,set rtnum1 = 1 to enable and 0 to disable.  when 1 then we run order update rules at plan time when above command is called,,1,0,0.0,0.0,OSSISVN_12615

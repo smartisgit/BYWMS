@@ -1,0 +1,90 @@
+<command>
+<name>ossi parse name value list</name>
+<description>
+Parse a name value pair list.  A list of name value pairs may be specified.  This command
+will parse them out in a well-defined resultset.
+</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+convert list
+where string = @sl_list
+and   type   = 'L'
+and   separator = nvl(@sl_list_sep,';')
+|
+sl_parse arg
+where i_arg_list = @retstr
+and   i_delim    = nvl(@sl_name_value_sep,'=')
+|
+publish data
+where name =@o_arg1
+and   value=@o_arg2
+|
+if ( nvl(@sl_name,'%') != '%' )
+{
+   if ( @name = @sl_name )
+      filter data
+      where moca_filter_level = 2
+}
+else
+   filter data
+]]>
+</local-syntax>
+
+<argument name="sl_list" required="no" datatype="string">List of name-value pairs</argument>
+<argument name="sl_list_sep" required="no" datatype="string">List Separator.  Default ;</argument>
+<argument name="sl_name_value_sep" required="no" datatype="string">Separator for name-value.  Default =</argument>
+<argument name="sl_name" required="no" datatype="string">If passed then only the value of this name will be returned</argument>
+
+
+
+<documentation>
+
+
+<remarks>
+This command may be used to parse a list of name-value pairs into individual rows and columns
+for processing.
+</remarks>
+
+<retcol name="name" type="string">Name of the parameter</retcol>
+<retcol name="value" type="string">Value</retcol>
+
+<retrows>The return set depends on the number of name-value pairs in the list</retrows>
+
+<example>
+ossi parse name value list
+where sl_list           = 'name1=val1;name2=val2'
+and   sl_list_sep       = ';'
+and   sl_name_value_sep = '='
+
+will return
+
+name   value
+-----  -----
+name1  val1
+name2  val2
+
+Now lets assume that we are only interested in the value of name1.
+
+ossi parse name value list
+where sl_list           = 'name1=val1;name2=val2'
+and   sl_list_sep       = ';'
+and   sl_name_value_sep = '='
+and   sl_name           = 'name1'
+
+will return
+
+name   value
+-----  -----
+name1  val1
+
+</example>
+
+<exception value="eOK">Normal successful completion</exception>
+</documentation>
+</command>

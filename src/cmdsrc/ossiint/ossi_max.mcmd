@@ -1,0 +1,60 @@
+<command>
+<name>ossi max</name>
+<description>Returns the value that is higher.
+If instance of java.lang.Comparable, like dates, uses that comparison.</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+publish data
+  where value1 = @moca_farg1
+    and value2 = @moca_farg2
+|
+[[
+  Object value = null;
+  if (value1.getClass() == value2.getClass())
+  {
+    if (value1 instanceof Comparable)
+    {
+      if (value1.compareTo(value2) < 0)
+      {
+        value = value2;
+      }
+      else
+      {
+        value = value1;
+      }
+    }
+  }
+  else
+  {
+    if (value1.toString().compareTo(value2.toString()) < 0)
+    {
+      value = value2;
+    }
+    else
+    {
+      value = value1;
+    }
+  }
+[value:value]
+]]
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<remarks>
+This command may be used to get higher value.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

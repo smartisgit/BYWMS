@@ -1,0 +1,157 @@
+<command>
+<name>get ossi directory contents over ftp</name>
+<description>get a directory via ftp.</description>
+<type>Local Syntax</type>
+<argument name="host" required="yes" datatype="string">
+</argument>
+<argument name="port" default-value="21" datatype="string">
+</argument>
+<argument name="user" datatype="string">
+</argument>
+<argument name="pass" datatype="string">
+</argument>
+<argument name="srcdir" datatype="string">
+</argument>
+<argument name="srcfilepattern" datatype="string">
+</argument>
+<argument name="use_sftp" default-value="0" datatype="integer">
+</argument>
+<argument name="trg_prefix" datatype="string">
+</argument>
+<argument name="trg_extension" datatype="string">
+</argument>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+[[
+  import com.redprairie.moca.*;
+  
+  import java.util.Enumeration;
+  
+  import com.jscape.inet.ftp.Ftp;
+  import com.jscape.inet.sftp.Sftp;
+  import com.jscape.inet.ssh.util.SshParameters;
+  
+  Enumeration items = null;
+  String error = null;
+  if (use_sftp == 0)
+  {
+    Ftp ftp = new Ftp(host, user, pass, port);   
+    try {
+      ftp.connect();
+      //listing = ftp.getDirListingAsString();
+      items = ftp.getDirListingRegex();
+      ftp.disconnect();
+    } 
+    catch (Exception e) {
+      error = e.getMessage();
+    }
+  }
+  else
+  {
+    if (port == 21) {
+        port = 22;
+    }
+    SshParameters params = new SshParameters(host, port, user, pass)
+    Sftp ftp = new Sftp(params);
+    try {
+      ftp.connect();
+      items = ftp.getDirListing();
+      ftp.disconnect();
+    } catch (Exception e) {
+      error = e.getMessage();
+    }
+  }
+  ArrayList<String> fileList = new ArrayList<String>();
+  ArrayList<String> trgList = new ArrayList<String>();
+  while (items.hasMoreElements()) {
+    Object item = items.nextElement();
+    String str = item.toString();
+    String filename = str.substring(str.lastIndexOf(" ") + 1, str.length());
+    if (trg_prefix != null && filename.startsWith(trg_prefix)) {
+      trgList.add(filename);
+    }
+    else if (trg_extension != null && filename.endsWith(trg_extension)) {
+      trgList.add(filename);
+    }
+    else if (filename.matches(srcfilepattern)) {
+      fileList.add(filename);
+    }
+  }
+  
+  HashMap<String,String> trgMap = new HashMap<String,String>();
+  if (trg_prefix != null)
+  {
+    int n=0;
+    while (n < fileList.size()) {
+      String filename = fileList.get(n);
+      if (!trgList.contains(trg_prefix + filename)) {
+        fileList.remove(n);
+      }
+      else {
+        trgMap.put(filename, trg_prefix + filename);
+        n++;
+      }
+    }
+  }
+  if (trg_extension != null)
+  {
+    int n=0;
+    while (n < fileList.size()) {
+      String filename = fileList.get(n);
+      if (!trgList.contains(filename + trg_extension)) {
+        fileList.remove(n);
+      }
+      else {
+        trgMap.put(filename, filename + trg_extension);
+        n++;
+      }
+    }
+  }
+  SimpleResults res = new SimpleResults();
+  res.addColumn("data_filename", MocaType.STRING);
+  res.addColumn("trg_filename", MocaType.STRING);
+  int n=0;
+  while (n < fileList.size()) {
+    res.addRow();
+    res.setStringValue(0, fileList.get(n));
+    res.setStringValue(1, trgMap.get(fileList.get(n)));
+    n++;
+  }
+[error:error,res:res]
+]]  
+|
+if (@error != null)
+{
+  set return status where status = 97050
+                      and action = 'get dir'
+                      and err_msg = @error
+}
+|
+publish data combination where res = @res 
+]]>
+</local-syntax>
+<documentation>
+<remarks>
+<![CDATA[
+  Returns:
+  Data_Filename
+  Data_filepath
+  Trg_filename
+  Trg_filepath
+]]>
+</remarks>
+<exception value="eOK">The command completed successfully.</exception>
+<exception value="eMOCA_FTP_COM_FAILURE">An FTP communication failure occurred.</exception>
+<seealso cref="remove ftp">
+</seealso>
+<seealso cref="put ftp">
+</seealso>
+</documentation>
+</command>

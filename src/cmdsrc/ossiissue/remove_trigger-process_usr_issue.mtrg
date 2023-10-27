@@ -1,0 +1,35 @@
+<trigger>
+<name>process usr issue</name>
+<on-command>remove trigger</on-command>
+<description></description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ */
+[select replace(@command, ' ', '_') command, replace(@trigger, ' ', '_') trg_nam from dual]
+|
+publish data where filename = @cmplvl || '/' || @command || '-' || @trg_nam || '.mtrg'
+               and pathname = @@LESDIR || '/src/cmdsrc/' || @filename
+|
+process usr issue
+  where uc_table_name = 'FILE'
+    and uc_action = 'REMOVE'
+
+]]>
+</local-syntax>
+<fire-sequence>10000</fire-sequence>
+<enable>yes</enable>
+<documentation>
+
+<remarks>
+This trigger process issue for deleting triggers.
+</remarks>
+
+<seealso cref="process usr issue"></seealso>
+
+</documentation>
+</trigger>

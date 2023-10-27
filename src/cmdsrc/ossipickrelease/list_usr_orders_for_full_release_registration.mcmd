@@ -1,0 +1,165 @@
+<command>
+<name>list usr orders for full release registration</name>
+<description>This command will list the orders that need to be marked for full release</description>
+ 
+<argument name="wh_id" required="yes" datatype="string"></argument>
+<argument name="ordnum" required="yes" datatype="string"></argument>
+<argument name="uc_cnt_pcksts_l_as_released" required="yes" datatype="string">Should we count L status as released?</argument>
+<argument name="uc_show_all_data" required="yes" datatype="string"></argument>
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+publish data
+where uc_cnt_pcksts_l_as_released = nvl( @uc_cnt_pcksts_l_as_released, 1 )
+|
+/*
+ * See decode below - there we use this variable to count L status
+ */
+publish data
+where uc_l_cnt_var_1 = decode ( @uc_cnt_pcksts_l_as_released, 1, 1, 0 )
+and   uc_l_cnt_var_0 = decode ( @uc_cnt_pcksts_l_as_released, 1, 0, 1 )
+|
+if ( @ordnum is null )  hide stack variable where name = 'ordnum'
+|
+{
+    /*
+     * See if a shipment is fully released bow
+     */
+    [
+    select 'register usr order fully released' uc_oper,
+           oo.*
+    from
+    (
+        select ord.*,
+               case
+                   /*
+                    * if order is release right now but now we have
+                    * replens
+                    * or we have some non r.
+                    * in that case we want to make order unreleased
+                    */
+                   when ord.uc_reldte is not null and
+                   (
+                       ord.uc_rw_cnt > 0 or
+                       ord.uc_pw_cnt_r = 0 or
+                       ord.uc_pw_cnt_non_r > 0
+                   )
+                   then 'U'
+                   /*
+                    * We declare order as ready to release fully when
+                    * we dont have any replens anymore
+                    * and we have some pckwrk in r
+                    * and nothing non relesed in pckwrk
+                    * If above is all done, then if order is not released or a pckwrk exists that was after this release
+                    */
+                   when 
+                   (
+                       ord.uc_rw_cnt = 0 
+                       and ord.uc_pw_cnt_r > 0 
+                       and ord.uc_pw_cnt_non_r = 0 
+                       and ( ord.uc_reldte is null or ord.uc_reldte < ord.uc_pw_max_adddte )
+                   )
+                   then 'R'
+                   else 'NOOP'
+               end uc_reg_oper_cd
+        from
+        (
+            select ord1.*,
+                   (
+                       select count(*)
+                       from rplwrk
+                       where rplwrk.wh_id = ord1.wh_id
+                       and rplwrk.client_id = ord1.client_id
+                       and rplwrk.ordnum = ord1.ordnum
+                   ) uc_rw_cnt
+            from
+            (
+                select ord.wh_id,
+                       ord.client_id,
+                       ord.ordnum,
+                       ord.uc_reldte,
+                       sum(ord_line.ordqty) ordqty,
+                       sum(ord_line.pckqty) pckqty,
+                       max(pckwrk_hdr.adddte) uc_pw_max_adddte,
+                       nvl(sum( decode (pckwrk_hdr.pcksts, 'R', 1, 'L', @uc_l_cnt_var_1, 0) ),0) uc_pw_cnt_r,
+                       nvl(sum( decode (pckwrk_hdr.pcksts, 'R', 0, 'L', @uc_l_cnt_var_0, 1) ),0) uc_pw_cnt_non_r
+                from ord
+                     join ord_line
+                         on ord_line.client_id = ord.client_id
+                         and ord_line.wh_id = ord.wh_id
+                         and ord_line.ordnum = ord.ordnum
+                     left outer join pckwrk_dtl 
+                         on pckwrk_dtl.client_id = ord_line.client_id
+                         and pckwrk_dtl.wh_id = ord_line.wh_id
+                         and pckwrk_dtl.ordnum = ord_line.ordnum
+                         and pckwrk_dtl.ordlin = ord_line.ordlin
+                         and pckwrk_dtl.ordsln = ord_line.ordsln
+                     left outer join pckwrk_hdr 
+                         on pckwrk_hdr.wrkref = pckwrk_dtl.wrkref
+                where ord.wh_id = @wh_id
+                and @+ord.ordnum
+                and ord_line.shpqty = 0
+                and ord_line.ordqty > 0
+                group by
+                       ord.wh_id,
+                       ord.client_id,
+                       ord.ordnum,
+                       ord.uc_reldte
+            ) ord1
+        ) ord
+    ) oo
+    where 1 = 1
+    and ( @uc_show_all_data = 1 or oo.uc_reg_oper_cd != 'NOOP' )
+    order by 1,2,3,4
+    ]
+    catch (-1403,510)
+}
+   
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This lists all the data for orders that are for ready for full registration
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+<retcol name="wh_id" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_oper" type="COMTYP_CHAR">Whether it is wave or shipment</retcol>
+<retcol name="uc_reg_oper_cd" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_reldte" type="COMTYP_CHAR">What was in the table when run</retcol>
+<retcol name="uc_pw_max_adddte" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_pw_cnt_r" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_pw_cnt_non_r" type="COMTYP_CHAR"></retcol>
+
+<retcol name="client_id" type="COMTYP_CHAR"></retcol>
+<retcol name="ordnum" type="COMTYP_CHAR"></retcol>
+<retcol name="ordqty" type="COMTYP_CHAR">sum from ord_line</retcol>
+<retcol name="pckqty" type="COMTYP_CHAR">sum from ord_line</retcol>
+
+<example>
+<![CDATA[
+<p>
+</p>
+]]>
+
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+<seealso cref="register usr shipment or wave fully released"></seealso>
+
+</documentation>
+
+
+</command>

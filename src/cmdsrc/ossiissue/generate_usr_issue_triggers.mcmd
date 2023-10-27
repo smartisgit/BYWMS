@@ -1,0 +1,34 @@
+<command>
+<name>generate usr issue triggers</name>
+<description>Generate User Issue Triggers</description>
+<type>Java Method</type>
+<class>OSSIIssueUtils</class>
+<method>generateTriggers</method>
+<package>com.redprairie.les.oracular.issue</package>
+<argument name="uc_ossi_obj_grp" datatype="string">
+</argument>
+<argument name="uc_ossi_obj_name" required="yes" datatype="string">
+</argument>
+<argument name="cmdlvl" required="yes" datatype="string">
+</argument>
+<argument name="create_cmd" datatype="string">
+</argument>
+<argument name="change_cmd" required="yes" datatype="string">
+</argument>
+<argument name="remove_cmd" required="yes" datatype="string">
+</argument>
+<documentation>
+<remarks>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ */
+This command generate issue tiggers.
+]]>
+</remarks>
+
+<exception value="eOK">The command completed successfully.</exception>
+</documentation>
+</command>

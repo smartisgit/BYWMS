@@ -1,0 +1,66 @@
+<command>
+<name>create receive invoice line</name>
+<description>Override core to capture pre view</description>
+
+<argument name="@*" required="yes" datatype="string">Data from list command is assumed to be on stack</argument>
+<argument name="uc_inhibit_change_hook" required="yes" datatype="string">if we pass this as '1' then all change hook logic is bypassed
+useful in testing and assessing overhead</argument>
+
+
+
+
+
+
+<type>Local Syntax</type>
+
+<local-syntax>
+<![CDATA[
+
+if ( @uc_inhibit_change_hook = '1' )
+   ^create receive invoice line where @*
+else
+{
+    process ossi pre tasks for crud action using rules
+    where uc_transaction_action = 'A'
+    and table_name = 'rcvlin'
+    and uc_smart_reghook_data_set = ''
+    and uc_rule_grp_id = null
+    and uc_rule_subgrp_id = null
+    and uc_rule_grp_id_set= null
+    and uc_set_default_mode = null
+    and uc_column_prefix_old = null
+    |
+    ^create receive invoice line
+    where @*
+    |
+    filter data
+    where moca_filter_level = 1
+    and uc_transaction_action = @uc_transaction_action
+}
+
+  
+]]>
+
+</local-syntax>
+
+<documentation>
+
+<remarks>
+<![CDATA[
+  <p>
+   This component calls the change and publishes old values that we are interested in
+  </p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+<retcol name="@*" type="(varies according to field type)">What core returned</retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+
+
+<seealso cref="process ossi pre tasks for crud action using rules"></seealso>
+
+
+</documentation>
+</command>

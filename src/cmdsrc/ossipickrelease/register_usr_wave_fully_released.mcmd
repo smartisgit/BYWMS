@@ -1,0 +1,86 @@
+<command>
+<name>register usr wave fully released</name>
+<description>Determine if a wave is fully released</description>
+ 
+<argument name="schbat"></argument>
+<argument name="wh_id"></argument>
+<argument name="uc_reg_oper_cd"></argument>
+
+
+<type>Local Syntax</type>
+
+<local-syntax>
+<![CDATA[
+
+if ( @uc_reg_oper_cd = 'R' or @uc_reg_oper_cd = 'U' )
+{
+    [
+    select pckbat.uc_reldte old_uc_reldte,
+         decode ( @uc_reg_oper_cd, 'R', sysdate, null ) as uc_new_reldte,
+           pckbat.wh_id
+    from pckbat
+    where schbat = @schbat
+    ]
+    |
+    if ( @? = 0 )
+    {
+        [
+        update pckbat
+        set uc_reldte = @uc_new_reldte:date
+        where  schbat = @schbat
+        ]
+        ;
+        write daily transaction
+        where actcod = 'UC_WREL'
+        and ship_id = @schbat
+        and var_nam = 'uc_reldte'
+        and fr_value = @old_uc_reldte
+        and to_value = @uc_new_reldte
+        ;
+        publish data
+        where schbat = @schbat
+        and uc_reldte = @uc_new_reldte
+        and old_uc_reldte = @old_uc_reldte
+        and wh_id = @wh_id
+        and uc_reg_oper_cd = @uc_reg_oper_cd
+    }
+}
+  
+]]>
+
+</local-syntax>
+
+<documentation>
+
+<remarks>
+<![CDATA[
+  <p>
+  This component is for:
+  1. Set wave uc_reldte.  That can come in handy to see when a wave was actually releaed
+
+  It retrns a row when wave is determined to be released anew.  Another trigger could hang on this command
+  If that needs to really be sensitive to the release of wave as opposed to release by cmbcod
+
+  A wave can be released several times in its life, e.g. if picks are cancelled.  This logic will run several
+  times in that situation.  The columns on shipment are informational - but when pick release calls this, it has
+  released all picks of the shipment so we also have a concept of seeing if the shipment.uc_reldte was more than x 
+  seconds ago to assume a new release cycle
+
+  </p>
+]]>
+</remarks>
+
+<retcol name="schbat" type="(varies according to field type)">Wave processed</retcol>
+<retcol name="uc_reldte" type="(varies according to field type)">Release date</retcol>
+<retcol name="wh_id" type="(varies according to field type)"></retcol>
+<retcol name="old_uc_reldte" type="(varies according to field type)">Old Release date</retcol>
+<retcol name="uc_reg_oper_cd" type="(varies according to field type)">Operation code</retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+
+
+<seealso cref="register usr shipment or wave fully released"></seealso>
+
+
+</documentation>
+</command>

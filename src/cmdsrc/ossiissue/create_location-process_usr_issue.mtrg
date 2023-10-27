@@ -1,0 +1,31 @@
+<trigger>
+<name>process usr issue</name>
+<on-command>create location</on-command>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ */
+if (@arecod != 'EXPR' and @arecod != 'RDTS')
+{
+  process usr issue
+    where uc_table_name = 'LOCMST'
+      and uc_action = 'ADD'
+}
+
+]]>
+</local-syntax>
+<fire-sequence>2000</fire-sequence>
+<documentation>
+
+<remarks>
+This trigger process issue for creating location.
+</remarks>
+
+<seealso cref="process usr issue"></seealso>
+
+</documentation>
+<enable>yes</enable>
+</trigger>

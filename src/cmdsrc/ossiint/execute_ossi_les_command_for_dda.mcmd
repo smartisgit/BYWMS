@@ -1,0 +1,157 @@
+<command>
+<name>execute ossi les command for dda</name>
+<description>Execute the les command in context of generic DDAs</description>
+
+<argument datatype="string" name="les_cmd_id">Command Id</argument>
+<argument datatype="string" name="uc_inhibit_dlytrn">Do not log dlytrn</argument>
+<argument datatype="string" name="usr_id"></argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+
+publish data
+where uc_inhibit_dlytrn = nvl(@uc_inhibit_dlytrn, '0' )
+and usr_id = nvl(@usr_id, @@USR_ID)
+|
+{
+    /*
+     * This makes sure that all dlytrn like invmov update and pckmov update will be written and not ignored
+     */
+    save session variable
+    where name = 'uc_write_dlytrn_force_option'
+    and value = '1'
+    ;
+    [
+    select syntax
+    from les_cmd
+    where les_cmd_id = @les_cmd_id
+    and cust_lvl = (select max(cust_lvl) from les_cmd c2 where c2.les_cmd_id = les_cmd.les_cmd_id)
+    ]
+    catch (-1403)
+    |
+    if (@? != 0)
+    {
+        set return status
+        where status = ossi__e('eUSR_LES_CMD_DOES_NOT_EXIST')
+    }
+    |
+    if ( ossi__user_has_access_to_opt_nam ( @les_cmd_id, @usr_id ) != '1' )
+    {
+        set return status
+        where status = '303'
+    }
+    else
+    {
+        if ( @uc_inhibit_dlytrn = '0' )
+        {
+            publish data
+            where my_savepoint = @les_cmd_id
+            and uc_session_id = ossi__next_number ( 'uc_print_hist_id' )
+            and var_nam_list = 'les_cmd_id,uc_surg_act_submit01,uc_surg_act_submit02,uc_surg_act_submit03,uc_surg_act_submit04,uc_surg_act_submit05,uc_surg_act_submit06,uc_surg_act_filter,uc_surg_act_clause'
+            and trndtl_table = 'usr_print_output_log'
+            |
+            {
+                set savepoint where i_savepoint = @my_savepoint
+                ;
+                try
+                {
+                    /*
+                     * Write daily transaction of how we were called
+                     */
+                    convert list 
+                    where string = @var_nam_list
+                    and type = 'L'
+                    |
+                    {
+                        execute server command
+                        where cmd = "publish data where my_value = @" || @retstr
+                        and inline = 1
+                        catch (@?)
+                        |
+                        if ( @? = 0 and @my_value is not null )
+                        {
+                            publish data
+                            where to_value = substr(@my_value,1,200)
+                            |
+                            if ( len(@my_value) > 200 )
+                                publish data
+                                where cmnt = substr(@my_value, 1, 2000)
+                            |                        
+                            write daily transaction
+                            where actcod = 'UC_ADFIX'
+                            and var_nam = @retstr
+                        }
+                    }
+                    ;
+                    /* 
+                     * Now execute our work 
+                     */
+                    execute server command
+                    where cmd = @syntax
+                    and inline = 1
+                    >> res
+                    |
+                    {
+                        convert ossi results to xml where res = @res
+                        catch (@?)
+                        |
+                        if ( @? = 0 )
+                        {
+                            write daily transaction
+                            where actcod = 'UC_PRNLOG'
+                            and trndtl_id = @uc_session_id
+                            and trndtl_table = @trndtl_table
+                            and cmnt = 'Results of executing fix ' || @les_cmd_id
+                            and uc_prtadr = null
+                            and var_nam = 'les_cmd_id'
+                            and to_value = @les_cmd_id
+                            and fr_value = null
+                            and adj_ref1 = null
+                            and adj_ref2 = null
+                            ;
+                            create record
+                            where table = @trndtl_table
+                            and uc_report_output_base64 = @mxml_xml
+                            and uc_print_hist_id = @uc_session_id
+                            catch (@?)
+                        }
+                        ;
+                        publish data combination where res = @res 
+                    }
+                }
+                finally
+                {
+                    if ( @do_update != 1 )
+                        rollback to savepoint where i_savepoint = @my_savepoint
+                }
+            } /* block */
+        } /* block to run an action */
+        else
+        {
+            execute server command
+            where cmd = @syntax
+            and inline = 1
+        }
+    }
+}
+  
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This can be invoked from a DDA to execute les_cmd entry.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

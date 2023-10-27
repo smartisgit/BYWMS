@@ -1,0 +1,25 @@
+#use $DCSDIR/include
+#include <dcsddl.h>
+#include <dcscolwid.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+
+#use $SALDIR/include
+#include <salcolwid.h>
+
+mset command on
+[
+ALTER_TABLE_TABLE_INFO(invdtl)
+ALTER_TABLE_ADD_COLUMN_START(uc_mass_scanner_msg_seq)
+     STRING_TY(30)
+ALTER_TABLE_ADD_COLUMN_END
+] catch (-2705,-1430 )
+RUN_DDL
+
+create db column comment 
+where table_name   = 'invdtl' 
+and column_name    = 'uc_mass_scanner_msg_seq'
+and column_comment = 'The message sequence passed in when using a mass scanner device like HVSS'
+RUN_DDL
+
+mset command off

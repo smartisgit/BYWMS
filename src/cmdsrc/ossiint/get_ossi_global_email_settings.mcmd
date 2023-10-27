@@ -1,0 +1,153 @@
+<command>
+<name>get ossi global email settings</name>
+<description>
+Using policies that can support expression, return global settings that can be used for sending email via standard send email command
+</description>
+
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+/*
+ * Revision Log
+ * 2021-10-19 saad.ahmad base ossi
+ */
+{
+    /*
+     * Since we have a password - that may need to be exnrypted.  We call the decrypt and that API needs this
+     */
+    save session variable where name = 'uc_int_comm_context' and value = 'SMART_INT_CONTEXT'
+    ;
+    publish data
+    where mail_server_expr       = ossi__polval ( 'USR-OSSI-SYSTEM-SETTINGS', 'EMAIL', 'MAIL-SERVER-EXPR',       '', 'rtstr1', '----' )
+    and   mail_port_expr         = ossi__polval ( 'USR-OSSI-SYSTEM-SETTINGS', 'EMAIL', 'MAIL-PORT-EXPR',         '', 'rtstr1', '----' )
+    and   mail_tls_expr          = ossi__polval ( 'USR-OSSI-SYSTEM-SETTINGS', 'EMAIL', 'MAIL-TLS-EXPR',          '', 'rtstr1', '----' )
+    and   mail_user_expr         = ossi__polval ( 'USR-OSSI-SYSTEM-SETTINGS', 'EMAIL', 'MAIL-USER-EXPR',         '', 'rtstr1', '----' )
+    and   mail_password_expr     = ossi__polval ( 'USR-OSSI-SYSTEM-SETTINGS', 'EMAIL', 'MAIL-PASSWORD-EXPR',     '', 'rtstr1', '----' )
+    and   email_enabled          = ossi__polval ( 'USR-OSSI-SYSTEM-SETTINGS', 'EMAIL', 'ENABLED',                '', 'rtnum1', '----' )
+    and   default_mail_from_expr = ossi__polval ( 'USR-OSSI-SYSTEM-SETTINGS', 'EMAIL', 'DEFAULT-MAIL-FROM-EXPR', '', 'rtstr1', '----' )
+    |
+    execute server command
+    where cmd = " publish data"
+             || " where hostname             = " || @mail_server_expr
+             || " and   port                 = int(" || @mail_port_expr || ")"
+             || " and   enableTLS            = int(" || @mail_tls_expr  || ")"
+             || " and   user                 = " || @mail_user_expr
+             || " and   uc_enc_password      = " || @mail_password_expr
+             || " and   password             = ossi__int_decrypt ( " || @mail_password_expr || ")"
+             || " and   uc_default_mail_from = " || @default_mail_from_expr
+    and inline = 1
+    |
+    filter data
+    where moca_filter_level       = 1
+    and uc_mail_server_expr       = @mail_server_expr
+    and uc_mail_port_expr         = @mail_port_expr
+    and uc_mail_tls_expr          = @mail_tls_expr
+    and uc_mail_user_expr         = @mail_user_expr
+    and uc_mail_password_expr     = @mail_password_expr
+    and uc_email_enabled          = @email_enabled
+    and uc_default_mail_from_expr = @default_mail_from_expr
+}
+
+]]>
+</local-syntax>
+
+
+<documentation>
+<remarks>
+This component returns some of the common settings we need for any email functionality.  It supports a policy structure where
+policies can in turn be expressions so it supports the idea where these may be in an environment variable.
+</remarks>
+
+
+<retrows>1</retrows>
+<retcol name="hostname" type="string">mail server host name</retcol>
+<retcol name="port" type="integer">mail server port</retcol>
+<retcol name="enableTLS" type="integer">1 or 0 to enable or disable TLS</retcol>
+<retcol name="user" type="string">if needed to authenticate to the mail server</retcol>
+<retcol name="uc_enc_password" type="string">if needed to authenticate to the mail server.  Thie may be encrypted</retcol>
+<retcol name="password" type="string">if needed to authenticate to the mail server.  Decrypted value</retcol>
+<retcol name="uc_default_mail_from" type="string">The default email from value</retcol>
+
+
+
+<retcol name="uc_mail_server_expr" type="string">Expression as stored in policy</retcol>
+<retcol name="uc_mail_port_expr" type="string">Expression as stored in policy</retcol>
+<retcol name="uc_mail_tls_expr" type="string">Expression as stored in policy</retcol>
+<retcol name="uc_mail_user_expr" type="string">Expression as stored in policy</retcol>
+<retcol name="uc_mail_password_expr" type="string">Expression as stored in policy</retcol>
+<retcol name="uc_default_mail_from_expr" type="string">Expression used to determine the email from value</retcol>
+
+<retcol name="uc_email_enabled" type="integer">1 or 0.  1 means email is enabled.  Respected by send ossi email command</retcol>
+
+<policy
+    polcod="USR-OSSI-SYSTEM-SETTINGS"
+    polvar="EMAIL"
+    polval="DEFAULT-MAIL-FROM-EXPR"
+    rtstr1="if [send ossi email] does not receive mail_from then this is used to determine the from email address.  Since it is an expression it is possible to refer to environment variables by prefixing with @@"
+></policy>
+<policy
+    polcod="USR-OSSI-SYSTEM-SETTINGS"
+    polvar="EMAIL"
+    polval="ENABLED"
+    rtnum1="1 or 0.  send ossi email command becomes a noop if this is 0"
+></policy>
+
+<policy
+    polcod="USR-OSSI-SYSTEM-SETTINGS"
+    polvar="EMAIL"
+    polval="MAIL-SERVER-EXPR"
+    rtstr1="An expression that resolves to the mail server.  Since it is an expression it possible to refer to environment variables by prefixing with @@"
+></policy>
+<policy
+    polcod="USR-OSSI-SYSTEM-SETTINGS"
+    polvar="EMAIL"
+    polval="MAIL-PORT-EXPR"
+    rtstr1="An expression that resolves to the mail server port.  Since it is an expression it possible to refer to environment variables by prefixing with @@"
+></policy>
+<policy
+    polcod="USR-OSSI-SYSTEM-SETTINGS"
+    polvar="EMAIL"
+    polval="MAIL-TLS-EXPR"
+    rtstr1="An expression that resolves to 1 or 0.  1 means use TLS.  Since it is an expression it is possible to refer to environment variables by prefixing with @@"
+></policy>
+<policy
+    polcod="USR-OSSI-SYSTEM-SETTINGS"
+    polvar="EMAIL"
+    polval="MAIL-USER-EXPR"
+    rtstr1="An expression that resolves to user id to authenticate to mail server.  Since it is an expression it is possible to refer to environment variables by prefixing with @@"
+></policy>
+<policy
+    polcod="USR-OSSI-SYSTEM-SETTINGS"
+    polvar="EMAIL"
+    polval="MAIL-PASSWORD-EXPR"
+    rtstr1="An expression that resolves to password to authenticate to mail server.  It supoorts encypted values as well.  See smartpasswd.bat script in $LESDIR/scripts.  Since it is an expression it is possible to refer to environment variables by prefixing with @@"
+></policy>
+
+
+
+
+
+<example>
+get ossi global email settings
+|
+send email
+where mail_from = 'saad.ahmad@smart-is.com'
+and send_to = 'saad.ahmad@smart-is.com'
+and subject = 'test'
+and message = 'test' 
+
+</example>
+<exception value="eOK">Normal successful completion</exception>
+
+<seealso cref="send email"></seealso>
+<seealso cref="get ossi app monitor email settings"></seealso>
+<seealso cref="send ossi email"></seealso>
+<seealso cref="manage ossi encrypted values for integration"></seealso>
+
+
+</documentation>
+</command>

@@ -1,0 +1,41 @@
+<command>
+<name>get usr issue for user</name>
+<description>Get issues for user</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ */
+[select *
+   from usr_ossi_issue_assign
+  where @*
+  order by uc_ossi_issue_assign_seq
+] 
+
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This command is used to get issue for user.
+</remarks>
+
+<retcol name="uc_ossi_issue_assign_seq" type="String"></retcol>
+<retcol name="uc_ossi_issue_id" type="String"></retcol>
+<retcol name="uc_ossi_user_id" type="String"></retcol>
+<retcol name="uc_ossi_stat_cd" type="String"></retcol>
+<retcol name="uc_ossi_ins_dt" type="date"></retcol>
+<retcol name="uc_ossi_ins_usr_id" type="String"></retcol>
+<retcol name="uc_ossi_upd_dt" type="date"></retcol>
+<retcol name="uc_ossi_upd_usr_id" type="String"></retcol>
+<retcol name="uc_ossi_issue_descr" type="String"></retcol>
+<retcol name="uc_ossi_obj_grp" type="String"></retcol>
+<retcol name="uc_ossi_obj_name" type="String"></retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

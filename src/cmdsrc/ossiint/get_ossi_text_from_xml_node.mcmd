@@ -1,0 +1,47 @@
+<command>
+<name>get ossi text from xml node</name>
+<description>Parse the XML looking for the given tag and return the contents</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+[[
+import javax.xml.parsers.*;
+import org.w3c.dom.*;
+
+DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
+DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
+Document doc = dBuilder.parse(new ByteArrayInputStream(mxml_xml.getBytes("UTF-8")));
+doc.getDocumentElement().normalize();
+NodeList nList = doc.getElementsByTagName(mxml_tag);
+for (int temp = 0; temp < nList.getLength(); temp++) {
+    Node nNode = nList.item(temp);
+    if (nNode.getNodeType() == Node.ELEMENT_NODE) {
+        Element eElement = (Element) nNode;
+        data = eElement.getTextContent();
+        break;
+    }
+}
+[data:data]
+]]
+
+]]>
+</local-syntax>
+<argument name="mxml_xml" required="yes" datatype="string"></argument>
+<argument name="mxml_tag" required="yes" datatype="string"></argument>
+<documentation>
+
+<remarks>
+Get text from XML node.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

@@ -1,0 +1,85 @@
+<command>
+<name>check usr poldat exclusion</name>
+<description>Returns 510 if any of the exclusions are found</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ * 20170315 ossi\saad.ahmad - 7026 - core ossi
+ * 20170711 ossi\saad.ahmad - 7026 - Bring the core Oracular components
+ */
+publish data
+where uc_do_only_wh_id = ossi__replace(upper(@@UC_VERSION_DO_ONLY_WH_ID),'"','')
+and uc_this_wh_id = upper(nvl(@wh_id#keep, @@WH_ID))
+|
+/*
+ * We generally do not control the warehouse specific policies
+ */
+if ( @wh_id != '----' and @wh_id is not null )
+{
+   /*
+    * We may have wh specific policies like CARTONIZATOIN that need to be exported 
+    */
+   if ( @uc_this_wh_id is not null and instr( ','||@uc_do_only_wh_id||',', ','||@uc_this_wh_id||',') > 0 )
+   {
+      [
+      select count(*) cnt_force
+      from poldat
+      where polcod = 'USR-OSSI-VERSION-CONTROL'
+      and polvar = 'OBJECT-TABLE-POLDAT'
+      and wh_id_tmpl = '----'
+      and polval = 'INCLUDE-IF-DEV-WH'
+      and rtnum1 = 1
+      and @polcod || '|' || @polvar || '|' || @polval like rtstr1
+      ]
+      |
+      if ( @cnt_force > 0 )
+         noop
+      else
+         set return status where status = 510
+   }
+   else
+   {    
+      set return status where status = 510
+   }
+}
+else
+{
+   publish data where table = 'POLDAT'
+   |
+   {
+      check usr column exclusion
+      where column = 'POLCOD'
+      and rtstr1 = @polcod
+      ;
+      check usr column exclusion
+      where column = 'POLVAR'
+      and rtstr1 = @polvar
+      ;
+      check usr column exclusion
+      where column = 'POLCOD-POLVAR'
+      and rtstr1 = @polcod || '|' || @polvar    
+      ;
+      check usr column exclusion
+      where column = 'POLCOD-POLVAR-POLVAL'
+      and rtstr1 = @polcod || '|' || @polvar || '|' || @polval    
+   }
+}
+    
+]]>
+</local-syntax>
+<argument name="polcod" required="yes" datatype="string"></argument>
+<argument name="polvar" required="yes" datatype="string"></argument>
+<documentation>
+
+<remarks>
+This command can be used to check poldat exclution. It returns 510 if the poldat should be excluded.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

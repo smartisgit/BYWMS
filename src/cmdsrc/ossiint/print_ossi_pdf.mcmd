@@ -1,0 +1,60 @@
+<command>
+<name>print ossi pdf</name>
+<description></description>
+<type>Local Syntax</type>
+
+<argument name="filename" required="yes" datatype="string"></argument>
+<argument name="printer" required="yes" datatype="string"></argument>
+<argument name="wh_id" required="no" datatype="string"></argument>
+
+<local-syntax>
+<![CDATA[
+
+[
+  select case svqflg when 1 
+           then prtque
+           else isnull(tcpadr, prtadr)
+         end uc_printer_name
+  from prsmst
+  where prtadr = @printer
+  and @+wh_id
+] catch(-1403, 510)
+|
+if (@? = -1403 or @? = 510)
+  set return status
+     where status = 35803
+|
+[[
+import java.awt.print.PrinterException
+import java.awt.print.PrinterJob
+import javax.print.PrintService
+import javax.print.PrintServiceLookup
+import org.apache.pdfbox.pdmodel.PDDocument
+import org.apache.pdfbox.printing.PDFPageable
+import org.apache.fontbox.ttf.TrueTypeFont
+
+PDDocument document = PDDocument.load(new File(filename))
+PrintService[] printServices = PrintServiceLookup.lookupPrintServices(null, null)
+PrintService printService = printServices.find{it.name == uc_printer_name}
+
+moca.trace("\nSending " + filename + " to printer: " + printService.name)
+
+PrinterJob job = PrinterJob.printerJob
+job.setPageable(new PDFPageable(document))
+job.setPrintService(printService)
+job.print()
+]]
+
+]]>
+</local-syntax>
+
+<documentation>
+    <remarks>
+    </remarks>
+
+    <example>
+    </example>
+
+</documentation>
+
+</command>

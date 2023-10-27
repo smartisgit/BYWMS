@@ -1,0 +1,220 @@
+<command>
+<name>perform usr automatic picking</name>
+<description></description>
+
+<argument datatype="string" name="wh_id"></argument>
+<argument datatype="string" name="comflg"></argument>
+<argument datatype="string" name="lodlvl"></argument>
+<argument datatype="string" name="uc_move_to_next_hop"></argument>
+<argument datatype="string" name="srcare "></argument>
+<argument datatype="string" name="uc_job_id "></argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20200417 mustafa.ahmed - 10731
+ */
+publish data
+where uc_job_id = nvl(@uc_job_id, 'AUTO_PICK' )
+|
+publish data
+where uc_job_id = 'UC_W_' || @wh_id || '_' || @uc_job_id
+and uc_ossi_who = @@USR_ID
+and uc_move_to_next_hop = nvl(@uc_move_to_next_hop,'1')
+and comflg = nvl(@comflg, 0 )
+|
+publish data
+where dstloc = ossi__polval('USR-PICKING', 'PICKING', 'TEMP-PD-LOC', null, null, @wh_id)
+|
+{
+    publish data
+    where uc_ossi_job_seq = ossi__register_job ( @uc_job_id, 
+                                                  'list='|| @list_id
+                                                ||',srcare='||@srcare
+                                                ||',comflg='||@comflg
+                                                ||',nexthop='||@uc_move_to_next_hop
+                                                ||',wh_id='||@wh_id
+                                                ,
+                                                @uc_ossi_who )
+    |
+    try
+    {
+        publish data
+        where uc_ossi_module_seq = ossi__register_module ( @uc_ossi_job_seq, 'GET_PICKS', '', @uc_ossi_who )
+        |
+        try
+        {
+            list usr list picks for automatic picking
+            catch (-1403,510)
+            >> res_picks
+            |
+            complete ossi job log
+            |
+            publish data
+            where pick_count = rowcount(@res_picks)
+            |
+            if ( @pick_count > 0 )
+            {
+                [[
+                String l_list_id = "";
+                Integer pp = 0;
+                boolean pick_done;
+                boolean hop_done;
+                while ( res_picks.next() )
+                {
+                    list_id = res_picks.getString ( "list_id" );
+                    ship_id = res_picks.getString ( "ship_id" );
+                    wrkref  = res_picks.getString ( "wrkref" );
+                    //
+                    moca.executeCommand ( "set savepoint where i_savepoint = @i_savepoint", [i_savepoint:wrkref] );
+                    //
+                    res_act = moca.executeInline ( " publish data " +
+                                                   " where uc_ossi_action_seq = ossi__register_action ( @uc_ossi_job_seq, @uc_ossi_module_seq, 'GET_INV', @ship_id || '/' || @list_id || '/' || @wrkref," + 
+                                                   "                                                     @uc_ossi_who )", 
+                                                   [wrkref:wrkref,list_id:list_id,ship_id:ship_id] );
+                    res_act.next();
+                    action_seq = res_act.getDouble ( "uc_ossi_action_seq" );
+                    //
+                    res_inv = moca.executeCommand ( " [select min(lodlvl) uc_pck_lodlvl, max(pckqty) uc_pck_pckqty from pckwrk_view where wrkref = @wrkref]" +
+                                                    " |" +
+                                                    " {" +
+                                                    "     list available inventory for pick in location" +
+                                                    "     where wrkref = @wrkref" +
+                                                    "     and wh_id = @wh_id" +
+                                                    "     catch (-1403,510)" +
+                                                    "     |" +
+                                                    "     if ( @uc_pck_lodlvl = 'L' )" +
+                                                    "     {" +
+                                                    "          [select sum(untqty) uc_lod_untqty from inventory_view where lodnum = @lodnum]" +
+                                                    "          |" +
+                                                    "          if ( @uc_lod_untqty = @uc_pck_pckqty )" +
+                                                    "              filter data where moca_filter_level = 3" +
+                                                    "     }" +
+                                                    "     else" +
+                                                    "         filter data where moca_filter_level = 1" +
+                                                    " }" +
+                                                    " catch (-1403,510)" +
+                                                    " |" +
+                                                    " if ( @? = 0 and @dtlnum )" +
+                                                    " {" +
+                                                    "     [" +
+                                                    "     select count(*) uc_cnt_hld" +
+                                                    "     from invhld" +
+                                                    "          join hldmst on hldmst.hldnum = invhld.hldnum and hldmst.hldpfx = invhld.hldpfx and hldmst.wh_id = invhld.wh_id" +
+                                                    "     where dtlnum = @dtlnum" +
+                                                    "     and nvl(alcflg,0) = 0" +
+                                                    "     ]" +
+                                                    "     |" +
+                                                    "     if ( @uc_cnt_hld = 0 )" +
+                                                    "         filter data where moca_filter_level = 3" +
+                                                    " }",
+                                                    [wrkref:wrkref, wh_id:wh_id] );
+                    moca.executeInline ( "complete ossi job log where uc_ossi_action_seq = @uc_ossi_action_seq", [uc_ossi_action_seq:action_seq] );
+                    //
+                    if ( res_inv.next() )
+                    {
+                        lodnum = res_inv.getString ( "lodnum" );
+                        try
+                        {
+                            res_p = moca.executeCommand ( " publish data " +
+                                                          " where uc_ossi_action_seq = ossi__register_action ( @uc_ossi_job_seq, @uc_ossi_module_seq, 'PICK_INV', @lodnum, @uc_ossi_who)" +
+                                                          " |" +
+                                                          " try" +
+                                                          " {" +
+                                                          "     move inventory" +
+                                                          "     where wh_id = @wh_id" +
+                                                          "     and wrkref = @wrkref" +
+                                                          "     and lodnum = @lodnum" +
+                                                          "     and dstloc = @dstloc" +
+                                                          "     and uc_doing_auto_pick = 1" +
+                                                          " }" +
+                                                          " finally" +
+                                                          " {" +
+                                                          "     if ( @? = 0 ) " +
+                                                          "         complete ossi job log" +
+                                                          "     else" +
+                                                          "         raise ossi job error where uc_ossi_err_code = @? and uc_ossi_err_descr = @! and is_job_flg = '0'" +
+                                                          " }" ,
+                                                          [wh_id:wh_id, wrkref:wrkref, lodnum:lodnum, dstloc:dstloc, uc_ossi_job_seq:uc_ossi_job_seq, uc_ossi_module_seq:uc_ossi_module_seq, uc_ossi_who:uc_ossi_who] );
+                            pick_done = true;
+                        }
+                        catch (Exception ee) 
+                        {
+                            pick_done = false;
+                            moca.executeCommand ( " rollback to savepoint where i_savepoint = @i_savepoint catch(@?)", [i_savepoint:wrkref] );
+                        }
+                        //
+                        hop_done = true; // assume it is done - we set it to not in catch
+                        //
+                        if ( uc_move_to_next_hop == '1' && pick_done )
+                        {
+                            try
+                            {
+                                res_h = moca.executeCommand ( " publish data " +
+                                                              " where uc_ossi_action_seq = ossi__register_action ( @uc_ossi_job_seq, @uc_ossi_module_seq, 'HOP_INV', @lodnum, @uc_ossi_who)" +
+                                                              " |" +
+                                                              " try" +
+                                                              " {" +
+                                                              "     move usr load to next location" +
+                                                              "     where wh_id = @wh_id" +
+                                                              "     and lodnum = @lodnum" +
+                                                              "     and uc_doing_auto_pick = 1" +
+                                                              " }" +
+                                                              " finally" +
+                                                              " {" +
+                                                              "     if ( @? = 0 ) " +
+                                                              "         complete ossi job log" +
+                                                              "     else" +
+                                                              "         raise ossi job error where uc_ossi_err_code = @? and uc_ossi_err_descr = @! and is_job_flg = '0'" +
+                                                              " }" ,
+                                                              [wh_id:wh_id, lodnum:lodnum, uc_ossi_job_seq:uc_ossi_job_seq, uc_ossi_module_seq:uc_ossi_module_seq, uc_ossi_who:uc_ossi_who] );
+                            }
+                            catch ( Exception ee )
+                            {
+                                hop_done = false;
+                                moca.executeCommand ( " rollback to savepoint where i_savepoint = @i_savepoint catch(@?)", [i_savepoint:wrkref] );  
+                            }
+                        } // next hop
+                        //
+                        if ( comflg == 1 )
+                        {
+                            moca.executeCommand ( "[commit] catch(@?)" );
+                        }
+                    } // found inv
+                } // all picks
+                ]]
+                ;
+                publish data
+                where pick_count = @pick_count
+            } /* found picks */
+        } /* module */
+        finally
+        {
+            if ( @? = 0 )
+                complete ossi job
+            else
+                raise ossi job error
+                where uc_ossi_err_code  = @?
+                and   uc_ossi_err_descr = @!
+                and   is_job_flg = '0'
+        }
+    }
+    finally
+    {
+        if ( @? = 0 )
+            complete ossi job
+        else
+            raise ossi job error
+            where uc_ossi_err_code  = @?
+            and   uc_ossi_err_descr = @!
+            and   is_job_flg = '1'
+    }
+}
+        
+]]>
+</local-syntax>
+</command>

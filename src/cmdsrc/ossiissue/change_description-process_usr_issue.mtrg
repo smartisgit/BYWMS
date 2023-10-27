@@ -1,0 +1,29 @@
+<trigger>
+<name>process usr issue</name>
+<on-command>change description</on-command>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ */
+check usr dscmst exclusion
+  catch (-1403,510)
+|
+if (@? = 0 and @locale_id = 'US_ENGLISH')
+  process usr issue
+  where uc_table_name = 'DSCMST'
+    and uc_action = 'UPDATE'
+]]></local-syntax>
+<fire-sequence>10000</fire-sequence>
+<documentation>
+
+<remarks>
+This trigger process issue for changing description.
+</remarks>
+
+<seealso cref="process usr issue"></seealso>
+
+</documentation>
+</trigger>

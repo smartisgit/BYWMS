@@ -1,0 +1,38 @@
+<command>
+<name>change ossi policy logic value</name>
+<description></description>
+
+<argument name="uc_rule_grp_id" required="yes" datatype="string"></argument>
+<argument name="uc_rule_subgrp_id" required="yes" datatype="string"></argument>
+<argument name="uc_rule_id" required="yes" datatype="string"></argument>
+<argument name="seqnum" required="yes" datatype="string">This user does not see.  Ever ascending value based on max and add 1</argument>
+
+<argument name="srtseq" required="yes" datatype="string">This is what user sees during sorting</argument>
+<argument name="ena_flg" required="yes" datatype="string">This is what user sees during sorting</argument>
+<argument name="uc_rule_expr" required="yes" datatype="string"></argument>
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+parse ossi policy logic
+|
+change ossi rule engine expression
+where seqnum = iif(@seqnum is null, 1, @seqnum)
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<remarks>
+This command may be used to change policy logic values.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

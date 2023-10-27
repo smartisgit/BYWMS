@@ -1,0 +1,64 @@
+<command>
+  <name>list usr expiration report</name>
+  <description>list usr expiration report</description>
+  <type>Local Syntax</type>
+  <local-syntax>
+<![CDATA[
+
+publish data
+where diff_date = @diff_date 
+and date = to_char(sysdate,'DD.MM.YYYY')
+|
+[
+          select distinct lms.arecod area,
+          lms.stoloc location,
+          iw.prtnum item_number,
+          pds.lngdsc description,
+          iw.lotnum lot_num,
+          iw.lodnum load,
+          iw.untqty total_quantity,
+          pdl.untqty box_quantity,
+          dms.short_dsc inv_status,
+        --to_char(iw.expire_dte,'MM/DD/YYYY ') expiration_date,
+          iw.expire_dte expiration_date,
+          trunc (iw.expire_dte - sysdate) days_left
+          from inventory_view iw,
+          prtftp_dtl pdl,
+          prtdsc pds,
+          locmst lms,
+          dscmst dms
+          where pdl.prtnum = iw.prtnum
+          and lms.arecod not in ('EXPR',
+          'SHIP',
+          'RSTG','SSTG','RDT','DSTG','ADJS','DSPCH','DAM','DOCK','CSTG')
+          and iw.wh_id = @@wh_id
+          and pdl.wh_id = iw.wh_id
+          and lms.wh_id = iw.wh_id
+          and dms.colnam = 'invsts'
+          and dms.locale_id = pds.locale_id
+          and dms.colval = iw.invsts
+          and iw.stoloc = lms.stoloc
+          and pdl.uomcod = 'MP'
+          and concat(concat (iw.prtnum,
+          '|AMW|'),iw.wh_id) = pds.colval
+          and pds.locale_id = @@locale_id
+          and trunc (iw.expire_dte - sysdate) <= @diff_date
+          ]
+|
+publish data 
+where area = @area 
+and location = @location 
+and item_number = @item_number
+and lot_num = @lot_num 
+and description = @description 
+and load = @load 
+and total_quantity = @total_quantity 
+and box_quantity = @box_quantity 
+and inv_status = @inv_status 
+and days_left = @days_left 
+and date = @date 
+and expiration_date = @expiration_date
+
+]]>
+</local-syntax>
+</command>

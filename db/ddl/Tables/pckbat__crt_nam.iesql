@@ -1,0 +1,27 @@
+#use $DCSDIR/include
+#include <dcsddl.h>
+#include <dcscolwid.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+
+#use $SALDIR/include
+#include <salcolwid.h>
+
+
+mset command on
+[
+ALTER_TABLE_TABLE_INFO(pckbat)
+ALTER_TABLE_ADD_COLUMN_START(crt_nam)
+     STRING_TY ( 40 )
+ALTER_TABLE_ADD_COLUMN_END
+] catch (ERR_COLUMN_ALREADY_EXISTS)
+RUN_DDL
+
+create db column comment 
+where table_name   = 'pckbat' 
+and column_name    = 'crt_nam'
+and column_comment = 'Name of Criteria'
+RUN_DDL
+
+
+mset command off

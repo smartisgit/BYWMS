@@ -1,0 +1,195 @@
+<command>
+<name>process ossi ldap sync user</name>
+<description>Process LDAP Sync for a user</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="uc_ossi_job_seq"></argument>
+<argument datatype="string" name="uc_ossi_who"></argument>
+<argument datatype="string" name="uc_res_les_usr_ath"></argument>
+
+
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+
+publish data
+where uc_ldap_sync_create_user_cmd = ossi__get_policy_data_as_var_list ( 'USR-OSSI-LDAP-SYNC', 'LES_USR_ATH', 'CREATE_USER_CMD', '----', ' and ' )
+and uc_row_count = rowcount(@uc_res_les_usr_ath)
+|
+publish data
+where uc_ossi_module_seq = ossi__register_module ( @uc_ossi_job_seq, 'LES_USR_ATH', 'rows='||@uc_row_count, @uc_ossi_who )
+|
+try
+{
+   if ( @uc_row_count > 0 )
+   {
+      /* Create user */
+      publish data combination
+      where res = @uc_res_les_usr_ath
+      |
+      if ( @uc_ldap_usr_id is not null )
+      {
+         publish data
+         where usr_id = upper(@uc_ldap_usr_id)
+         |
+         {
+            execute server command
+            where cmd = "list users where usr_id = '" || @usr_id || "'"
+            and inline = 0
+            catch (-1403,510)
+            |
+            if ( @? = 0 )
+            {
+               if ( @uc_ena_flg != '1' and @usr_sts = 'A')
+               {
+                  [
+                  update les_usr_ath
+                  set usr_sts = 'I',
+                      uc_ldap_pk = @uc_ldap_pk
+                  where usr_id = @usr_id
+                  ]
+                  ;
+                  publish data
+                  where old_usr_sts = 'A'
+                  and new_usr_sts = 'I'
+                  and reacod = 'CHANGE'
+                  and uc_create_user_status = '0'
+                  and uc_create_user_message = 'Success'
+               }
+               else if ( @uc_ena_flg = '1' and @usr_sts != 'A' )
+               {
+                  [
+                  update les_usr_ath
+                  set usr_sts = 'A',
+                      uc_ldap_pk = @uc_ldap_pk
+                  where usr_id = @usr_id
+                  ]
+                  ;
+                  publish data
+                  where old_usr_sts = @usr_sts
+                  and new_usr_sts = 'A'
+                  and reacod = 'CHANGE'
+                  and uc_create_user_status = '0'
+                  and uc_create_user_message = 'Success'
+               }
+            }
+            else if ( @uc_ena_flg = '1' )
+            {
+               if ( @uc_ldap_sync_create_user_cmd is not null )
+                  execute server command
+                  where cmd = "publish data where "||@uc_ldap_sync_create_user_cmd
+                  and inline = 1
+               |
+               create user address catch(@?) /* want sync to continue */
+               |
+               publish data
+               where uc_create_user_status = @?
+               and uc_create_user_message = @!
+               |
+               [
+               update les_usr_ath
+               set uc_ldap_pk = @uc_ldap_pk
+               where usr_id = @usr_id
+               ]
+               catch (-1403,510)
+               |
+               publish data
+               where old_usr_sts = ''
+               and new_usr_sts = 'A'
+               and reacod = 'CREATE'
+               and uc_create_user_status = string(@uc_create_user_status)
+               and uc_create_user_message = @uc_create_user_message
+            }
+            else
+               publish data
+               where reacod = ''
+            |
+            if ( @reacod is not null )
+               write daily transaction
+               where actcod = 'UC_LSYNCU'
+               and movref = substr(@usr_id,1,20)
+               and traknm = string(@uc_ossi_job_seq)
+               and var_nam = 'usr_sts'
+               and fr_value = @old_usr_sts
+               and to_value = @new_usr_sts
+               and adj_ref1 = @uc_create_user_status
+               and cmnt = 'User was in LDAP results but different from RP. Status=' || @uc_create_user_message
+               and wh_id = '----'
+         } /* stack of usr_id */
+      } /* have ldap user id */
+      ;
+      /*
+       * Now go other way.All users that were created by ldap must still be there
+       */
+      {
+         [
+         select usr_id uc_les_usr_ath_usr_id
+         from les_usr_ath
+         where uc_ldap_pk is not null
+         and usr_sts = 'A'
+         order by 1
+         ]
+         catch (-1403,510)
+         |
+         if ( @? = 0 )
+         {
+            {
+               filter ossi rows with condition
+               where res = @uc_res_les_usr_ath
+               and uc_condition = "upper(@uc_ldap_usr_id) = @uc_les_usr_ath_usr_id and @uc_ena_flg = '1' "
+            }
+            >> res_filtered
+            |
+            /* If not found in ldap - disable it */
+            if ( rowcount(@res_filtered) = 0)
+            {
+               [
+               update les_usr_ath
+               set usr_sts = 'I'
+               where usr_id = @uc_les_usr_ath_usr_id
+               ]
+               ;
+               write daily transaction
+               where actcod = 'UC_LSYNCU'
+               and movref = substr(@uc_les_usr_ath_usr_id,1,20)
+               and traknm = string(@uc_ossi_job_seq)
+               and reacod = 'CHANGE'
+               and var_nam = 'usr_sts'
+               and fr_value = 'A'
+               and to_value = 'I'
+               and adj_ref1 = '0'
+               and cmnt = 'User was not in LDAP results.  Status=Success'
+               and wh_id = '----'
+            } /* not in ldap query */
+         } /* all active users in ldap in our db */
+      } /* block for round 2 */
+   } /* found rows in resultset */
+   ;
+   complete ossi job log
+} /* module */
+catch (@?)
+{
+   raise ossi job error
+   where uc_ossi_err_code  = @?
+   and   uc_ossi_err_descr = @!
+   and   is_job_flg = '0'
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+This component syncs up rp les_usr_ath to the result set passed in
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

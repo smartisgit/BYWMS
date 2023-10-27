@@ -1,0 +1,45 @@
+#use $LESDIR/include
+#use $DCSDIR/include
+#use $MOCADIR/include
+#use $LESDIR/db/ddl/Indexes
+
+#include <dcsddl.h>
+#include <dcscolwid.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+
+mset command on
+[
+CREATE_TABLE (usr_ossi_mon)
+(
+    uc_monitor_id                  STRING_TY(60)    not null,    /* PK */
+    uc_monitor_descr               STRING_TY(1000),    
+    ena_flg                        FIXED_INT_TY(8),
+    uc_check_cmd                   STRING_TY(4000),
+    uc_fix_cmd                     STRING_TY(4000),
+    uc_raise_ems_alert_on_fail_flg FIXED_INT_TY(8),
+    uc_log_mon_dlytrn_flg          FIXED_INT_TY(8),
+    uc_mon_srtseq                  FIXED_INT_TY(8),
+    uc_cust_flg                    FLAG_TY,
+    /**/
+    uc_sch_active_tim_start   STRING_TY(100),
+    uc_sch_active_tim_end     STRING_TY(100),
+    uc_sch_inactive_tim_start STRING_TY(100),
+    uc_sch_inactive_tim_end   STRING_TY(100),
+    uc_sch_interval           INTEGER_TY,
+    uc_sch_active_dow_list    STRING_TY(100),
+    uc_sch_active_dom_list    STRING_TY(100),
+    uc_sch_inactive_dom_list  STRING_TY(100),
+    /**/
+    ins_dt                   DATE_TY,
+    last_upd_dt              DATE_TY,
+    ins_user_id              STRING_TY(40),
+    last_upd_user_id         STRING_TY(40)
+)
+CREATE_TABLE_TABLESPACE(usr_ossi_mon_TBL_TBLSPC, usr_ossi_mon_STORAGE)
+] catch(ERR_TABLE_ALREADY_EXISTS)
+RUN_DDL
+
+mset command off
+
+#include "usr_ossi_mon.tdoc"

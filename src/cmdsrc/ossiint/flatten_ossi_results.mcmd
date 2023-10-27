@@ -1,0 +1,39 @@
+<command>
+<name>flatten ossi results</name>
+<description>Turn 2 columns in res into 1 row where col1 = col2</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+[[
+  Map<String,String> map = new HashMap<String,String>();
+  while (res.next())
+  {
+    map.put(res.getString(col1), res.getString(col2));
+  }
+map;
+]]
+
+
+]]>
+</local-syntax>
+<argument name="res" required="yes" datatype="resultset"></argument>
+<argument name="col1" required="yes" datatype="string"></argument>
+<argument name="col2" required="yes" datatype="string"></argument>
+
+<documentation>
+
+<remarks>
+Convert rows to columns.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

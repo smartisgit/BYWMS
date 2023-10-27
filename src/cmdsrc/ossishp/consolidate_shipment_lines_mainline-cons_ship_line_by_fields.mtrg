@@ -1,0 +1,13 @@
+<trigger>
+<name>cons_ship_line_by_fields</name>
+<on-command>consolidate shipment lines mainline</on-command>
+<fire-sequence>51</fire-sequence>
+<disable>yes</disable>
+<documentation>
+<seealso cref="consolidate shipment lines by delivery date"></seealso>
+<seealso cref="consolidate shipment lines mainline"></seealso>
+<seealso cref="consolidate ossi shipment lines with standard fields">
+    This is created in its place woth same logic as standard so that we can call it via rules engine
+</seealso>
+</documentation>
+</trigger>

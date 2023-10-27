@@ -1,0 +1,125 @@
+<command>
+<name>create ossi lov menu item</name>
+<description>Create LOV menu item and opt_nam</description>
+<type>Local Syntax</type>
+
+<argument name="mnu_grp" required="yes" datatype="string"></argument>
+<argument name="polvar" required="yes" datatype="string"></argument>
+<argument name="mnu_itm" required="yes" datatype="string"></argument>
+<argument name="mls_text" required="yes" datatype="string"></argument>
+<argument name="mnu_seq" required="yes" datatype="string"></argument>
+<argument name="uc_role_list" required="yes" datatype="string"></argument>
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+
+if ( @mnu_itm is null or @mls_text is null or @polvar is null )
+   set return status
+   where status = '507'
+   and message = 'polvar, mnu_itm, mls_text required'
+;
+if ( @mnu_itm like 'mnu%' )
+   set return status
+   where status = 99999 /* this command is only intended to be called like this - not from a frontend */
+   and message = 'Do not pass the leading mnuitm.  That is concatenated'
+;
+publish data
+where i_mnu_itm = @mnu_itm
+|
+publish data
+where mnu_grp = nvl(@mnu_grp, 'mnugrpusrLOV' )
+and mnu_itm = 'mnuitm' || @i_mnu_itm
+and opt_nam = 'mnuopt' || @i_mnu_itm
+and uc_role_list = nvl(@uc_role_list,'SUPER,DCS_SUPER')
+and pk_upper_case = 'F'
+|
+{
+   sl_change gen_maint 
+   where table_name = 'les_mnu_opt'
+   and opt_typ = 'A'
+   and pmsn_mask = -1
+   and ena_flg = 1
+   and exec_nam = 'usrPolicyList'
+   and exec_parm = 'polvar=' || @polvar
+   ;
+   sl_change gen_maint
+   where table_name = 'les_mnu_itm'
+   and mnu_seq = nvl(@mnu_seq,0)
+   and opt_nam = @opt_nam
+   ;
+   sl_change gen_maint 
+   where table_name = 'sys_dsc_mst'
+   and colnam = 'opt_nam'
+   and colval = @opt_nam
+   and locale_id = 'US_ENGLISH'
+   and cust_lvl = 10
+   and mls_text = @mls_text
+   ;
+   sl_change gen_maint 
+   where table_name = 'sys_dsc_mst'
+   and colnam = 'mnu_itm'
+   and colval = @mnu_itm
+   and locale_id = 'US_ENGLISH'
+   and cust_lvl = 10
+   and mls_text = @mls_text
+   ;
+   convert list
+   where string = @uc_role_list
+   and type = 'L'
+   and separator = ','
+   |
+   if ( @retstr )
+   {
+      sl_change gen_maint
+      where table_name = 'les_opt_ath'
+      and opt_nam = @opt_nam
+      and ath_typ = 'R'
+      and ath_id = @retstr
+      and pmsn_mask = -1
+   }
+   ;
+   publish data
+   where @+mnu_grp
+   and @+mnu_itm
+   and @+polvar
+   and @+opt_nam
+   and @+mls_text
+   and @+uc_role_list
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This command is used to add menu items and option names for adding to special application to maintain value lists
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+<retcol name="mnu_grp" type="COMTYP_CHAR"></retcol>
+<retcol name="mnu_itm" type="COMTYP_CHAR"></retcol>
+<retcol name="polvar" type="COMTYP_CHAR"></retcol>
+<retcol name="opt_nam" type="COMTYP_CHAR"></retcol>
+<retcol name="mls_text" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_role_list" type="COMTYP_CHAR"></retcol>
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+</documentation>
+
+
+
+</command>

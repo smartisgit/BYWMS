@@ -1,0 +1,95 @@
+<command>
+<name>register usr one wave as released fully</name>
+<description>Register one shipment as fully released</description>
+ 
+<argument name="wh_id" required="yes" datatype="string">wh</argument>
+<argument name="schbat" required="yes" datatype="string">shipment</argument>
+<argument name="comflg" required="yes" datatype="string">commit</argument>
+
+
+<argument name="uc_ossi_job_seq" required="yes" datatype="string"></argument>
+<argument name="uc_ossi_module_seq" required="yes" datatype="string"></argument>
+<argument name="uc_ossi_who" required="yes" datatype="string"></argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+
+publish data
+where my_savepoint = 'SP_' || @schbat
+|
+{
+    if ( @uc_reg_oper_cd = 'R' or @uc_reg_oper_cd = 'U' )
+    {
+        set savepoint where i_savepoint = @my_savepoint
+        ;
+        publish data
+        where uc_ossi_action_seq = ossi__register_action ( @uc_ossi_job_seq, @uc_ossi_module_seq, 'RELEASE', 
+                                                           @schbat,
+                                                           @uc_ossi_who )
+        |
+        {
+            register usr wave fully released
+            catch(@?)
+            |
+            publish data
+            where uc_ossi_err_code  = @?
+            and uc_ossi_err_descr = @!
+            |
+            {
+                complete ossi job log
+                ;
+                if ( @comflg = 1 )
+                {
+                    if ( @uc_ossi_err_code = 0 )
+                        [commit] catch (@?)
+                    else
+                        rollback to savepoint 
+                        where i_savepoint = @my_savepoint
+                }
+                ;
+                publish data
+                where wh_id = @wh_id
+                and schbat = @schbat
+                and my_savepoint = @my_savepoint
+                and comflg = @comflg
+                and uc_ossi_job_seq = @uc_ossi_job_seq
+                and uc_ossi_module_seq = @uc_ossi_module_seq
+                and uc_ossi_action_seq = @uc_ossi_action_seq
+                and uc_ossi_err_code = @uc_ossi_err_code
+                and uc_ossi_err_descr = @uc_ossi_err_descr
+            } /* scope */
+        }
+    }
+}
+
+
+]]>
+</local-syntax>
+<documentation>
+
+<retrows>1</retrows>
+<retcol name="wh_id" type="string"></retcol>
+<retcol name="schbat" type="string"></retcol>
+<retcol name="my_savepoint" type="string"></retcol>
+<retcol name="comflg" type="string"></retcol>
+<retcol name="uc_ossi_job_seq" type="string"></retcol>
+<retcol name="uc_ossi_action_seq" type="string"></retcol>
+<retcol name="uc_ossi_module_seq" type="string"></retcol>
+<retcol name="uc_ossi_err_code" type="string"></retcol>
+<retcol name="uc_ossi_err_descr" type="string"></retcol>
+
+
+
+<remarks>
+<![CDATA[
+
+This command will register one wave fully released
+
+]]>
+</remarks>
+
+</documentation>
+</command>

@@ -1,0 +1,155 @@
+<command>
+<name>purge usr job log</name>
+<description>Purge job logs more than days_old</description>
+
+<argument name="dayold" required="yes" datatype="integer">Days Old. Number of days of data to keep</argument>
+<argument name="uc_purge_job_definition_exec" required="yes" datatype="String"></argument>
+<argument name="uc_purge_task_definition_exec" required="yes" datatype="String"></argument>
+<argument name="uc_purge_usr_ossi_job_log" required="yes" datatype="String"></argument>
+<argument name="uc_fix_end_dte_job_definition_exec" required="yes" datatype="String"></argument>
+<argument name="uc_fix_end_dte_task_definition_exec" required="yes" datatype="String"></argument>
+<argument name="comflg" required="yes" datatype="String"></argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+publish data
+where uc_purge_job_definition_exec = nvl(@uc_purge_job_definition_exec, '1' )
+and uc_purge_task_definition_exec = nvl(@uc_purge_task_definition_exec, '1' )
+and uc_purge_usr_ossi_job_log = nvl(@uc_purge_usr_ossi_job_log, '1' )
+and uc_fix_end_dte_job_definition_exec = nvl(@uc_fix_end_dte_job_definition_exec, '1' )
+and uc_fix_end_dte_task_definition_exec = nvl(@uc_fix_end_dte_task_definition_exec, '1' )
+and comflg = nvl(@comflg, 1)
+and dayold = nvl(@dayold, 15)
+|
+{
+    if ( @uc_purge_usr_ossi_job_log = '1' )
+    {
+        [
+        select nvl(max (uc_ossi_job_seq),0) max_job_seq
+        from usr_ossi_job_log
+        where  moca_util.date_diff_days ( uc_ossi_start_dt, sysdate ) >= @dayold
+        ]  
+        |
+        if ( @max_job_seq > 0 )
+        {
+            [
+            delete from usr_ossi_job_log 
+            where uc_ossi_job_seq <= @max_job_seq
+            ]
+            catch(-1403,510)
+        }
+        ;
+        if ( @comflg = 1 )
+            [commit] catch(@?)
+    }
+    ;
+    if ( @uc_fix_end_dte_job_definition_exec = '1' )
+    {
+        [
+        select x.*
+        from
+        ( 
+            select job_id, node_url, max(start_dte) start_dte, count(*) cnt, sum(decode(end_dte, null, 1,0)) uc_cnt_active
+            from job_definition_exec
+            group by job_id, node_url
+        ) x
+        where x.uc_cnt_active > 1
+        order by 1,2
+        ]
+        catch (-1403,510)
+        |
+        if ( @? = 0 )
+        {
+            /* Fix all executions of this job before today to end todat */
+            [
+            update job_definition_exec
+            set end_dte = sysdate
+            where job_id = @job_id
+            and node_url = @node_url
+            and start_dte < @start_dte:date
+            and end_dte is null
+            ]
+            catch (-1403,510)
+            ;
+            if ( @comflg = 1 )
+                [commit] catch(@?)
+        }
+    }
+    ;
+    if ( @uc_fix_end_dte_task_definition_exec = '1' )
+    {
+        [
+        select x.*
+        from
+        ( 
+            select task_id, node_url, max(start_dte) start_dte, count(*) cnt, sum(decode(end_dte, null, 1,0)) uc_cnt_active
+            from task_definition_exec
+            group by task_id, node_url
+        ) x
+        where x.uc_cnt_active > 1
+        order by 1,2
+        ]
+        catch (-1403,510)
+        |
+        if ( @? = 0 )
+        {
+            /* Fix all executions of this job before today to end todat */
+            [
+            update task_definition_exec
+            set end_dte = sysdate
+            where task_id = @task_id
+            and node_url = @node_url
+            and start_dte < @start_dte:date
+            and end_dte is null
+            ]
+            catch (-1403,510)
+            ;
+            if ( @comflg = 1 )
+                [commit] catch(@?)
+        }
+    }
+    ;
+    if ( @uc_purge_job_definition_exec = '1' )
+    {
+        [
+        delete from job_definition_exec
+        where  moca_util.date_diff_days ( end_dte, sysdate ) >= @dayold
+        ]
+        catch (-1403,510)
+        ;
+        if ( @comflg = 1 )
+            [commit] catch(@?)
+    }
+    ;
+    if ( @uc_purge_task_definition_exec = '1' )
+    {
+        [
+        delete from task_definition_exec
+        where  moca_util.date_diff_days ( end_dte, sysdate ) >= @dayold
+        ]
+        catch (-1403,510)
+        ;
+        if ( @comflg = 1 )
+            [commit] catch(@?)
+    }
+    ;
+    publish data
+    where dayold = @dayold
+    and comflg = @comflg
+    and uc_purge_job_definition_exec = @uc_purge_job_definition_exec
+    and uc_purge_task_definition_exec = @uc_purge_task_definition_exec
+    and uc_purge_usr_ossi_job_log = @uc_purge_usr_ossi_job_log
+    and uc_fix_end_dte_job_definition_exec = @uc_fix_end_dte_job_definition_exec
+    and uc_fix_end_dte_task_definition_exec = @uc_fix_end_dte_task_definition_exec
+}
+
+]]></local-syntax>
+
+</command>

@@ -1,0 +1,189 @@
+<command>
+<name>get ossi mapped value by logic</name>
+<description>Find the mapped value using rules engine</description>
+<type>Local Syntax</type>
+
+
+<argument datatype="string" name="uc_rule_grp_id">Rule Group Id.  These can have embeded &lt;&lt;CLIENT_ID&gt;&gt; &lt;&lt;WH_ID&gt;&gt; &lt;&lt;CLIENT_GRP&gt;&gt;</argument>
+<argument datatype="string" name="uc_rule_subgrp_id">Rule Subgroup Id</argument>
+
+<argument datatype="string" name="uc_rule_grp_id_alt1">Altermate Rule Group Id.  This is used if uc_rule_grp_id fails to find mapping</argument>
+<argument datatype="string" name="uc_rule_subgrp_id_alt1">Alternate Rule Subgroup Id</argument>
+
+
+<argument datatype="string" name="ifd_fld_misc_data">When called from algorithm it is called with this value.
+It can have a / to indicate it specifis primary and secondary lookups</argument>
+<argument datatype="string" name="uc_build_sql_case">If 1 we build a SQL case statement</argument>
+<argument datatype="string" name="uc_replace_variable_list">
+This is name=value;name=value type of list.  Typically we have created the rules with @ variables.  If we want to use the same
+rule for SQL case statement we may have to replae @ variables with a certain prefix for table name.  This provides that list
+</argument>
+
+
+<argument datatype="string" name="wh_id">if available it is used.  Or whse_id is used</argument>
+<argument datatype="string" name="client_id">if available it is used.  We determine client_grp from it</argument>
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 2021-07-15 saad.ahmad - 11919 - Bring the core Oracular components
+ */
+
+publish data
+where r_polval = null
+|
+publish data
+where ifd_fld_misc_data1 = ossi__pos_value ( @ifd_fld_misc_data, 1, '/' )
+and ifd_fld_misc_data2 = ossi__pos_value ( @ifd_fld_misc_data, 2, '/' )
+|
+if ( @uc_rule_grp_id is null and @uc_rule_subgrp_id is null  and @ifd_fld_misc_data1 is not null )
+    publish data
+    where uc_rule_grp_id = ossi__pos_value ( @ifd_fld_misc_data1, 1, ',' )
+    and uc_rule_subgrp_id = ossi__pos_value ( @ifd_fld_misc_data1, 2, ',' )
+|
+if ( @uc_rule_grp_id_alt1 is null and @uc_rule_subgrp_id_alt1 is null and @ifd_fld_misc_data2 is not null )
+    publish data
+    where uc_rule_grp_id_alt1 = ossi__pos_value ( @ifd_fld_misc_data1, 1, ',' )
+    and uc_rule_subgrp_id_alt1 = ossi__pos_value ( @ifd_fld_misc_data1, 2, ',' )
+|
+publish data
+where wh_id = nvl(@wh_id, @whse_id)
+and client_id = nvl(nvl(@client_id, @prt_client_id),'----')
+|
+publish data
+where my_sess_var_client_grp = 'uc_client_grp_id_' || @client_id
+|
+{
+    publish data
+    where client_grp = ossi__sess_var ( @my_sess_var_client_grp, '', 'Y' )
+    |
+    if ( @client_grp is null )
+    {
+        [
+        select nvl(max(client_grp),'----') client_grp
+        from client_grp_client
+        where client_id = @client_id
+        ]
+        |
+        {
+            save session variable where name = @my_sess_var_client_grp and value = @client_grp
+            ;
+            publish data
+            where client_grp = @client_grp
+        }
+    }
+    else
+        publish data where client_grp = @client_grp
+}
+|
+publish data
+where uc_rule_grp_id = ossi__replace(ossi__replace(ossi__replace(@uc_rule_grp_id, '<<CLIENT_ID>>', @client_id),'<<WH_ID>>', @wh_id), '<<CLIENT_GRP>>', @client_grp)
+and uc_rule_subgrp_id = ossi__replace(ossi__replace(ossi__replace(@uc_rule_subgrp_id, '<<CLIENT_ID>>', @client_id),'<<WH_ID>>', @wh_id), @client_grp)
+|
+{
+    if ( @uc_build_sql_case = 1 )
+    {
+        if ( @uc_replace_variable_list is not null )
+        {
+            {
+                convert list
+                where string = @uc_replace_variable_list
+                and type = 'L'
+                and separator = ';'
+                |
+                publish data
+                where uc_lookup_var = ossi__get_fld_from_list ( @retstr, 1, '=' )
+                and uc_repl_with_val = ossi__get_fld_from_list ( @retstr, 2, '=' )
+                and uc_var_seq = @count
+            }
+            >> res_repl_var
+        }
+        else
+            noop >> res_repl_var
+        |
+        [[
+        StringBuffer retString = new StringBuffer("case when 1=0 then '' ");
+        res = moca.executeInline ( " get ossi rules for policy based rules engine" +
+                                   " where uc_rule_grp_id = @uc_rule_grp_id" +
+                                   " and uc_rule_subgrp_id = @uc_rule_subgrp_id" +
+                                   " catch (-1403,510)" );
+        while ( res.next() )
+        {
+            uc_rule_expr  = res.getString("uc_rule_expr").replaceAll("@", "").replaceAll('"', "'");
+            uc_rule_value = res.getString("uc_rule_value").replaceAll("@", "").replaceAll('"', "'");
+            //
+            res_repl_var.reset();
+            while ( res_repl_var.next() )
+            {
+                uc_rule_expr  = uc_rule_expr.replaceAll ( res_repl_var.getString("uc_lookup_var"), res_repl_var.getString("uc_repl_with_val") );
+                uc_rule_value = uc_rule_value.replaceAll ( res_repl_var.getString("uc_lookup_var"), res_repl_var.getString("uc_repl_with_val") );
+            }
+            //
+            this_clause = " when " + uc_rule_expr + " then '" + uc_rule_value + "'";
+            retString.append ( this_clause );
+        }
+        retString.append ( " end" );
+        [uc_ret:retString.toString()]
+        ]]
+    }
+    else
+    {
+        get ossi result by evaluating policy
+        where polcod = @uc_rule_grp_id
+        and polvar = @uc_rule_subgrp_id
+        catch (-1403,510)
+        >> res_eval_res
+        |
+        {
+            /*
+             * If we are unable to find value but we have an alternate, use it.
+             */
+            if ( rowcount(@res_eval_res) = 0 and @uc_rule_grp_id_alt1 is not null and @uc_rule_subgrp_id_alt1 is not null )
+            {
+                get ossi result by evaluating policy
+                where polcod = @uc_rule_grp_id_alt1
+                and polvar = @uc_rule_subgrp_id_alt1
+                catch (-1403,510)
+            }
+            else
+                publish data combination
+                where res = @res_eval_res
+            |
+            if ( @r_polval = '----' or @r_polval = 'NULL' )
+                publish data where uc_ret = ''
+            else
+                publish data 
+                where uc_ret = sl_fmt__trim ( @r_polval, 'B' )
+        }        
+    }
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+This command is called to evaluate the rules and return the value.  it can also be used in a mode to return a case stetement.  Case statement
+can come in handy when we want to use it for a SQL.  In that case it removes the @ variables.
+At this time case statement use is experimental is not used anywhere.
+
+For normal scenarios we have a call mode that allows an aternate lookup as well.  That comes in handy if we have a main rule which is
+more specific, say by client_grp and then a general rule.
+</remarks>
+
+<retrows>1</retrows>
+<retcol name="uc_ret" type="COMTYP_CHAR">The returned value.  Final value or a case statement.</retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+
+<seealso cref="get ossi rules for policy based rules engine">When we are building a case stement we use this to return all rows</seealso>
+<seealso cref="get ossi result by evaluating policy">This returns the deternined value</seealso>
+
+</documentation>
+
+
+
+</command>

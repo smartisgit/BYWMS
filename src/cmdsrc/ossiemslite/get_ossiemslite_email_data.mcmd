@@ -1,0 +1,106 @@
+<command>
+<name>get ossiemslite email data</name>
+<description>get usr ems email body</description>
+
+<argument name="uc_rule_subgrp_id" required="yes" datatype="string">EMAIL-BODY or EMAIL-SUBJECT or EMAIL-TO</argument>
+<argument name="uc_return_column" required="yes" datatype="string">Actual value to use is retuend here</argument>
+<argument name="uc_return_column_raw_value" required="yes" datatype="string">Raw value with place holders retyuend as this</argument>
+<argument name="uc_return_column_int_value" required="yes" datatype="string">Raw value with MLS Tags replaced with @</argument>
+<argument name="uc_override_value_passed_in" required="yes" datatype="string">If this is passed in.  It is returned</argument>
+<argument name="uc_replace_variables" required="yes" datatype="string">Do we replace data in data retuend</argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+publish data
+where pol_wh_id = '----'
+|
+publish data
+where evt_nam = @evt_nam
+and wh_id = nvl(nvl(@wh_id, @@WH_ID),'----')
+and usr_id = nvl(nvl(@usr_id, @@USR_ID),'NOUSER')
+and uc_replace_nl_char = nvl(@uc_replace_nl_char, '1' )
+and uc_nl_str_ind = nvl(@uc_nl_str_ind, '\n')
+and uc_replace_variables = nvl(@uc_replace_variables, 1 )
+and uc_return_column_raw_value = nvl(@uc_return_column_raw_value, @uc_return_column || '_raw' )
+and uc_return_column_int_value = nvl(@uc_return_column_int_value, @uc_return_column || '_int' )
+|
+[[
+uc_actual_nl_str = System.getProperty("line.separator")
+]]
+|
+{
+    if ( @uc_override_value_passed_in is not null )
+        publish data
+        where r_polval = @uc_override_value_passed_in
+    else
+        get ossi result by evaluating policy
+        where uc_rule_grp_id = 'OSSI-EMSLITE'
+        and uc_rule_subgrp_id = @uc_rule_subgrp_id
+        catch (-1403,510)
+    |
+    if ( @uc_replace_variables = 1 )
+    {
+        /*
+         * Replace all ^^ variables with @
+         */
+        publish data
+        where uc_int_polval = ossi__replace_enclosed_tags ( @r_polval, '^', 'P', '@' )
+        |
+        /*
+         * Now replace the @ variables with values
+         */
+        replace ossi variables
+        where input_string = @uc_int_polval
+        |
+        publish data
+        where uc_int_polval = @uc_int_polval
+        and uc_final_value = @result_string
+    }
+    else
+        publish data
+        where uc_final_value = @r_polval
+        and uc_int_polval = @r_polval
+    |
+    if ( @uc_replace_nl_char = '1' )
+        publish data
+        where uc_final_value = ossi__replace ( @uc_final_value, @uc_nl_str_ind, @uc_actual_nl_str )
+    else
+        publish data
+        where uc_final_value = @uc_final_value
+    |
+    execute server command
+    where cmd = " publish data "
+             || " where " || @uc_return_column           || " = @uc_final_value"
+             || " and   " || @uc_return_column_raw_value || " = @r_polval"
+             || " and   " || @uc_return_column_int_value || " = @uc_int_polval"
+    and inline = 1
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+
+
+<remarks>
+This command is used in context of mini-EMS to get a complete email body where the EMS tags are replaced with values
+</remarks>
+
+<retrows>1</retrows>
+<retcol name="@uc_return_column" type="string">The name of return column is passed in</retcol>
+<retcol name="@uc_return_column_raw_value" type="string">Either passed in.  if not we concatenate _raw</retcol>
+<retcol name="@uc_return_column_int_value" type="string">Either passed in.  if not we concatenate _int</retcol>
+
+<example>
+</example>
+<exception value="eOK">Normal successful completion</exception>
+
+<seealso cref="log ems event"></seealso>
+<seealso cref="get usr ems email subject"></seealso>
+
+
+</documentation>
+
+</command>

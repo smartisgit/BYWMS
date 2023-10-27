@@ -1,0 +1,64 @@
+<command>
+<name>ossi is_dev_env</name>
+<description>Is this a dev environment?
+</description>
+<type>Local Syntax</type>
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+publish data
+where uc_is_dev_env_var_val = @@UC_DEV_ENV
+and uc_only_do_this_wh_env_var_val = @@UC_VERSION_DO_ONLY_WH_ID
+|
+if ( @uc_only_do_this_wh_env_var_val is not null or @uc_is_dev_env_var_val = '1' )
+    publish data
+    where ret = '1'
+else
+    publish data
+    where ret = '0'
+
+    
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+See if this a dev environment
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+<retcol name="ret" type="COMTYP_CHAR"></retcol>
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+<policy 
+   polcod="ANY" 
+   polvar="ANY" 
+   polval="Name of the workflow" 
+   rtstr1="expression that evaluates to true if this is the pkgcod">
+   rtstr2="commandto execute">
+   rtnum1="1 to enable it"
+   rtnum2="Type of command.  0 means moca command"
+</policy>
+
+<seealso cref="get ossi result by evaluating policy"></seealso>
+
+</documentation>
+
+
+
+</command>

@@ -1,0 +1,98 @@
+<command>
+<name>resolve ossi rules engine return value</name>
+<description>If the value returned is in a specific format we may need to resolve it further</description>
+
+<argument name="uc_rules_engine_value" required="yes" datatype="string"></argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+publish data
+where use_uc_rules_engine_value = trim(@uc_rules_engine_value)
+|
+/*
+ * First evaluate if it is an expression
+ */
+{
+   if ( @use_uc_rules_engine_value  like '@%' )
+   {
+      execute server command
+      where cmd = "publish data where uc_resolved_value = " || @use_uc_rules_engine_value
+      and inline = 1
+      |
+      publish data
+      where use_uc_rules_engine_value = @uc_resolved_value
+      and uc_valid_value_to_use  = '1'
+      and uc_value_type_cd = 'EXPPR@'
+   }
+   else if ( @use_uc_rules_engine_value  like '{%}' )
+   {
+      execute server command 
+      where cmd = @use_uc_rules_engine_value
+      and inline = 1
+      catch(-1403,510)
+      |
+      publish data
+      where use_uc_rules_engine_value = @uc_rule_value
+      and uc_valid_value_to_use = '1'
+      and uc_value_type_cd = 'EXPR{}'
+   }
+   else if ( @use_uc_rules_engine_value  like '[[%]]' )
+   {
+      publish data
+      where use_uc_rules_engine_value = substr(@use_uc_rules_engine_value, 3, len(@use_uc_rules_engine_value)-4)
+      |
+      execute server command
+      where cmd = "publish data where uc_resolved_value = " || @use_uc_rules_engine_value
+      and inline = 1
+      |
+      publish data
+      where use_uc_rules_engine_value = @uc_resolved_value
+      and uc_valid_value_to_use  = '1'
+      and uc_value_type_cd = 'EXPPR[[]]'
+   }
+   else
+   {
+      publish data
+      where use_uc_rules_engine_value = @uc_rules_engine_value
+      and uc_valid_value_to_use  = '1'
+      and uc_value_type_cd = 'LITERAL'
+   }
+   |
+   if ( upper(@use_uc_rules_engine_value) = 'NULL' or @use_uc_rules_engine_value = '' )
+      publish data
+      where use_uc_rules_engine_value = ''
+      and uc_valid_value_to_use = '1'
+      and uc_value_type_cd = @uc_value_type_cd || '-' || 'NULL'
+   else if ( upper(@use_uc_rules_engine_value) = 'NOCHANGE' )
+      publish data
+      where use_uc_rules_engine_value = ''
+      and uc_valid_value_to_use = '0'
+      and uc_value_type_cd = @uc_value_type_cd || '-' || 'NOCHANGE'
+   else
+      publish data
+      where use_uc_rules_engine_value = @use_uc_rules_engine_value
+      and uc_valid_value_to_use  = '1'
+      and uc_value_type_cd = @uc_value_type_cd
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<remarks>
+This command is used to resolve ossi rule engine return values.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

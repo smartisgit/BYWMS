@@ -1,0 +1,92 @@
+<command>
+<name>create ossi document store data</name>
+<description>Create record in usr_ossi_doc_store table</description>
+<type>Local Syntax</type>
+
+
+<argument datatype="string" name="uc_doc_id">if not passed generate number</argument>
+<argument datatype="string" name="uc_contents_base64">File contents to insert</argument>
+<argument datatype="string" name="uc_contents_filnam">File with contents</argument>
+<argument datatype="string" name="uc_doc_typ_cd">Document Type code</argument>
+<argument datatype="string" name="uc_doc_subtyp_cd">Subtype code</argument>
+
+
+
+<local-syntax>
+<![CDATA[
+
+if ( @uc_contents_base64 is null and @uc_contents_filnam is null )
+    set return status
+    where status = 507
+    and verb = 'create'
+    and noun = 'ossi document store data'
+    and argname = 'one of uc_contents_base64 or uc_contents_filnam'
+;
+publish data
+where wh_id = nvl(@wh_id, @@WH_ID)
+|
+if ( @uc_doc_id is null )
+   publish data
+   where uc_doc_id = ossi__next_number ( 'uc_doc_id' )
+|
+if ( @uc_contents_base64 is null )
+{
+   read file
+   where filnam = @uc_contents_filnam
+   and mode = 'B'
+    |
+    publish data
+    where uc_read_file_size = @size
+    |
+    encode to base64
+    where bin_data = @data
+    |
+    sl_split filename 
+    where full_file_name = @uc_contents_filnam
+    |
+    get file info 
+    where filnam = @uc_contents_filnam
+    catch(@?)
+    |
+    publish data
+    where uc_contents_base64 = @base64_encoded
+    and uc_filesize = @size
+    and uc_file_full_path = @uc_contents_filnam
+    and uc_file_folder = @s_dir
+    and uc_filename_only = @s_org_filname
+    and uc_file_created_ts = @created
+    and uc_file_accessed_ts = @accessed
+    and uc_file_modified_ts = @modifed
+}
+|
+{
+   create record
+   where table = 'usr_ossi_doc_store'
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+Create arecord in usr_ossi_doc_store table
+</remarks>
+
+<retrows>1</retrows>
+
+<retcol name="uc_doc_id" type="string">The generated PK value</retcol>
+
+
+<exception value="eOK">Normal successful completion</exception>
+
+<seealso cref="print file"></seealso>
+<seealso cref="load ossi inbound file contents to table"></seealso>
+<seealso cref="get ossi stored file from doc store"></seealso>
+<seealso cref="usr parse_filenaem_for_doc_store"></seealso>
+
+
+</documentation>
+
+
+
+</command>

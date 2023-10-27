@@ -1,0 +1,23 @@
+<trigger>
+<name>execute ossi wrkque triggers by oprcod</name>
+<on-command>change work</on-command>
+<description></description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+execute ossi wrkque triggers by oprcod
+
+]]>
+</local-syntax>
+<fire-sequence>20000</fire-sequence>
+<enable>yes</enable>
+<argument name="reqnum" required="yes" datatype="string"></argument>
+<documentation>
+<remarks>
+<![CDATA[
+call hook to exdecute oprcod hooks
+]]>
+</remarks>
+</documentation>
+</trigger>

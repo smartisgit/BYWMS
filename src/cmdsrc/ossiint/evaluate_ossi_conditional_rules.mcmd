@@ -1,0 +1,37 @@
+<command>
+<name>evaluate ossi conditional rules</name>
+<description>Evaluate Conditional Rules</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+/*
+ * Change Log
+ * Initial Check In
+ * 20200513 Haseeb Ahmed- 11118 - Create a new web screen to maintain rules engine where we have condition and action
+ */
+parse ossi policy logic
+|
+list ossi conditional rules
+>> res
+|
+evaluate ossi rules for policy based rules engine
+  where res = @res
+    and return_all = 1
+
+]]>
+</local-syntax>
+<argument name="polcod" required="yes" datatype="string"></argument>
+<argument name="polvar" required="yes" datatype="string"></argument>
+
+<documentation>
+
+<remarks>
+This command is used to evaluate conditional rules.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

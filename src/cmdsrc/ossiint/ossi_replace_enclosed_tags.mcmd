@@ -1,0 +1,87 @@
+<command>
+<name>ossi replace_enclosed_tags</name>
+<description>
+FUNCTION:  Look for substrings enclosed in a pair of tags with a new prefix.  One use is to for example replace ^^ for EMS mesages
+with a single @ before the value
+</description>
+
+<argument name="moca_farg1" required="no" datatype="string">Original String</argument>
+<argument name="moca_farg2" required="no" datatype="string">Enclosing string.  Default to ^ meaning we are looking for 
+substrings enclosed in ^^</argument>
+<argument name="moca_farg3" required="no" datatype="string">Replace method
+P means providing a new prfix.  This is the default
+R means replace with new value
+</argument>
+<argument name="moca_farg4" required="no" datatype="string">Replace string.  Default is assuming P above
+so [this value]$1.  
+</argument>
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+/*
+ * Revision Log
+ * 2021-10-19 saad.ahmad 11805 - original
+ */
+publish data
+where str = @moca_farg1
+and enclosing_tag = nvl(@moca_farg2,'^')
+and repl_method = nvl(@moca_farg3, 'P')
+and repl_value = nvl(@moca_farg4,'@' )
+|
+if ( @str is null )
+    publish data where ret = null
+else
+{
+    /* Following worked - leaving here for documentation
+    publish data
+    where uc_search_regexp = "\^([^\^]*)\^"
+    */
+    publish data
+    where uc_search_regexp = "\" || @enclosing_tag || "([^\" || @enclosing_tag || "]*)\" || @enclosing_tag
+    |
+    if ( @repl_method = 'P' )
+        publish data 
+        where use_repl_value = @repl_value || '$1'
+    else
+        publish data 
+        where use_repl_value = @repl_value
+    |
+    [[
+    ret = str.replaceAll(uc_search_regexp, use_repl_value)
+    ]]
+}
+
+]]>
+</local-syntax>
+
+
+<documentation>
+
+
+<remarks>
+This function will take an input string where we have substrings in a pair of tags.  It can replace them with:
+If called for R - with a new value everywhere
+If called for P - with a new prefix
+
+We are using it to replace EMS tags (^^) with a single prefix @ so that we cna then use replae ossi variable on the final string
+</remarks>
+
+<retcol name="ret" type="string">Value of the parameter</retcol>
+
+<retrows>1</retrows>
+
+<example>
+publish data 
+where x=ossi__replace_enclosed_tags ( "this is a ^test^ of ems ^test^ replacement logic ^abc^" )
+
+</example>
+<exception value="eOK">Normal successful completion</exception>
+
+<seealso cref="replace ossi variables"></seealso>
+
+</documentation>
+</command>

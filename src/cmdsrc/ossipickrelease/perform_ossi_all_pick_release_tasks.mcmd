@@ -1,0 +1,309 @@
+<command>
+<name>perform ossi all pick release tasks</name>
+<description>Perform all the pick release tasks</description>
+ 
+<argument name="wh_id" required="yes" datatype="string"></argument>
+<argument name="comflg" required="yes" datatype="string"></argument>
+
+<argument name="uc_run_pckrel_reg_p" required="yes" datatype="string"></argument>
+<argument name="uc_run_pckrel_reg_h" required="yes" datatype="string"></argument>
+<argument name="uc_run_pckrel_alloc" required="yes" datatype="string"></argument>
+<argument name="uc_run_pckrel_rel" required="yes" datatype="string"></argument>
+<argument name="uc_run_pcklst_rule" required="yes" datatype="string"></argument>
+<argument name="uc_run_pcklst_rel" required="yes" datatype="string"></argument>
+<argument name="uc_reset_oprcod_on_picks" required="yes" datatype="string"></argument>
+<argument name="uc_manually_assign_list_to_kits" required="no" datatype="string"></argument>
+
+<argument name="uc_ossi_job_id" required="no" datatype="string"></argument>
+<argument name="uc_ossi_who" required="no" datatype="string"></argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161220 saad.ahmad - 7142 - pick release
+ */
+publish data
+where
+    uc_run_pckrel_reg_p    = nvl ( @uc_run_pckrel_reg_p, '0' ) 
+and uc_run_pckrel_reg_h    = nvl ( @uc_run_pckrel_reg_h, '0' )
+and uc_run_pckrel_alloc    = nvl ( @uc_run_pckrel_alloc, '0' )
+and uc_run_pckrel_rel      = nvl ( @uc_run_pckrel_rel, '1' )
+and uc_run_pcklst_rule     = nvl ( @uc_run_pcklst_rule, '1' )
+and uc_run_pcklst_rel      = nvl ( @uc_run_pcklst_rel, '1' )
+and wh_id                  = nvl ( @wh_id, '%' )
+|
+publish data
+where uc_reset_oprcod_on_picks = nvl(@uc_reset_oprcod_on_picks, decode ( @uc_run_pckrel_rel, '1', '1', '0') )
+|
+publish data
+where uc_ossi_job_id         = nvl(@uc_ossi_job_id, 'UC_W_' || @wh_id || '_ALLPCKREL' )
+and uc_ossi_who              = nvl(@uc_ossi_who, @wh_id || '-' || @@USR_ID )
+|
+register ossi job or module
+where uc_ossi_module_id = @uc_ossi_job_id
+|
+try
+{
+   if ( @uc_run_pckrel_reg_p = '1' )
+   {
+      [
+      select wh_id 
+      from wh
+      where wh_id like @wh_id
+      order by 1
+      ]
+      catch (-1403,510)
+      |
+      if ( @? = 0 )
+      {
+         publish data
+         where uc_ossi_action_seq = ossi__register_action ( @uc_ossi_job_seq, @uc_ossi_module_seq, 'pckrel reg pending picks', @wh_id,  @uc_ossi_who )
+         |
+         {
+            publish data 
+            where pcksts = 'P'
+            |
+            process pick release registration
+            where wh_id = @wh_id
+            and pcksts = @pcksts
+            and comflg = @comflg
+            catch(@?)
+            ;
+            if ( @comflg = 1 ) commit
+            ;
+            complete ossi job log
+         }
+      }
+   } /* run pick release registration for p picks */
+   ; 
+   if ( @uc_run_pckrel_reg_h = '1' )
+   {
+      [
+      select wh_id 
+      from wh
+      where wh_id like @wh_id
+      order by 1
+      ]
+      catch (-1403,510)
+      |
+      if ( @? = 0 )
+      {
+         publish data
+         where uc_ossi_action_seq = ossi__register_action ( @uc_ossi_job_seq, @uc_ossi_module_seq, 'pckrel reg held picks', @wh_id,  @uc_ossi_who )
+         |
+         {
+            publish data 
+            where pcksts = 'H'
+            |
+            process pick release registration
+            where wh_id = @wh_id
+            and pcksts = @pcksts
+            and comflg = @comflg
+            catch(@?)
+            ;
+            if ( @comflg = 1 ) commit
+            ;
+            complete ossi job log
+         }
+      }
+   } /* run pick release registration for h picks */
+   ;
+   if ( @uc_run_pckrel_alloc = '1' )
+   {
+      publish data
+      where uc_ossi_action_seq = ossi__register_action ( @uc_ossi_job_seq, @uc_ossi_module_seq, 'pckrel alloc loc', @wh_id,  @uc_ossi_who )
+      |
+      {
+         if ( @wh_id = '%' or @wh_id is null )
+            hide stack variable where name = 'wh_id'
+         |
+         job pick release manager
+         where prcmod = 'a'
+         and comflg = @comflg
+         catch(@?)
+         ;
+         if ( @comflg = 1 ) commit
+         ;
+         complete ossi job log
+      }
+   } /* run pick release allocator */
+   ;
+   if ( @uc_run_pcklst_rule = '1' )
+   {
+      [
+      select wh_id 
+      from wh
+      where wh_id like @wh_id
+      ]
+      catch (-1403,510)
+      |
+      if ( @? = 0 )
+      {
+         if (@uc_manually_assign_list_to_kits = 1)
+         {
+            publish data
+            where uc_ossi_action_seq = ossi__register_action ( @uc_ossi_job_seq, @uc_ossi_module_seq, 'assgn list to pend picks', @wh_id,  @uc_ossi_who )
+            |
+            {
+               assign ossi list id to pending kit picks
+               where wh_id = @wh_id
+               catch(@?)
+               ;
+               complete ossi job log
+            }
+         }
+         ;
+         publish data
+         where uc_ossi_action_seq = ossi__register_action ( @uc_ossi_job_seq, @uc_ossi_module_seq, 'run pcklst rules', @wh_id,  @uc_ossi_who )
+         |
+         {
+            job pick release manager 
+            where prcmod = 'L'
+            and comflg = @comflg
+            catch(@?)
+            ;
+            if ( @comflg = 1 ) 
+               commit
+            ;
+            complete ossi job log
+         }
+      }
+   }
+   ;
+   if ( @uc_run_pckrel_rel = '1' )
+   {
+      publish data
+      where uc_ossi_action_seq = ossi__register_action ( @uc_ossi_job_seq, @uc_ossi_module_seq, 'run pckrel rel', @wh_id,  @uc_ossi_who )
+      |
+      {
+         if ( @wh_id = '%' or @wh_id is null )
+            hide stack variable where name = 'wh_id'
+         |
+         job pick release manager
+         where prcmod = 'R'
+         and comflg = @comflg
+         catch(@?) /* because it is a daemon */
+         ;
+         if ( @comflg = 1 ) commit
+         ;
+         complete ossi job log
+      }
+   }
+   ;
+   if ( @uc_run_pcklst_rel = '1' )
+   {
+      [
+      select wh_id 
+      from wh
+      where wh_id like @wh_id
+      ]
+      catch (-1403,510)
+      |
+      if ( @? = 0 )
+      {
+         publish data
+         where uc_ossi_action_seq = ossi__register_action ( @uc_ossi_job_seq, @uc_ossi_module_seq, 'run pcklst rel', @wh_id,  @uc_ossi_who )
+         |
+         {
+            process pick list release 
+            where wh_id = @wh_id
+            catch(@?) /* because it is a daemon */
+            ;
+            if ( @comflg = 1 ) commit
+            ;
+            complete ossi job log
+         }
+      }
+   }
+   ;
+   if ( @uc_reset_oprcod_on_picks = '1' )
+   {
+      publish data
+      where uc_ossi_action_seq = ossi__register_action ( @uc_ossi_job_seq, @uc_ossi_module_seq, 'reset pck oprcod', @wh_id,  @uc_ossi_who )
+      |
+      {
+         reset usr oprcod on picks
+         catch(@?)
+         ;
+         if ( @comflg = 1 ) commit
+         ;
+         complete ossi job log
+      }
+   }
+   ;
+   complete ossi job or module
+   ;
+   publish data
+   where wh_id = @wh_id
+   and comflg = @comflg
+   and uc_run_pckrel_reg_p    = @uc_run_pckrel_reg_p
+   and uc_run_pckrel_reg_h    = @uc_run_pckrel_reg_h
+   and uc_run_pckrel_alloc    = @uc_run_pckrel_alloc
+   and uc_run_pckrel_rel      = @uc_run_pckrel_rel
+   and uc_run_pcklst_rule     = @uc_run_pcklst_rule
+   and uc_run_pcklst_rel      = @uc_run_pcklst_rel
+   and uc_reset_oprcod_on_picks = @uc_reset_oprcod_on_picks
+} /* main block */
+catch (@?)
+{
+   publish data
+   where uc_ossi_err_code  = @?
+   and   uc_ossi_err_descr = @!
+   |
+   raise ossi job error
+   where is_job_flg = '0'
+}
+
+
+   
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This component does the various phases of pick release in good order.  We want to run pick release final phase and list in sequence so that they dont overlap.
+We are allowing hooks for running registration and allocation phase as well - but that is an insurance policy - we expect to run them as independent jobs.
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+<retcol name="wh_id" type="COMTYP_CHAR"></retcol>
+<retcol name="comflg" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_run_pckrel_reg_p" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_run_pckrel_reg_h" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_run_pckrel_alloc" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_run_pckrel_rel" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_run_pcklst_rule" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_run_pcklst_rel" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_reset_oprcod_on_picks" type="COMTYP_CHAR"></retcol>
+
+
+<example>
+<![CDATA[
+<p>
+perform ossi all pick release tasks
+where wh_id = '%'
+and comflg = 1
+</p>
+]]>
+
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+
+<seealso cref="process pick release"></seealso>
+
+</documentation>
+
+
+</command>

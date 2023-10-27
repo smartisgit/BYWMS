@@ -1,0 +1,149 @@
+<command>
+<name>process ossi pre tasks for crud action using rules</name>
+<description>The pattern to deal with the case of hooks for crud commands is simiar.  This will be able to do those tasks</description>
+
+<argument name="uc_transaction_action" required="yes" datatype="string">A C or D</argument>
+<argument name="table_name" required="yes" datatype="string">A C or D</argument>
+<argument name="uc_smart_reghook_data_set" required="no" datatype="string">If passed in, then we set session variable uc_smart_reghook_data to this value</argument>
+<argument name="uc_rule_grp_id" required="no" datatype="string">If null passed in, then we construct as OSSI-[table]-BEFORE-CRUD</argument>
+<argument name="uc_rule_subgrp_id" required="no" datatype="string">If null passed in, then GLOBAL-MAP</argument>
+<argument name="uc_rule_grp_id_set" required="no" datatype="string">if not passed in, then use what we have uc_rule_grp_id</argument>
+<argument name="uc_set_default_mode" required="no" datatype="string">If not passed in, default to SET</argument>
+<argument name="uc_column_prefix_old" required="no" datatype="string">If not passed in, default to uc_old_</argument>
+
+<argument name="uc_crud_pre_tasks_les_cmd" required="no" datatype="string">If passed in, execute this command to set context</argument>
+
+
+
+
+
+
+<type>Local Syntax</type>
+
+<local-syntax>
+<![CDATA[
+
+/*
+ * Revision Log
+ * 2021-11-01 saad.ahmad 12539 - Original
+ */
+publish data
+where table_name = upper(@table_name)
+|
+publish data
+where uc_hook_logic_code = nvl(ossi__polval ( 'USR-OSSI-DATA-CHANGE-HOOK', @table_name, 'ENABLED', '', 'rtnum1', '----'),0)
+|
+publish data
+where uc_rule_grp_id = upper(nvl(@uc_rule_grp_id, 'OSSI-' || @table_name || '-BEFORE-CRUD'))
+and uc_rule_subgrp_id = upper(nvl(@uc_rule_subgrp_id, 'GLOBAL-MAP' ))
+|
+publish data
+where uc_rule_grp_id_set = upper(nvl(@uc_rule_grp_id_set, @uc_rule_grp_id))
+and uc_set_default_mode = nvl(@uc_set_default_mode, 'SET' )
+and uc_column_prefix_old = nvl(@uc_column_prefix_old, 'uc_old_' )
+and uc_res_old = null
+|
+if ( @uc_crud_pre_tasks_les_cmd is not null )
+    execute ossi les_cmd
+    where les_cmd_id = @uc_crud_pre_tasks_les_cmd
+    and uc_les_cmd_inline = 1
+    and exec_uc_les_cmd_cust_lvl = null
+    and uc_inhibit_return_extra_columns = 1
+    catch (-1403,510)
+|
+{
+    if ( @uc_smart_reghook_data_set is not null )
+        save session variable
+        where name = 'uc_smart_reghook_data'
+        and value = @uc_smart_reghook_data_set
+    ;
+    if ( @uc_hook_logic_code != 0 )
+    {
+        execute ossi all conditional rules
+        where uc_rule_grp_id = @uc_rule_grp_id
+        and uc_rule_subgrp_id = @uc_rule_subgrp_id
+        and uc_cache_key= null
+        catch (-1403,510)
+    }
+    ;
+    if ( @uc_transaction_action != 'A' )
+    {
+        get ossi table data with alias for key
+        where table_name = @table_name
+        and uc_column_prefix = @uc_column_prefix_old
+        catch (-1403,510)
+        >> uc_res_old
+    }
+    |
+    {
+        if ( @uc_hook_logic_code != 0 )
+        {
+            if ( @uc_res_old is not null and rowcount(@uc_res_old) > 0 )
+                publish data combination
+                where res = @uc_res_old
+            |
+            publish ossi fields from rules engine
+            where uc_rule_grp_id = @uc_rule_grp_id_set
+            and uc_table_name = @table_name
+            and uc_set_default_mode = @uc_set_default_mode
+            catch (-1403,510)
+        }
+        else
+            noop
+        |
+        filter data
+        where moca_filter_level = 1
+        and uc_hook_logic_code = @uc_hook_logic_code
+        and uc_reg_stat_cd = decode ( @uc_hook_logic_code, 1, 'P', 'C' )
+        and uc_regdte = decode ( @uc_hook_logic_code, 1, null, sysdate )
+        and uc_transaction_action = @uc_transaction_action
+        and uc_res_old = @uc_res_old
+    }
+}
+  
+]]>
+
+</local-syntax>
+
+<documentation>
+
+<remarks>
+<![CDATA[
+  <p>
+  For the crud components the code pattern there is very similar across objects.  We have the ability to execute some code before doing anything
+  then we also have a hook to publish defaults.  For change and remove we need to fetch old values.  And finally we publish.  
+  So this component does all that task so the final crud components (refer to seealso) become very simple and consistent.
+  </p>
+]]>
+</remarks>
+
+<retcol name="@*" type="(varies according to field type)">All order columns</retcol>
+<retcol name="uc_hook_logic_code" type="Integer">Whatever pokicy was set to for this table</retcol>
+<retcol name="uc_reg_stat_cd" type="String">If registeration policy has 1 then we need a job to register so put P.  In other cases put C as no register job is needed</retcol>
+<retcol name="uc_regdte" type="String">If registeration policy has 1 then we need a job to register so put null.  In other cases put sysdate as no register job is needed</retcol>
+<retcol name="uc_transaction_action" type="String">The passed in action is published for downstream work</retcol>
+<retcol name="uc_res_old" type="Results">When it is C or D then we get old data.  This is that as a resultset</retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+
+<seealso cref="create order">To see example of how it is used</seealso>
+<seealso cref="change order">To see example of how it is used</seealso>
+<seealso cref="remove order">To see example of how it is used</seealso>
+
+<seealso cref="get ossi table data with alias for key"></seealso>
+
+<seealso cref="execute ossi all conditional rules"></seealso>
+<seealso cref="publish ossi fields from rules engine"></seealso>
+
+<policy
+    polcod="USR-OSSI-DATA-CHANGE-HOOK"
+    polvar="table name"
+    polval="ENABLED"
+    rtnum1="1 to use job.  2 to do inline.  0 to disable"
+>
+   We are using this so that if we have 0 or 2 then the order should be created with C and regdte filled in already
+</policy>
+
+
+</documentation>
+</command>

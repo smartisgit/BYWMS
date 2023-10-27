@@ -1,0 +1,46 @@
+<command>
+<name>list ossi primary key for table</name>
+<description>Get primary key resultset.  Cache results</description>
+<type>Local Syntax</type>
+
+<argument name="table_name" required="yes" datatype="string">Name of the table</argument>
+
+
+<local-syntax>
+<![CDATA[
+
+{
+    execute ossi moca and cache
+    where uc_cache_key = 'UC_TABLE_PK_' || @table_name
+    and uc_cache_grp = 'UC_TABCOLS'
+    and uc_inline = 1
+    and uc_moca_cmd = "list primary key for table where table_name = @table_name"
+}
+
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+Get the PK of the table.  Cache results
+</p>
+]]>
+</remarks>
+
+<retrows>n</retrows>
+<retcol name="table_name"></retcol>
+<retcol name="index_name"></retcol>
+<retcol name="column_name"></retcol>
+<retcol name="column_position"></retcol>
+
+
+<exception value="eOK">The command completed successfully.</exception>
+<exception value="510">If variable was not passed and no default was passed.</exception>
+
+<seealso cref="list table columns"></seealso>
+</documentation>
+
+</command>

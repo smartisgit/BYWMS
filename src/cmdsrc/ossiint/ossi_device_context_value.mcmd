@@ -1,0 +1,82 @@
+<command>
+<name>ossi device_context_value</name>
+<description>FUNCTION: Get a value from device context table</description>
+
+<argument name="moca_farg1" required="yes" datatype="string">variable name</argument>
+<argument name="moca_farg2" required="yes" datatype="string">devcod</argument>
+<argument name="moca_farg3" required="yes" datatype="string">wh_id</argument>
+<argument name="moca_farg4" required="yes" datatype="string">srtseq</argument>
+<argument name="moca_farg5" required="yes" datatype="string">delete</argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+publish data
+where dev_varnam  = @moca_farg1
+and devcod = nvl(@moca_farg2, @@DEVCOD)
+and wh_id = nvl(@moca_farg3, @@WH_ID )
+and srtseq = @moca_farg4
+and del_flg = nvl(@moca_farg5, 0 )
+|
+{
+    if ( @srtseq is null ) hide stack variable where name = 'srtseq'
+    |
+    [
+    select x.*
+    from
+    (
+        select srtseq, value ret_value
+        from device_context
+        where wh_id = @wh_id
+        and devcod = @devcod
+        and dev_varnam = @dev_varnam
+        and @+srtseq
+        and rownum < 999999
+        order by srtseq desc
+    ) x 
+    where rownum < 2
+    ]
+    catch (-1403,510)
+    |
+    if ( @? = 0 )
+    {
+        if ( @del_flg = 1 )
+            [
+            delete from device_context
+            where wh_id = @wh_id
+            and devcod = @devcod
+            and dev_varnam = @dev_varnam
+            and srtseq = @srtseq
+            ]
+            catch (-1403,510)
+        ;
+        publish data
+        where ret_value = @ret_value
+    }
+    else
+        publish data
+        where ret_value = ''
+     
+}
+
+]]>
+</local-syntax>
+
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This function can be used to easily get a value from device context
+</p>
+]]>
+</remarks>
+
+<retrows>MOCA Function - So one row is returned</retrows>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+</documentation>
+
+</command>

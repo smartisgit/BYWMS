@@ -1,0 +1,212 @@
+<command>
+<name>list usr shipments for full release registration</name>
+<description>This command will list the shipments and waves that need to be marked for full release</description>
+ 
+<argument name="wh_id" required="yes" datatype="string"></argument>
+<argument name="ship_id" required="yes" datatype="string"></argument>
+<argument name="uc_show_all_data" required="yes" datatype="integer"> default="0"</argument>
+
+<argument name="uc_cnt_pcksts_l_as_released" required="yes" datatype="integer" default="1">
+    Should we count L status as released?
+    Default to 1
+</argument>
+
+<argument name="uc_rel_after_ord" required="yes" datatype="integer" default="0">
+    If we pass 1, then shiment release will happen when orders for the shipment are marked
+    for release.  If 0 then shipment will release independent of the order and strictly based on pckwrk
+    if we do something on order release then it will generally not make sense to ignore it.  But if order release
+    is irrelevant then it makes sens to pass in 0 here.  
+    if it is 1 then if an order is split into multiple shipments and one of the orders is not released, then whole shipment
+    will be held back
+</argument>
+
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+publish data
+where uc_cnt_pcksts_l_as_released = nvl( @uc_cnt_pcksts_l_as_released, 1 )
+|
+/*
+ * See decode below - there we use this variable to count L status
+ */
+publish data
+where uc_l_cnt_var_1 = decode ( @uc_cnt_pcksts_l_as_released, 1, 1, 0 )
+and   uc_l_cnt_var_0 = decode ( @uc_cnt_pcksts_l_as_released, 1, 0, 1 )
+|
+if ( @uc_rel_after_ord is null )
+    publish data
+    where uc_rel_after_ord = 0
+|
+/*
+ * uc_unregister_cond.  If this satisfies we make the shipment unregistered, see SQL below for the logic
+ *     overall logic is ORd for shpsts = R (meaning it has been completely cancelled).  If it happens we want to mark shipment as no longer registered
+ *         shipment.alcdte becomes null.  That means the same
+ *         For the last part Ord we depend on uc_rel_after_ord.  
+ *              uc_rel_after_ord = 1, means that 
+ *                  a. if there are any orders not released fully or #orders fully releaed is 0 (for shipment)
+ *                     then unregister shipment as well
+ *              uc_rel_after_ord = 0, means that
+ *                  a. If shipment has any replens OR #released pckwrk = 0 OR #non releasedx pckwrk > 0.  
+ * Registering condition depends on uc_register_cond.  And uc_col_max_reldte.  uc_col_max_reldte simply says the max reldte value.
+ *     If uc_rel_after_ord is 1, then shipment reldte if before order reldte we register again ELSE see max pckwrk adddte
+ *     In addition to this, to mark as rehistered
+ *         uc_rel_after_ord = 1, means that 
+ *             a. shp.uc_cnt_non_rel_ord = 0 (meaning no non released orders) AND
+ *             b. shp.uc_cnt_rel_ord > 0 (meaning there are some Released orders)
+ *         uc_rel_after_ord = 0, means that we go by pckwrk
+ *             a. uc_rw_cnt = 0 (no replen) AND c_pw_cnt_r > 0 (some released pckwrk) AND uc_pw_cnt_non_r = 0 (no non releaesed pw)
+ * 
+ */
+if ( @uc_rel_after_ord = 1 )
+    publish data
+    where uc_unregister_cond = "shp.uc_cnt_non_rel_ord > 0 or shp.uc_cnt_rel_ord = 0"
+    and uc_register_cond = "shp.uc_cnt_non_rel_ord = 0 and shp.uc_cnt_rel_ord > 0"
+    and uc_col_max_reldte = "shp.uc_max_ord_reldte"
+else
+    publish data
+    where uc_unregister_cond = "shp.uc_rw_cnt > 0 or shp.uc_pw_cnt_r = 0 or shp.uc_pw_cnt_non_r > 0"
+    and uc_register_cond = "shp.uc_rw_cnt = 0 and shp.uc_pw_cnt_r > 0 and shp.uc_pw_cnt_non_r = 0"
+    and uc_col_max_reldte = "shp.uc_pw_max_adddte"
+|
+{
+    if ( @ship_id is null ) hide stack variable where name = 'ship_id'
+    |
+    {
+        /*
+         * See if a shipment is fully released bow
+         */
+        [
+        select 'register usr shipment fully released' uc_oper,
+               ss.*
+        from
+        (
+            select shp.*,
+            case
+                /* See comment above around uc_rel_after_ord = 1 for details */
+                when shp.uc_reldte is not null and
+                (
+                    shp.shpsts = 'R' or
+                    ( @uc_unregister_cond:raw ) or
+                    shp.alcdte is null
+                )
+                then 'U'
+                when 
+                (
+                        (@uc_register_cond:raw)
+                    and shp.alcdte is not null
+                    and shp.uc_cnt_shipment_pw > 0 /* This is explicit because if shipment is cancelled fully we dont want to R */
+                    and ( shp.uc_reldte is null or shp.uc_reldte < @uc_col_max_reldte:raw ) /* this will cover brand new register or if pw/ord was released after this */
+                )
+                then 'R'
+                else 'NOOP'
+            end uc_reg_oper_cd
+            from
+            (
+                select shp1.*,
+                       (
+                           select count(*)
+                           from rplwrk
+                           where rplwrk.ship_id = shp1.ship_id
+                       ) uc_rw_cnt,
+                       (
+                           select count(*)
+                           from pckwrk_dtl
+                           where pckwrk_dtl.ship_id = shp1.ship_id
+                       ) uc_cnt_shipment_pw
+                from
+                (
+                    select shipment.wh_id,
+                           shipment.ship_id,
+                           shipment.alcdte,
+                           shipment.uc_reldte,
+                           shipment.shpsts,
+                           count( distinct decode(ord.uc_reldte, null, ord.ordnum, null ) ) uc_cnt_non_rel_ord,
+                           count( distinct decode(ord.uc_reldte, null, null, ord.ordnum ) ) uc_cnt_rel_ord,
+                           max(ord.uc_reldte) uc_max_ord_reldte,
+                           max(pckwrk_hdr.adddte) uc_pw_max_adddte,
+                           nvl(sum( decode (pckwrk_hdr.pcksts, 'R', 1, 'L', @uc_l_cnt_var_1, 0) ),0) uc_pw_cnt_r,
+                           nvl(sum( decode (pckwrk_hdr.pcksts, 'R', 0, 'L', @uc_l_cnt_var_0, 1) ),0) uc_pw_cnt_non_r
+                    from shipment
+                    join shipment_line on shipment_line.ship_id = shipment.ship_id and shipment_line.linsts != 'B'
+                    join pckwrk_dtl on pckwrk_dtl.ship_line_id = shipment_line.ship_line_id
+                    join pckwrk_hdr on pckwrk_hdr.wrkref = pckwrk_dtl.wrkref
+                    join ord
+                         on ord.client_id = shipment_line.client_id
+                         and ord.wh_id = shipment_line.wh_id
+                         and ord.ordnum = shipment_line.ordnum
+                    where 1=1
+                    and shipment.wh_id = @wh_id
+                    and shipment.stgdte is null
+                    and shipment.loddte is null
+                    /*#nobind*/
+                    and shipment.shpsts not in ( 'C', 'B', 'S', 'L', 'D', 'R')
+                    /*#bind*/
+                    and @+shipment.ship_id
+                    group by
+                           shipment.wh_id,
+                           shipment.ship_id,
+                           shipment.alcdte,
+                           shipment.uc_reldte,
+                           shipment.shpsts
+                ) shp1
+            ) shp
+        ) ss
+        where 1=1
+        and ( @uc_show_all_data = 1 or ss.uc_reg_oper_cd != 'NOOP' )
+        order by 1,2,3,4
+        ]
+        catch (-1403,510)
+    }    
+}
+  
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This lists all the data for shipments that are for ready for full registration.  
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+<retcol name="wh_id" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_oper" type="COMTYP_CHAR">Whether it is wave or shipment</retcol>
+<retcol name="uc_reg_oper_cd" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_reldte" type="COMTYP_CHAR">What was in the table when run</retcol>
+<retcol name="ship_id" type="COMTYP_CHAR"></retcol>
+<retcol name="alcdte" type="COMTYP_CHAR"></retcol>
+<retcol name="shpsts" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_cnt_non_rel_ord" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_cnt_rel_ord" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_max_ord_reldte" type="COMTYP_CHAR"></retcol>
+
+<example>
+<![CDATA[
+<p>
+</p>
+]]>
+
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+<seealso cref="register usr shipment or wave fully released"></seealso>
+<seealso cref="list usr orders for full release registration">
+    this depends on the order release command.  When orders are fully released then the shipment is considered
+    for full release
+</seealso>
+
+
+</documentation>
+
+
+</command>

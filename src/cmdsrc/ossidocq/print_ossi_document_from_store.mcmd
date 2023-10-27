@@ -1,0 +1,38 @@
+<command>
+<name>print ossi document from store</name>
+<description>Print the document to the given printer</description>
+<type>Local Syntax</type>
+
+<argument name="uc_doc_upload_q_id" required="yes" datatype="string">This is the identifier for upload queue</argument>
+<argument name="printer" required="yes" datatype="string"></argument>
+<argument name="copies"></argument>
+
+<local-syntax>
+<![CDATA[
+
+publish data
+  where uc_upload_id = nvl(@uc_upload_id, @uc_doc_upload_q_id)
+    and printer = @printer
+    and copies = nvl(@copies, 1)
+|
+publish data
+  where filename = @@UC_DOC_Q_DOWNLOAD_PATH || '/' || @uc_upload_id
+|
+if (lower(@uc_upload_id) like '%.out')
+{
+  print lbl label operations label 
+    where filename = @filename 
+      and prtadr = @printer 
+}
+else
+{
+  print file
+    where filename = @filename
+      and printer = @printer
+      and copies = @copies
+      and raw = 1
+}
+
+]]>
+</local-syntax>
+</command>

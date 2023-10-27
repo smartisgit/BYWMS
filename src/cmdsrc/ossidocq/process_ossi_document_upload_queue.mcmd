@@ -1,0 +1,94 @@
+<command>
+<name>process ossi document upload queue</name>
+<description>See all documents that are ready to be uploaded to document store and proess them</description>
+
+<argument name="comflg" required="yes" datatype="string"></argument>
+<argument name="uc_show_all_data" required="yes" datatype="string"></argument>
+<argument name="uc_ossi_job_id" required="yes" datatype="string"></argument>
+
+<argument name="uc_num_concurrent_calls" required="yes" datatype="string"></argument>
+<argument name="uc_keep_processed_records" required="yes" datatype="integer">1 or 0.  if 1 we keep processed records for success.  0 means we delete them.  1 is default</argument>
+
+
+<argument name="uc_doc_prefix" required="no" datatype="string">Prefix of documents to keep uniqueness in a common store.  if not specified use @@UC_DOC_Q_UPLOAD_PREFIX.  And if not that then MOCA_ENVNAME</argument>
+<argument name="uc_doc_tmp_path" required="no" datatype="string">Where is temp file created.  if not passed then $LESDIR/temp</argument>
+
+<argument name="uc_az_blob_container" required="no" datatype="string">name of the comtainer.  if not specified use @@UC_DOC_Q_UPLOAD_CONTAINER</argument>
+<argument name="uc_az_blob_account" required="no" datatype="string">name of the account.  if not specified use @@UC_DOC_Q_UPLOAD_ACCOUNT</argument>
+<argument name="uc_az_blob_sas_token" required="no" datatype="string">value of the SAS token.  if not specified use @@UC_DOC_Q_UPLOAD_SAS_TOKEN</argument>
+<argument name="uc_az_pgm" required="no" datatype="string">program to use.  if not specified use env var UC_AZ_PGM.  if that is not set default to az</argument>
+
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+publish data
+where comflg = nvl(@comflg, 1 )
+and uc_ossi_job_id = nvl(@uc_ossi_job_id, 'UC_G_' || 'DOCUPLQ' )
+and uc_ossi_who = nvl(@uc_ossi_who, @@USR_ID )
+and uc_num_concurrent_calls = nvl(@uc_num_concurrent_calls, 10)
+and uc_keep_processed_records = nvl(@uc_keep_processed_records, 1 )
+and uc_max_attempts = nvl(@uc_max_attempts, 10)
+|
+{
+    execute ossi work using async execution
+    where uc_get_work_cmd = "list ossi documents ready for upload"
+    and uc_do_work_cmd = 'upload ossi one document to store'
+    and uc_ossi_job_id = @uc_ossi_job_id
+    and uc_ossi_who = @uc_ossi_who
+    and uc_pk_col = 'uc_doc_upload_q_id'
+    and uc_num_concurrent_calls = @uc_num_concurrent_calls
+    and comflg = @comflg
+    and uc_exec_status_col = 'uc_ossi_err_code'
+    and uc_exec_message_col = 'uc_ossi_err_descr'
+    and uc_data_col = 'uc_doc_upload_q_id'
+}
+   
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This job will utilize async processing to upload the documents to document store
+</p>
+]]>
+</remarks>
+
+<retrows>n</retrows>
+
+<retcol name="wh_id" type="COMTYP_CHAR"></retcol>
+<retcol name="ship_id" type="COMTYP_CHAR"></retcol>
+<retcol name="my_savepoint" type="COMTYP_CHAR"></retcol>
+<retcol name="comflg" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_ossi_job_seq" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_ossi_module_seq" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_ossi_action_seq" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_ossi_err_code" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_ossi_err_descr" type="COMTYP_CHAR"></retcol>
+
+
+
+
+
+<example>
+<![CDATA[
+<p>
+</p>
+]]>
+
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+<seealso cref="list usr shipments for full release registration"></seealso>
+
+</documentation>
+
+
+</command>

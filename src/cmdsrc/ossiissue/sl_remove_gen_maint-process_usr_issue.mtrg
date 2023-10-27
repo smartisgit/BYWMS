@@ -1,0 +1,26 @@
+<trigger>
+<name>process usr issue</name>
+<on-command>sl_remove gen_maint</on-command>
+<local-syntax>
+<![CDATA[
+ignore ossi this object for data management
+|
+if (@uc_do_issue_logging = '1')
+{
+   publish data
+     where table_name = upper(nvl(@table_name, @table))
+   |
+   if (ossi__override_table_name(@table_name) != 1)
+   {
+      process usr issue
+        where uc_table_name = @table_name
+          and uc_action = 'REMOVE'
+   }
+}
+]]></local-syntax>
+<fire-sequence>10000</fire-sequence>
+<documentation>
+<seealso cref="process usr issue"></seealso>
+</documentation>
+
+</trigger>

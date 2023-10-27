@@ -1,0 +1,24 @@
+<command>
+<name>change ossi auto wave rule</name>
+<description>this command will change the auto wave rule</description>
+<type>Local Syntax</type>
+ 
+<local-syntax>
+<![CDATA[
+
+change record
+where table = 'usr_auto_wave_rule_hdr'
+and uc_sch_tim_local_flg = nvl(@uc_sch_tim_local_flg, 1)
+
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This command is used to change auto wave rules.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

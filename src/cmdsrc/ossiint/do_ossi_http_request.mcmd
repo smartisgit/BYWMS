@@ -1,0 +1,491 @@
+<command>
+<name>do ossi http request</name>
+<description>Do http call</description>
+ 
+<argument name="url" alias="uri" required="yes" datatype="string"></argument>
+<argument name="method" default-value="post" required="yes" datatype="string"></argument>
+<argument name="headers" alias="header" datatype="string"></argument>
+<argument name="body" alias="payload" datatype="string"></argument>
+<argument name="namevaluepairs" alias="namevaluepair" datatype="string"> NOT SUPPORTED AT THIS TIME</argument>
+<argument name="content_type" alias="" datatype="string">NOT SUPPORTED AT THIS TIME.
+Use application/x-www-formurlencoded</argument>
+<argument name="uc_www_call_seq" alias="" datatype="string"></argument>
+<argument name="uc_file_suffix" alias="" datatype="string">The log files will have this suffix after
+the uc_www_call_seq in their names
+</argument>
+<argument name="dstnam" alias="" datatype="string">CONNECTSHIP or DESCARTES</argument>
+<argument name="uc_http_verb" alias="" datatype="string">Default verb is POST</argument>
+<argument name="response_encoding" alias="" datatype="string">Full XML processing instruction to use with encoding and potentially XML version
+</argument>
+<argument name="uc_rp2outside_charset" alias="" datatype="string">Full XML processing instruction to use with encoding and potentially XML version </argument>
+<argument name="uc_outside2rp_charset" alias="" datatype="string">Full XML processing instruction to use with encoding and potentially XML version </argument>
+
+<argument name="uc_basic_auth_userid" alias="" datatype="string">user id for basic authentication</argument>
+<argument name="uc_basic_auth_password" alias="" datatype="string">password id for basic authentication</argument>
+<argument name="uc_soap_action" alias="" datatype="string">In Soap 1.1 we need this in header</argument>
+
+<argument name="uc_status_check" alias="" datatype="string">This is the logic (MOCA) to see if call succeeded</argument>
+<argument name="uc_error_parse_logic" alias="" datatype="string">This is the logic (MOCA) to parse error response</argument>
+<argument name="uc_success_parse_logic" alias="" datatype="string">This is the logic (MOCA) to parse error response</argument>
+<argument name="uc_relogin_needed_logic" alias="" datatype="string">This is the logic (MOCA) to parse error response</argument>
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20200424 mustafa.ahmed - 11101 - Also Added uc_request_parameter_for_response (sent with void package for metapack)
+ */
+publish data
+where uc_inhibit_www_post_in_groovy=@@UC_INHIBIT_WWW_POST_IN_GROOVY
+and   uc_default_content_type = 'text/xml' /* 'text/plain' */
+and   uc_do_decode = decode(@dstnam, 'DESCARTES', '1', '0' ) /* dont do descartes at that time */
+and   uc_rp2outside_charset = nvl( @uc_rp2outside_charset, 'UTF8' )
+and   uc_outside2rp_charset = nvl( @uc_outside2rp_charset, 'UTF8')
+and   uc_log_cs_conv_file   = nvl ( nvl( @uc_log_cs_conv_file,   @@UC_WEB_SERVICE_LOG_CS_CONV_FILE ), '1' )
+and   uc_www_conn_timeout = int( nvl ( @@UC_WWW_CONN_TIMEOUT, '60000') )
+and   uc_www_read_timeout = int( nvl ( @@UC_WWW_READ_TIMEOUT, '60000') )
+and   uc_basic_auth_userid = @uc_basic_auth_userid
+and   uc_basic_auth_password = @uc_basic_auth_password
+and   uc_http_verb = nvl(@uc_http_verb,'POST' )
+and   uc_request_parameter_for_response = @uc_request_parameter_for_response
+/**/
+and   uc_request_passed   = null
+and   uc_error_code       = null
+and   uc_error_message    = null
+and   uc_request_res      = null
+and   uc_relogin_needed   = null
+|
+if ( @uc_http_verb = "DELETE" )
+   publish data
+   where uc_send_output = '0'
+else
+   publish data
+   where uc_send_output = '1'
+|
+if ( @uc_basic_auth_userid is not null and @uc_basic_auth_password is not null )
+{
+   publish data
+   where uc_user_password = @uc_basic_auth_userid || ':' || @uc_basic_auth_password
+   |
+   [[
+   uc_user_password_bytes = uc_user_password.getBytes()
+   ]]
+   |
+   encode to base64
+   where bin_data = @uc_user_password_bytes
+   |
+   publish data
+   where uc_use_basic_auth = '1'
+   and uc_user_password_base64 = @base64_encoded
+}
+else
+   publish data
+   where uc_use_basic_auth = '0'
+|
+{
+   {
+      publish data
+      where uc_web_service_log_path      = nvl(@@UC_WEB_SERVICE_LOG_PATH, @@LESDIR || '/files/' || @dstnam )
+      and   uc_web_service_log_enabled   = nvl(nvl(@uc_web_service_log_enabled, @@UC_WEB_SERVICE_LOG_ENABLED ),'1')
+      and   uc_web_service_post_disabled =@@UC_WEB_SERVICE_POST_DISABLED
+      and   uc_content_type = nvl(@content_type, @uc_default_content_type  )
+      |
+      if ( @uc_web_service_log_enabled = '1' and @uc_www_call_seq and @uc_web_service_log_path )
+      {
+         publish data
+         where uc_request_body_file          = @uc_www_call_seq || @uc_file_suffix || '.request.xml'
+         and   uc_request_cs_conv_body_file  = @uc_web_service_log_path || '/' || @uc_www_call_seq || 
+                                               @uc_file_suffix || '.cs_conv.request.xml'
+         and   uc_response_body_file_raw     = decode( @uc_do_decode, '1', @uc_www_call_seq||@uc_file_suffix||'.response_raw', '' )
+         and   uc_response_body_file_decoded = @uc_www_call_seq || @uc_file_suffix || '.response_decoded.xml'
+         and   uc_log_path                   = @uc_web_service_log_path
+      }
+      |
+      {
+         if ( @uc_request_body_file  )
+            write output file
+            where filnam = @uc_request_body_file
+            and path = @uc_log_path
+            and mode = 'w'
+            and data = nvl(@body,'**Empty Body**')
+         ;
+         if ( @uc_web_service_post_disabled = '1' )
+         {
+            publish data
+            where uc_elapsed = 0
+            and   uc_response_status = ossi__e ( 'eUSR_PM_MANIFEST_WWW_POST_DISABLED' )
+            and   uc_response = '<DISABLED></DISABLED'
+            and   uc_response_decoded = '<DISABLED></DISABLED'
+         }
+         else
+         {
+            publish data 
+            where uc_start_ts = ossi__ts()
+            and uc_proxy_host_port = @@UC_PROXY_HOST_PORT
+            |
+            /*
+             * Note on characterset issues.  
+             * Core
+             *   The data in our database is UTF8.  When it enters java world they are strings in java enconding which is UCS
+             *   Now the issue is how we send data on the wire.
+             * RP->outside
+             * - note content_type setting that is passed in.  that is something like text/xml;charset=iso-8859-9.  
+             *   For UTF it was charset=UTF-8
+             * - Then see the line like PrintWriter out = new PrintWriter ( new OutputStreamWriter. 
+             *   That indicates the characterset we are going to write
+             *   for example [new OutputStreamWriter ( wr, "UTF-8" )] or [new OutputStreamWriter ( wr, "ISO-8859-9" )]
+             * - Then printlin calls work
+             * Response
+             * - Same issue in reverse on the way back [new InputStreamReader( ir, "UTF-8" )] will expect UTF-8
+             * - Then readln calls will properly confvert from that to Java strings
+             * Test notes
+             * - First tried with no characterset here.  That did not work on YTC 
+             * - When sending English we received garbage on way back.  That got resolved when I did InputStreamReader with UTF-8
+             * As per YTC sending UTF-8 was ok - but that was not working.  
+             */
+            [[
+            import java.net.*;
+            import java.io.*;
+            String tag = "#### DO_HTTP_GROOVY ####:"
+            String uc_state;
+            Integer uc_read_data = 0;
+            String body_len;
+            //
+            StringBuffer ret = new StringBuffer ("");
+            String inputLine;
+            //
+            body_len = body.length().toString();
+            URL my_url = new URL(url);
+            HttpURLConnection conn = null;
+            if (uc_proxy_host_port != null && uc_proxy_host_port.length() > 0)
+            {
+              moca.trace("set proxy");
+              String[] hostPortArr = uc_proxy_host_port.split(":");
+              Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress(hostPortArr[0], Integer.parseInt(hostPortArr[1])));
+              conn = (HttpURLConnection) my_url.openConnection(proxy);
+            }
+            else
+            {
+              conn = (HttpURLConnection) my_url.openConnection();
+            }
+            moca.trace("opened connection");
+            uc_state = "URL_CREATED";
+            moca.trace( MocaTrace.FLOW, tag + "URL Created" );
+            //
+            if ( uc_request_cs_conv_body_file != null && uc_log_cs_conv_file == "1" )
+            {
+               moca.trace( MocaTrace.FLOW, tag + "Writing characterset specific file:" + uc_request_cs_conv_body_file );
+               try
+               {
+                  File log_out_file = new File ( uc_request_cs_conv_body_file );
+                  PrintWriter log_out = new PrintWriter ( log_out_file, uc_rp2outside_charset );
+                  log_out.println ( body );
+                  log_out.close();
+               }
+               catch ( Exception ee )
+               {
+                  moca.trace( MocaTrace.FLOW, tag + "Error writing file" );
+               }
+            }
+            moca.trace( MocaTrace.FLOW, tag + "File converted and logged if needed" );
+            //
+            conn.setConnectTimeout ( uc_www_conn_timeout );
+            conn.setReadTimeout ( uc_www_read_timeout );
+            conn.setRequestMethod(uc_http_verb);
+            moca.trace( MocaTrace.FLOW, tag + 
+                        "conn set till before content-typ.  Content type is " + uc_content_type +",len=" + body_len + "-" +
+                        uc_http_verb);
+            conn.setRequestProperty("Content-Type", uc_content_type );
+            moca.trace( MocaTrace.FLOW, tag + "content type set" );
+            
+            if(uc_request_parameter_for_response != null && uc_request_parameter_for_response.length() > 0)
+            {
+               moca.trace( MocaTrace.FLOW, tag + "request parameter:" + uc_request_parameter_for_response );
+               conn.setRequestProperty("Accept", uc_request_parameter_for_response );
+               moca.trace( MocaTrace.FLOW, tag + "request parameter is set" );
+            }
+            //
+            if ( uc_soap_action != null && uc_soap_action.length() > 0 )
+            {
+               moca.trace( MocaTrace.FLOW, tag + "soap action passed in as:" + uc_soap_action );
+               conn.setRequestProperty( "SOAPAction", uc_soap_action );
+               moca.trace( MocaTrace.FLOW, tag + "soap action is set" );
+            }
+            //
+            if ( uc_use_basic_auth == '1' )
+            {
+               conn.setRequestProperty("Authorization", "Basic " + uc_user_password_base64 );
+               moca.trace( MocaTrace.FLOW, tag + "auth=" + uc_user_password_base64 );
+            }
+            //
+            if ( uc_send_output == "1" )
+            {
+               conn.setDoOutput(true);
+               uc_state = "CONN_SET";
+               moca.trace( MocaTrace.FLOW, tag + "Conn Set" );
+               //
+               //
+               DataOutputStream wr = new java.io.DataOutputStream(conn.getOutputStream());
+               //PrintWriter out = new PrintWriter ( new java.io.OutputStreamWriter ( wr, uc_rp2outside_charset ) );
+               //out.println(body);
+               //out.write(body); 
+               //out.close();
+               wr.writeBytes(body);
+               wr.flush();
+               wr.close();
+            }
+            else
+            {
+               moca.trace( MocaTrace.FLOW, tag + "No data sent" );
+               uc_state = "CONN_SET_NOOUT";
+            }
+            moca.trace( MocaTrace.FLOW, tag + "[" + body + "]" );
+            moca.trace( MocaTrace.FLOW, tag + "Write post closed" );
+            uc_state = "OUT_CLOSED"
+            //
+            uc_state = "Getting Response status ..."
+            uc_resp_code = conn.getResponseCode();
+            uc_resp_message = conn.getResponseMessage();
+            uc_state = "GOT_RESP_STATUS"
+            moca.trace( MocaTrace.FLOW, tag + "Got code " + uc_resp_code + ",message=" + uc_resp_message );
+            //
+            //moca.trace( MocaTrace.FLOW, tag + "Attempt Connect Again..." );
+            //conn.connect();
+            //uc_state = "READ_CONN_DONE";
+            //moca.trace( MocaTrace.FLOW, tag + "Read Conenction Mode" );
+            //
+            DataInputStream ir;
+            try
+            {
+               ir = new DataInputStream ( conn.getInputStream() );
+            }
+            catch ( Exception ee )
+            {
+                moca.trace( MocaTrace.FLOW, tag + "got exception ..." + ee.getMessage() );
+                ir  = new DataInputStream ( conn.getErrorStream() );
+                moca.trace( MocaTrace.FLOW, tag + "assigned to errorStream" );
+            }
+            moca.trace( MocaTrace.FLOW, tag + "input stream created" );
+            //
+            BufferedReader in_reader = new BufferedReader( new InputStreamReader( ir, uc_outside2rp_charset ) );
+            uc_state = "READER_STARTED";
+            moca.trace( MocaTrace.FLOW, tag + "Read Started" );
+            //
+            while ((inputLine = in_reader.readLine()) != null)
+            {
+               uc_read_data = 1;
+               ret.append ( inputLine );
+               moca.trace( MocaTrace.FLOW, tag + "... read some" );
+            }
+            uc_state = "READER_ENDED";
+            moca.trace( MocaTrace.FLOW, tag + "read ended" );
+            //
+            in_reader.close();
+            [uc_resp_code:uc_resp_code,uc_resp_message:uc_resp_message,uc_ret_body:ret.toString(), uc_read_data:uc_read_data, uc_state:uc_state]      
+            ]]
+            catch(@?)
+            |
+            if ( @? != 0 )
+            {
+               /*
+                * If we got an http level error, construct a response string that is per YTC standards and can be interpretted
+                */
+               publish data
+               where uc_err_message = @!
+               |
+               publish data
+               where uc_resp_code = 99990
+               and uc_ret_body = "<RP_ERROR>"
+                              || "<data>"
+                              ||    "<outFlag>99990</outFlag>"
+                              ||    "<saveCustomerResult><outResult>" || @uc_err_message || "</outResult></saveCustomerResult>"
+                              ||    "<InvoiceOrderResultVO>"
+                              ||       "<returnStatus>99990</returnStatus>"
+                              ||       "<invoiceOrderResultDetail>"
+                              ||          "<docId>ERROR</docId>"
+                              ||          "<resultCode>99990</resultCode>"
+                              ||          "<resultMessage>" || @uc_err_message || "</resultMessage>"
+                              ||       "</invoiceOrderResultDetail>"
+                              ||    "</InvoiceOrderResultVO>"
+                              || "</data>"
+                              || "</RP_ERROR>"
+               and uc_read_data = 0
+               and uc_state = "ERROR"
+            }
+            else
+            {
+               publish data
+               where uc_resp_code = @uc_resp_code
+               and uc_ret_body = @uc_ret_body
+               and uc_read_data = @uc_read_data
+               and uc_state = @uc_read_data
+            }
+            |
+            publish data
+            where uc_end_ts = ossi__ts ()
+            |
+            /*
+             * Did we succeed or fail - that is based on differnt logic
+             */
+            if ( @uc_error_parse_logic is not null ) 
+            {
+               execute server command
+               where cmd = @uc_error_parse_logic
+               and inline = 1
+               catch (-1403,510)
+            }
+            else
+               publish data
+               where uc_request_passed = 1
+            |
+            /*
+             * Did we geta specific parser for fault vs success.  if so if we have fault use fault parser else the success parser
+             */
+            {
+               if ( @uc_request_passed = 0 )
+               {
+                  if ( @uc_status_check_logic is not null )
+                     execute server command
+                     where cmd = @uc_status_check_logic
+                     and inline = 1
+                     catch (-1403,510)
+                  else
+                     publish data
+                     where uc_error_code = 'UNKNOWN_ERROR_CODE'
+                     and uc_error_message = 'UNNKWN_ERROR_TEXT'
+               }
+               else
+               {
+                  if ( @uc_success_parse_logic is not null )
+                     execute server command
+                     where cmd = @uc_status_check_logic
+                     and inline = 1
+                     catch (-1403,510)
+                  else
+                     noop >> uc_request_res
+               }
+            }
+            |
+            /*
+             * See if we need to tell the caller to relogin
+             */
+            if ( @uc_request_passed = 0 )
+            {
+               if ( @uc_relogin_needed_logic is not null )
+                  execute server command
+                  where cmd = @uc_relogin_needed_logic
+                  and inline = 1
+                  catch (-1403,510)
+               else
+                  publish data
+                  where uc_relogin_needed = 0
+            }
+            else
+               publish data
+               where uc_relogin_needed = 0
+            |
+            /*
+             * If caller wants reponse to have a certain processing instruction for his XML, put it there.
+             * if response did not have any, put his.  if it had some take it out and put his.
+             */
+            if ( @response_encoding )
+            {
+               if ( @uc_ret_body like '<?xml%' )
+               {
+                  publish data
+                  where uc_ret_body = @response_encoding || substr ( @uc_ret_body, instr(@uc_ret_body, '?>') + 2 )
+               }
+               else
+                  publish data
+                  where uc_ret_body = @response_encoding || @uc_ret_body
+            }
+            |
+            if ( @uc_do_decode = '1' )
+               set return status
+               where status = 99999
+               and message = 'decoding response not implemented yet'
+            else
+               publish data
+               where uc_ret_body_decoded = @uc_ret_body
+            |
+            {
+               if ( @uc_response_body_file_raw )
+                  write output file
+                  where filnam = @uc_response_body_file_raw
+                  and path = @uc_log_path
+                  and mode = 'w'
+                  and data = nvl(@uc_ret_body,'**Empty Body**')
+               ;
+               if ( @uc_response_body_file_decoded )
+                  write output file
+                  where filnam = @uc_response_body_file_decoded
+                  and path = @uc_log_path
+                  and mode = 'w'
+                  and data = nvl(@uc_ret_body_decoded,'**Empty Body**')
+               ;
+               noop
+            }
+            |
+            publish data
+            where uc_elapsed          = @uc_end_ts - @uc_start_ts
+            and   uc_response_status  = @uc_resp_code
+            and   uc_resppnse_message = @uc_resp_message
+            and   uc_response         = @uc_ret_body
+            and   uc_response_decoded = @uc_ret_body_decoded
+            and   uc_state            = @uc_state
+            and   uc_read_data        = @uc_read_data
+            and   uc_request_passed   = @uc_request_passed
+            and   uc_error_code       = @uc_error_code
+            and   uc_error_message    = @uc_error_message
+            and   uc_request_res      = @uc_request_res
+            and   uc_relogin_needed   = @uc_relogin_needed
+         }
+         |
+         /*
+          * Final returned columns
+          */
+         publish data
+         where uc_response_status = @uc_response_status
+         and   uc_resppnse_message = @uc_resppnse_message
+         and   reason = ' '
+         and   body         = @uc_ret_body
+         and   body_decoded = @uc_response_decoded
+         and   content_type = "xml"
+         and   elapsed      = @uc_elapsed / 1000 /* convert to seconds */
+         and   uc_request_body_file          = decode( @uc_request_body_file,          '', '', @uc_log_path || '/' || @uc_request_body_file )
+         and   uc_response_body_file_raw     = decode( @uc_response_body_file_raw,     '', '', @uc_log_path || '/' || @uc_response_body_file_raw )
+         and   uc_response_body_file_decoded = decode( @uc_response_body_file_decoded, '', '', @uc_log_path || '/' || @uc_response_body_file_decoded )
+         and   uc_state            = @uc_state
+         and   uc_read_data        = @uc_read_data
+         /* Statuses */
+         and   uc_request_passed   = @uc_request_passed
+         and   uc_error_code       = @uc_error_code
+         and   uc_error_message    = @uc_error_message
+         and   uc_request_res      = @uc_request_res
+         and   uc_relogin_needed   = @uc_relogin_needed
+         /* used commands */
+         and uc_status_check = @uc_status_check
+         and uc_error_parse_logic = @uc_error_parse_logic
+         and uc_success_parse_logic = @uc_success_parse_logic
+         and uc_relogin_needed_logic = @uc_relogin_needed_logic
+      }
+   }
+}
+]]>
+</local-syntax>
+
+<documentation>
+
+<remarks>
+This command does HTTP calls.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

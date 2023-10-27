@@ -1,0 +1,108 @@
+<command>
+
+<name>merge results</name>
+
+<description>Merges the result sets and returns 1 row</description>
+
+<type>Local Syntax</type>
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+/* Make sure the res is passed in */
+    if (@res is not null)
+    {
+        [[
+            import com.redprairie.moca.*;
+            import com.redprairie.moca.MocaException;
+            import com.redprairie.moca.util.*;
+            import com.redprairie.moca.EditableResults;
+            import com.redprairie.moca.SimpleResults ;
+            import com.redprairie.moca.MocaType;
+            int colCount = res.getColumnCount();
+            String[] valStr =  new String[colCount];
+            String[] typStr =  new String[colCount];
+            int tempInt = 0;
+            double tempDob = 0.0;
+           
+            
+            res.reset();
+            
+            SimpleResults retRes = moca.newResults();
+            // Add columns to return resultset as same as in input result set
+            // Make the datatype of each column as string as we are going to concatenate instead of res.getColumnType(counter)
+            for (int counter = 0; counter < colCount; counter++) {
+                retRes.addColumn(res.getColumnName(counter),
+                                 MocaType.STRING);
+            }
+            res.reset();
+            for (int counter = 0; counter < colCount; counter++) {
+                typStr[counter] = res.getColumnType(counter).toString().toUpperCase();
+            }
+
+            // Add only one row to return result set 
+            retRes.addRow();
+            // Initialize the array
+            for (int counter = 0; counter < colCount; counter++)
+                valStr[counter] = "";
+
+            res.reset();
+            //Loop through the resultset
+            while(res.next()) {
+                // Concatenate the values of each column if the value is not null
+                for (int counter = 0; counter < colCount; counter++) {
+                    if (!res.isNull(counter)) {
+                        if (typStr[counter].equals("INTEGER")) {
+                            // Integer so sum up
+                            if (!valStr[counter].isEmpty())
+                                tempInt = Integer.parseInt(valStr[counter]);
+                            else
+                                tempInt = 0;
+                            tempInt += Integer.parseInt(res.getString(counter));
+                            valStr[counter] = tempInt;
+                        }
+                        else if (typStr[counter].equals("DOUBLE")) {
+                            // Float so sum up
+                            if (!valStr[counter].isEmpty())
+                                tempDob = Double.parseDouble(valStr[counter]);
+                            else
+                                tempDob = 0;
+                            tempDob += Double.parseDouble(res.getString(counter));
+                            valStr[counter] = tempDob;
+                        }
+                        else
+                            valStr[counter] += res.getString(counter);
+                    }
+                }
+            }
+
+            // Set the appended value to the return result set
+            for (int counter = 0; counter < colCount; counter++)
+                retRes.setStringValue(counter, valStr[counter]);
+
+            return retRes;
+        ]]
+    }
+]]>
+</local-syntax>
+
+<argument name="res" datatype="string"> Result set </argument>
+
+<documentation>
+<remarks>
+<![CDATA[
+    <p>
+        This command will merge multiple rows into single row. It means the values in each column will be merged.
+        If the datatype of a column is numeric then the column will be summed up else the values will be appended.
+    </p>
+]]>
+</remarks>
+</documentation>
+
+</command>

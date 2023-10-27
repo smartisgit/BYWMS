@@ -1,0 +1,19 @@
+#use $DCSDIR/include
+#include <dcsddl.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+
+mset command on
+[
+CREATE_PK_CONSTRAINT_BEGIN(usr_rule_engine_cond_expr, usr_rule_engine_cond_expr_pk)
+(
+    uc_rule_grp_id, uc_rule_subgrp_id , uc_rule_id , seqnum 
+)
+CREATE_PK_CONSTRAINT_USING_INDEX
+CREATE_PK_CONSTRAINT_END
+]
+catch (ERR_INDEX_ALREADY_EXISTS,ERR_PRIMARY_KEY_ALREADY_EXISTS,-4902)
+
+RUN_DDL
+
+mset command off

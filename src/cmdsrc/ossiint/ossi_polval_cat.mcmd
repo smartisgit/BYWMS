@@ -1,0 +1,86 @@
+<command>
+<name>ossi polval_cat</name>
+<description>Find a policy value as a function.  Return rtstr1 combined
+</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="moca_farg1">Filter: Policy Code</argument>
+<argument datatype="string" name="moca_farg2">Filter: Policy Variable</argument>
+<argument datatype="string" name="moca_farg3">Filter: Policy Value</argument>
+<argument datatype="string" name="moca_farg4">Optional Filter: rtstr1</argument>
+<argument datatype="string" name="moca_farg5">Optional.  Return column.  Default rtstr1</argument>
+<argument datatype="string" name="moca_farg6">Optional.  Additional filter</argument>
+<argument datatype="string" name="moca_farg7">Separator to use</argument>
+<argument datatype="string" name="moca_farg8">Warehouse Id</argument>
+
+
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+publish data
+where polcod = @moca_farg1
+and   polvar = @moca_farg2
+and   polval = @moca_farg3
+and   rtstr1 = @moca_farg4
+and   retcol = nvl(@moca_farg5,'rtstr1')
+and   uc_filter = nvl(@moca_farg6, '1=1' )
+and   separator = nvl(@moca_farg7, '----')
+and   wh_id = nvl(nvl(nvl(@moca_farg8,@wh_id),@@WH_ID),'----')
+|
+{
+   if ( @rtstr1 is null )
+      hide stack variable where name = 'rtstr1'
+   |
+   if ( @polval is null )
+      hide stack variable where name = 'polval'
+   |
+   execute ossi moca and cache
+   where uc_cache_grp = 'OSSI__POLVAL'
+   and uc_moca_cmd = "[
+      select @retcol:raw uc_value
+      from poldat_view
+      where 1=1
+      and polcod = @polcod
+      and polvar = @polvar
+      and @+polval
+      and @+rtstr1
+      and @uc_filter:raw
+      and wh_id = @wh_id
+      order by srtseq
+      ]"
+   and uc_inline = 1
+   and uc_cache_key = @polcod || '__' || @polvar || '__' || @polval || '__' || @rtstr1 || '__' || @uc_filter || '__' || @wh_id
+   and uc_force_ossi_cache1 = '1'
+   catch(-1403,510)
+   >> res
+   |
+   convert column results to string
+   where resultset = @res
+   and colnam = 'uc_value'
+   |
+   if ( @separator = '----' )
+      publish data
+      where result_string = ossi__replace(@result_string, '----', '' )
+   else
+      publish data
+      where result_string = @result_string
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+MOCA Function to get multiple rows of a policy as a string
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

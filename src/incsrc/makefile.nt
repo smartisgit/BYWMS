@@ -1,0 +1,47 @@
+LESDIR=..\..
+
+NOINSTALL=YES
+
+TARGET=hinstall
+TARGETTYPE=
+
+INC=$(LESDIR)\include
+
+TARGETS=$(INC)\usrcolwid.h \
+	$(INC)\usrddl.h \
+	$(INC)\usrerr.h \
+        $(INC)\usrgendef.h \
+        $(INC)\usrtbldef.h \
+        $(INC)\varcolwid.h \
+	$(INC)\varddl.h \
+	$(INC)\varerr.h \
+        $(INC)\vargendef.h \
+        $(INC)\vartbldef.h 
+
+all: install
+hinstall: install
+
+clean:
+
+install: $(TARGETS)
+
+$(INC)\usrcolwid.h: usrcolwid.h
+	@copy $? $@
+$(INC)\usrddl.h: usrddl.h
+	@copy $? $@
+$(INC)\usrerr.h: usrerr.h
+	@copy $? $@
+$(INC)\usrgendef.h: usrgendef.h
+	@copy $? $@
+$(INC)\usrtbldef.h: usrtbldef.h
+	@copy $? $@
+$(INC)\varcolwid.h: varcolwid.h
+	@copy $? $@
+$(INC)\varddl.h: varddl.h
+	@copy $? $@
+$(INC)\varerr.h: varerr.h
+	@copy $? $@
+$(INC)\vargendef.h: vargendef.h
+	@copy $? $@
+$(INC)\vartbldef.h: vartbldef.h
+	@copy $? $@

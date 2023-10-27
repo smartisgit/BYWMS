@@ -1,0 +1,23 @@
+<command>
+<name>create ossi auto wave rule</name>
+<description>this command will create auto wave rule</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+ 
+create record
+where table = 'usr_auto_wave_rule_hdr'
+and uc_sch_tim_local_flg = nvl(@uc_sch_tim_local_flg, 1)
+
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This command is used to create Auto Wave rules
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

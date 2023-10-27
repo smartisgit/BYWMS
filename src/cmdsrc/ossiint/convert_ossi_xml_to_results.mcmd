@@ -1,0 +1,31 @@
+<command>
+<name>convert ossi xml to results</name>
+<description>Convert XML to results</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+parse xml
+  where mxml_xml = @mxml_xml
+|
+convert xml to result set
+
+]]>
+</local-syntax>
+<argument name="mxml_xml" required="yes" datatype="string"></argument>
+
+<documentation>
+
+<remarks>
+This command convets an XML string to a MOCA resultset.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

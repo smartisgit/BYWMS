@@ -1,0 +1,35 @@
+<trigger>
+<name>mark ossi parent table as needing register</name>
+<on-command>assign shipment to stop</on-command>
+<fire-sequence>100000</fire-sequence>
+
+<local-syntax>
+<![CDATA[
+
+[
+select stop.car_move_id
+from shipment
+     join stop on stop.stop_id = shipment.stop_id
+where shipment.ship_id = @ship_id
+and stop.car_move_id is not null
+]
+catch (-1403,510)
+|
+if ( @? = 0 )
+{
+    mark ossi parent table as needing register
+    where table_name = 'CAR_MOVE'
+    and uc_reg_reacod = 'DA'
+    and uc_parent_update_clause = null
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<seealso cref="mark ossi parent table as needing register"></seealso>
+
+</documentation>
+
+</trigger>

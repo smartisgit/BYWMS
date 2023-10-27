@@ -1,0 +1,52 @@
+<command>
+<name>ossi dscmst_text</name>
+<description>FUNCTION: get text from dscmst table</description>
+
+<argument name="moca_farg1" required="yes" datatype="string">colnam</argument>
+<argument name="moca_farg2" required="yes" datatype="string">colval</argument>
+<argument name="moca_farg3" required="yes" datatype="string">locale id</argument>
+<argument name="moca_farg4" required="yes" datatype="string">output column</argument>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+publish data
+where colnam = @moca_farg1
+and colval = @moca_farg2
+and locale_id = nvl(nvl(@moca_farg3, @@LOCALE_ID),'US_ENGLISH')
+and output_col = nvl(@moca_farg4, 'short_dsc' )
+|
+{
+   [
+   select nvl( min(@output_col:raw), @colval) ret
+   from dscmst
+   where colnam = @colnam
+   and colval = @colval
+   and locale_id = @locale_id
+   ]
+}
+
+]]>
+</local-syntax>
+
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This function can be used to easily fetch the dscmst data for a given value.  Useful in rules engine
+</p>
+]]>
+</remarks>
+
+<retrows>MOCA Function - So one row is returned</retrows>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+</documentation>
+
+</command>

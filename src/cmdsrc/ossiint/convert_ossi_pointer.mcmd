@@ -1,0 +1,36 @@
+<command>
+<name>convert ossi pointer</name>
+<description>Convert pointer to a different type</description>
+
+
+<type>C Function</type>
+<function>usrOssiConvertPointerToType</function>
+
+<argument name="pointer" required="yes" datatype="pointer">
+</argument>
+<argument name="output_type"  datatype="string">
+</argument>
+<argument name="output_column" datatype="string">
+</argument>
+
+
+<documentation>
+<remarks>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+]]>
+</remarks>
+<retrows>One</retrows>
+<retcol name="status" type="string">A string describing the number of bytes transferred.</retcol>
+<exception value="eOK">The command completed successfully.</exception>
+<exception value="eMOCA_FTP_COM_FAILURE">An FTP communication failure occurred.</exception>
+<seealso cref="get ossi ftp">
+</seealso>
+<seealso cref="remove ossi ftp">
+</seealso>
+</documentation>
+</command>

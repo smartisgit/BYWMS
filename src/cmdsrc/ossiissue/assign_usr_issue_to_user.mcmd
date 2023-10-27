@@ -1,0 +1,31 @@
+<command>
+<name>assign usr issue to user</name>
+<description>Assign user issue to user</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ */
+generate next number where numcod = 'uc_ossi_issue_assign_seq'
+|
+change usr issue where uc_ossi_issue_assign_seq = @nxtnum
+                   and uc_ossi_ins_usr_id = sysdate
+                   and uc_ossi_ins_usr_id = @@USR_ID
+
+]]>
+</local-syntax>
+
+<argument name="uc_ossi_issue_assign_seq" required="yes">Issue Assignment Sequence</argument>
+<documentation>
+
+<remarks>
+This command is used to assign issues to user.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

@@ -1,0 +1,63 @@
+<command>
+<name>ossi pos_value</name>
+<description>
+Given a list, return nth value indexed off 1
+</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+publish data
+where  uc_list = @moca_farg1
+and    uc_pos  = @moca_farg2
+and    uc_delim= nvl(@moca_farg3,',')
+|
+if ( @uc_list is null )
+   publish data where ret = ''
+else
+{
+   convert list
+   where string = @uc_list
+   and   type   = 'L'
+   and   separator = @uc_delim
+   >> res
+   |
+   if ( @uc_pos = 0 )
+      publish data where ret = rowcount(@res)
+   else if ( rowcount(@res) = 0 )
+      publish data where ret = ''
+   else
+   {
+      publish data combination where res = @res
+      |
+      if ( @count = @uc_pos )
+         publish data where ret = @retstr
+   }
+}
+
+]]>
+</local-syntax>
+
+
+
+
+<documentation>
+
+
+<remarks>
+</remarks>
+
+
+<retrows>The return set depends on the number of name-value pairs in the list</retrows>
+
+<example>
+
+</example>
+
+<exception value="eOK">Normal successful completion</exception>
+</documentation>
+</command>

@@ -1,0 +1,123 @@
+<command>
+<name>process ossi ldap sync</name>
+<description>Process LDAP Sync</description>
+
+<argument datatype="string" name="uc_job_id"></argument>
+
+<type>Local Syntax</type>
+
+
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+
+
+/* To see if we are enabled - do select - not ossi__polval to easily disable when running */
+[
+select max(rtnum1) uc_ldap_sync_enabled
+from poldat_view
+where polcod = 'USR-OSSI-LDAP-SYNC'
+and polvar = 'MISCELLANEOUS'
+and polval = 'ENABLED'
+and wh_id = '----'
+]
+|
+publish data
+where uc_ldap_sync_create_user_cmd = ossi__get_policy_data_as_var_list ( 'USR-OSSI-LDAP-SYNC', 'LES_USR_ATH', 'CREATE_USER_CMD', '----', ' and ' )
+and uc_ldap_sync_create_role_cmd = ossi__get_policy_data_as_var_list ( 'USR-OSSI-LDAP-SYNC', 'LES_USR_ATH', 'CREATE_ROLE_CMD', '----', ' and ' )
+and uc_job_id = nvl(@uc_job_id, 'UC_G_LDAP_SYNC' )
+and uc_ossi_who = @@USR_ID
+and usr_min_rowcount_in_ldap = int(nvl(@@UC_LDAP_SYNC_LES_USR_ATH_MIN_ROWCOUNT,'1'))
+and uc_force_inhibit_version_control = '1'
+|
+if ( @uc_ldap_sync_enabled = 1)
+{
+   publish data
+   where uc_ossi_job_seq = ossi__register_job ( @uc_job_id, '', @uc_ossi_who )
+   |
+   try
+   {
+      publish data
+      where uc_ossi_module_seq = ossi__register_module ( @uc_ossi_job_seq, 'GET-LDAP-DATA', '', @uc_ossi_who )
+      |
+      try
+      {
+         list ossi ldap data for sync
+         |
+         complete ossi job log
+         |
+         if ( rowcount(@uc_res_les_usr_ath) > @usr_min_rowcount_in_ldap and rowcount(@uc_res_les_ath_role) > 0 and rowcount(@uc_res_les_usr_role) > 0 )
+         {
+            process ossi ldap sync user
+            ;
+            process ossi ldap sync role
+            ;
+            process ossi ldap sync user role
+            ;
+            process ossi ldap sync user wh
+            ;
+            process ossi ldap sync send user shutdown
+         }
+      }
+      catch (@?)
+      {
+         raise ossi job error
+         where uc_ossi_err_code  = @?
+         and   uc_ossi_err_descr = @!
+         and   is_job_flg = '0'
+      }
+      ;
+      publish data
+      where uc_string_uc_ossi_job_seq = string(@uc_ossi_job_seq)
+      |
+      [
+      select traknm uc_ossi_job_seq,
+             dlytrn_id,
+             actcod,
+             reacod  uc_action,
+             movref ath_id,
+             var_nam,
+             fr_value,
+             to_value,
+             adj_ref1 uc_status,
+             adj_ref2 msg_id,
+             wh_id,
+             devcod,
+             cmnt
+      from dlytrn
+      where traknm = @uc_string_uc_ossi_job_seq
+      and actcod like 'UC_LSYNC%'
+      order by 1,2
+      ]
+      catch (-1403,510)
+   } /* end main */
+   finally
+   {
+      if ( @? = 0 )
+         complete ossi job
+      else
+         raise ossi job error
+         where uc_ossi_err_code  = @?
+         and   uc_ossi_err_descr = @!
+         and   is_job_flg = '1'
+   } /* job */
+} /* enabled */
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+This component syncs up the LDAP stuff
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

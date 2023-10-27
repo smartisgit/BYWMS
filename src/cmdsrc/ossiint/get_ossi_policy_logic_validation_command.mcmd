@@ -1,0 +1,41 @@
+<command>
+<name>get ossi policy logic validation command</name>
+<description>Get the valid possibilities that fill the combo box 
+when you add a value in OSSI Policy Logic Maintenance</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+parse ossi policy logic
+|
+/*
+ * Colnam is the column to pass into the valdt command
+ */
+[select rtstr1 valdt_cmd,
+        rtstr2 colnam
+   from poldat_view 
+  where polcod = 'USR-POLICY-LOGIC-VALIDATION' 
+    and polvar = @polcod 
+    and polval = @polvar
+    and wh_id = nvl(@wh_id, @@wh_id) 
+    and rtnum1 = 1
+] 
+]]>
+</local-syntax>
+<argument name="uc_policy_logic" required="yes" datatype="string"></argument>
+<documentation>
+
+<remarks>
+This command is used to get policy logic validation command.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

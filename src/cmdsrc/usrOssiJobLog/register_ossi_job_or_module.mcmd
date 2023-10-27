@@ -1,0 +1,66 @@
+<command>
+<name>register ossi job or module</name>
+<description>If within a job, the register a module otherwise register the job</description>
+<type>Local Syntax</type>
+
+<argument name="uc_ossi_job_seq"    required="no" datatype="Integer">Job Number</argument>
+<argument name="uc_ossi_module_id"  required="no" datatype="String">Default 0</argument>
+<argument name="uc_ossi_data"       required="no" datatype="String">Additional data </argument>
+<argument name="uc_ossi_who"        required="no" datatype="String">Additional data </argument>
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+if ( nvl(@uc_ossi_job_seq,0) = 0 )
+   publish data
+   where uc_ossi_job_seq = ossi__register_job ( @uc_ossi_module_id,  @uc_ossi_data, @uc_ossi_who )
+   and   called_in_job = '0'
+   and   uc_created_dummy_job = '1'
+else
+   publish data
+   where called_in_job = '1'
+   and   uc_ossi_job_seq = @uc_ossi_job_seq
+   and   uc_created_dummy_job = '0'
+|
+publish data
+where uc_ossi_module_seq    = ossi__register_module ( @uc_ossi_job_seq, @uc_ossi_module_id, @uc_ossi_data, @uc_ossi_who )
+and   called_in_job         = @called_in_job
+and   uc_ossi_job_seq       = @uc_ossi_job_seq
+and   uc_created_dummy_job  = @uc_created_dummy_job
+
+]]>
+</local-syntax>
+
+
+
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+
+??
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+<retcol name="uc_ossi_job_seq"      type="COMTYP_INT">Job Sequence Number</retcol>
+<retcol name="called_in_job"        type="COMTYP_INT">1 if within another job.  0 if not (and new job createdd)</retcol>
+<retcol name="uc_ossi_module_seq"   type="COMTYP_INT">Module Sequence generated</retcol>
+<retcol name="uc_created_dummy_job" type="COMTYP_INT">1 if created a new dummy job</retcol>
+
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+</documentation>
+
+</command>

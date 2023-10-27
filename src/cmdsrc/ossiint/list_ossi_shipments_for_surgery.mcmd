@@ -1,0 +1,103 @@
+<command>
+<name>list ossi shipments for surgery</name>
+<description>Get shipment data for sugery</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+if (@uc_adhoc_filter_file is not null)
+{
+  get ossi clause from adhoc filter file
+    where column = 'ship_id'
+}
+else
+{
+  publish data
+    where clause = '1=1'
+}
+|
+get ossi issue filter for surgery
+  where @*
+|
+get ossi les command
+  where les_cmd_id = 'uc_shipment_surgery_issue'
+catch (-1403,510)
+|
+if (@? != 0)
+{
+  publish data 
+    where syntax = null
+}
+| 
+[select x.*,
+        '' uc_issue
+   from (select s.ship_id,
+                s.wh_id,
+                s.shpsts,
+                count(DISTINCT sl.ordnum) uc_num_ord,
+                max(sl.ordnum) ordnum,
+                count(DISTINCT sl.ship_line_id) uc_num_sl,
+                sum(sl.pckqty + sl.inpqty + sl.stgqty + sl.shpqty) shpqty,
+               (select count(*) c from pckwrk_view where ship_id = s.ship_id and wrktyp in ( 'P', 'B') ) uc_num_pckwrk,
+               (select count(*) c from rplwrk where ship_id = s.ship_id) uc_num_rplwrk,
+               (select count(*) c from xdkwrk where ship_id = s.ship_id) uc_num_xdkwrk,
+               nvl(@uc_issue_filter_value, @uc_issue_filter) uc_issue_filter
+           from shipment s
+           join shipment_line sl
+             on s.ship_id = sl.ship_id
+          where 1 = 1
+          group by s.ship_id,
+                s.wh_id,
+                s.shpsts
+        ) x
+  where wh_id = @wh_id
+    and @+ship_id
+    and @+shpsts
+    and @+uc_num_ord
+    and @+ordnum
+    and @+uc_num_sl
+    and @+shpqty
+    and @+uc_num_pckwrk
+    and @+uc_num_rplwrk
+    and @+uc_num_xdkwrk
+    and @clause:raw
+    and @*
+  order by 1
+] >> res
+|
+add ossi issue for surgery
+  where res = @res
+    and syntax = @syntax
+    and uc_issue_filter_value = nvl(@uc_issue_filter_value, @uc_issue_filter)
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<remarks>
+This command is used to get shipment data for surgery.
+</remarks>
+
+<retcol name="ship-id" type="String">Shipment ID</retcol>
+<retcol name="wh_id" type="String">Warehouse ID</retcol>
+<retcol name="shpsts" type="String">ship status</retcol>
+<retcol name="uc_num_ord" type="String">Number of orders</retcol>
+<retcol name="ordnum" type="String">Order Number</retcol>
+<retcol name="uc_num_sl" type="String">Number of Shipment Line ID</retcol>
+<retcol name="shpqty" type="String">Ship Quantity</retcol>
+<retcol name="uc_num_pckwrk" type="String">Number of Pickwrk</retcol>
+<retcol name="uc_num_rplwrk" type="String">Number of rplwrk</retcol>
+<retcol name="uc_num_xdkwrk" type="String">Num of xdkwrk</retcol>
+<retcol name="uc_issue_filter" type="String">Issue Filter</retcol>
+<retcol name="uc_issue" type="String">Issue</retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

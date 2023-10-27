@@ -1,0 +1,59 @@
+<command>
+<name>list ossi conditional rule domains</name>
+<description>Returns a list of policy logic domains</description>
+<argument name="lngdsc" required="yes" datatype="string"></argument>
+<argument name="codval" required="yes" datatype="string"></argument>
+<argument name="short_dsc" required="yes" datatype="string"></argument>
+<argument name="colnam" required="no" datatype="integer"></argument>
+<argument name="srtseq" required="no" datatype="integer"></argument>
+<argument name="rqdflg" required="no" datatype="integer"></argument>
+<argument name="img_id" required="no" datatype="integer"></argument>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+/*
+ * Change Log
+ * Initial Check In
+ * 20200512 Haseeb.Ahmed - 11118 - Create a new web screen to maintain rules engine where we have condition and action
+ */
+publish data 
+  where usr_id = nvl(@usr_id, @@USR_ID) 
+|
+{
+  [select distinct uc_rule_grp_id || '|' || uc_rule_subgrp_id as uc_policy_logic 
+     from USR_RULE_ENGINE_COND_EXPR ] catch (-1403)
+>> res 
+|
+sort result set 
+      where result_set = @res 
+        and sort_list = 'uc_policy_logic' 
+  |
+  {
+    publish data 
+        where opt_nam = 'opt' || @uc_policy_logic 
+    |
+    if (ossi__user_has_access_to_opt_nam(@opt_nam, @usr_id) = 1)
+    filter data 
+        where moca_filter_level = 3 
+          and opt_nam = @opt_nam 
+  }
+}
+
+]]>
+</local-syntax>
+
+
+<documentation>
+<remarks>
+Get all policy logic domains with this command
+</remarks>
+
+<retcol name="uc_policy_logic" type="String">Policy Logic</retcol>
+<retcol name="optnam" type="String">Policy Logic</retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

@@ -1,0 +1,20 @@
+DCSDIR=..\..\..
+
+NOINSTALL=YES
+
+TARGET=hinstall
+TARGETTYPE=
+
+INC=$(DCSDIR)\include
+
+TARGETS=$(INC)\project.h
+
+all: install
+hinstall: install
+
+clean:
+
+install: $(TARGETS)
+
+$(INC)\project.h: project.h
+	@copy $? $@

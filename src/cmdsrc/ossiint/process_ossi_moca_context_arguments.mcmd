@@ -1,0 +1,109 @@
+<command>
+<name>process ossi moca context arguments</name>
+<description>take all arguments passed in where clause and process them</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="uc_column_name_value_delim"></argument>
+<argument datatype="string" name="uc_use_column_name">1 or 0.  default 0.  When returning name/value if 1 use name.  0 means mls text</argument>
+<argument datatype="string" name="uc_arg_separator">if returning as a string what i the separator after every name/valur pair</argument>
+
+
+
+<local-syntax>
+<![CDATA[
+
+/*
+ * Change Log
+ * Initial Check In
+ * 2021-10-10 saad.ahmad - 11805 - original
+ */
+publish data
+where locale_id = nvl(nvl(@locale_id, @@LOCALE_ID), 'US_ENGLISH')
+and uc_column_name_value_delim = nvl(@uc_column_name_value_delim, ':' )
+and uc_use_column_name = nvl(@uc_use_column_name, '0')
+|
+if ( @uc_arg_separator is null )
+    [[
+    uc_arg_separator = "," + System.getProperty("line.separator")
+    ]]
+|
+{
+    [[
+    import com.redprairie.moca.*;
+    import com.redprairie.moca.util.*;
+    //
+    MocaContext moca = MocaUtils.currentContext();
+    MocaArgument[] args = moca.getArgs();
+    // 
+    SimpleResults resArgs = new SimpleResults();
+    resArgs.addColumn("column_name",            MocaType.STRING);
+    resArgs.addColumn("column_mls_text",        MocaType.STRING);
+    resArgs.addColumn("column_value",           MocaType.STRING);
+    resArgs.addColumn("column_name_value",      MocaType.STRING);
+    resArgs.addColumn("column_mls_name_value",  MocaType.STRING);
+    //
+    for (MocaArgument arg : args)
+    {
+        if(arg != null)
+        {
+            res_mls = moca.executeInline ( "get mls text where mls_id = @mls_id and locale_id = @locale_id catch(@?)",
+                                           [mls_id:arg.getName()] );
+            if ( res_mls.next() )
+                mls_text = res_mls.getString ( "mls_text" );
+            else
+                mls_text = arg.getName();
+            //
+            resArgs.addRow();
+            resArgs.setValue ( "column_name",           arg.getName() );
+            resArgs.setValue ( "column_mls_text",       mls_text );
+            resArgs.setValue ( "column_value",          arg.getValue().toString() );
+            resArgs.setValue ( "column_name_value",     arg.getName() + uc_column_name_value_delim + arg.getValue().toString() );
+            resArgs.setValue ( "column_mls_name_value", mls_text + uc_column_name_value_delim + arg.getValue().toString() );
+        }
+    }
+    [uc_moca_args:resArgs]
+    ]]
+    |
+    if ( @uc_moca_args is not null and rowcount(@uc_moca_args) > 0 )
+    {
+        convert column results to string 
+        where res = @uc_moca_args 
+        and colnam = decode ( @uc_use_column_name, '1', 'column_name_value', 'column_mls_name_value' )
+        and separator = @uc_arg_separator
+        |
+        publish data
+        where uc_moca_args = @uc_moca_args
+        and uc_moca_args_str = @result_string
+    }
+    else
+        publish data
+        where uc_moca_args = null
+        and uc_moca_args_str = ''
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+This command will return all MOCA Args as a resultset.  Or optionally as a string
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+<retrows>1</retrows>
+<retcol name="uc_moca_args" type="COMTYP_RES">Resultset.  One row per argument.  Following columns 
+column_name
+column_mls_text
+column_value
+column_name_value
+column_mls_name_value
+</retcol>
+
+<retcol name="uc_moca_args_str" type="string">Args as a delimited string of name/value paris</retcol>
+
+
+</documentation>
+
+
+</command>

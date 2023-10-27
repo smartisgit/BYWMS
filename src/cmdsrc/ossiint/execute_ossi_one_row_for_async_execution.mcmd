@@ -1,0 +1,127 @@
+<command>
+<name>execute ossi one row for async execution</name>
+<description>Execute one row for async execution</description>
+
+<argument name="uc_full_moca_cmd" required="yes" datatype="string"></argument>
+<argument name="uc_ossi_job_seq" required="yes" datatype="integer"></argument>
+<argument name="uc_ossi_module_seq" required="yes" datatype="integer"></argument>
+<argument name="uc_ossi_who" required="yes" datatype="integer"></argument>
+<argument name="uc_pk_data" required="yes" datatype="string"></argument>
+<argument name="comflg" required="no" datatype="integer">Commit Flag - In PD assuming pass in 1</argument>
+<argument name="uc_exec_status_col" required="no" datatype="string">Execution Status column</argument>
+<argument name="uc_exec_message_col" required="no" datatype="string">Execution message column</argument>
+<argument name="uc_update_status_cmd" required="no" datatype="string">Command to update status</argument>
+<argument name="uc_update_status_passed" required="no" datatype="string">Update status command was passed or not</argument>
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+try 
+{
+    execute server command
+    where cmd = @uc_full_moca_cmd
+    and inline = 1
+    >> res
+    |
+    {
+        if (@comflg != 0)
+            execute ossi command as job action 
+            where cmd = "commit" 
+        ;
+        if (@uc_ossi_job_seq is not null and @uc_ossi_module_seq is not null)
+        {
+            if ( @uc_exec_status_col is not null and @uc_exec_message_col is not null and upper(@uc_exec_status_col) != 'NULL' )
+            {
+                publish top rows
+                where res = @res
+                and rows = 1
+                |
+                execute server command
+                where cmd = " publish data where uc_ossi_err_code = @" || @uc_exec_status_col || " and uc_ossi_err_descr = @" || @uc_exec_message_col
+                and inline = 1
+            }
+            |  
+            {
+                if ( @uc_update_status_passed = '1' )
+                {
+                    publish data
+                    where uc_set_final_status = '1'
+                    |
+                    execute ossi command as job action 
+                    where cmd = @uc_update_status_cmd
+                    ;
+                    if ( @comflg != 0 )
+                        execute ossi command as job action 
+                        where cmd = "commit" 
+                    ;
+                    noop
+                }
+            }
+            |
+            complete ossi job log
+        }
+    }
+    |
+    publish data
+    where res = @res 
+}
+catch (@?)
+{
+    publish data
+    where uc_ossi_err_code = @?
+    and uc_ossi_err_descr = @!
+    and is_job_flg = '0'
+    |
+    {
+        if (@comflg != 0)
+            execute ossi command as job action 
+            where cmd = "rollback" 
+        ;
+        if ( @uc_update_status_passed = '1' )
+        {
+            publish data
+            where uc_set_final_status = '1'
+            |
+            execute ossi command as job action 
+            where cmd = @uc_update_status_cmd
+            ;
+            if ( @comflg != 0 )
+                execute ossi command as job action 
+                where cmd = "commit" 
+        }
+        ;
+        if (@uc_ossi_job_seq is not null and @uc_ossi_module_seq is not null )
+        {
+            raise ossi job error
+        }
+    }
+    ;
+    noop    
+}
+|
+if (@res is not null)
+{
+    publish data combination 
+    where res = @res 
+}
+
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This is called from within the asynchronous execution framework to process a single record.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

@@ -1,0 +1,25 @@
+#use $DCSDIR/include
+#include <dcsddl.h>
+#include <dcscolwid.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+
+#use $SALDIR/include
+#include <salcolwid.h>
+
+mset command on
+[
+ALTER_TABLE_TABLE_INFO(invdtl)
+ALTER_TABLE_ADD_COLUMN_START(uc_pack_irreversible_flg)
+     FLAG_TY
+ALTER_TABLE_ADD_COLUMN_END
+] catch (-2705,-1430 )
+RUN_DDL
+
+create db column comment 
+where table_name   = 'invdtl' 
+and column_name    = 'uc_pack_irreversible_flg'
+and column_comment = 'Set to 1 to not allow the packing to be reversed'
+RUN_DDL
+
+mset command off

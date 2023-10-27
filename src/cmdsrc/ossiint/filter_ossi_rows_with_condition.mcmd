@@ -1,0 +1,44 @@
+<command>
+<name>filter ossi rows with condition</name>
+<description>Evaluate a passed in condition to see what rows to publish</description>
+
+<argument name="res" required="yes" datatype="string"></argument>
+<argument name="uc_condition" required="yes" datatype="string"></argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+publish data combination
+where res = @res
+|
+{
+   execute server command
+   where cmd = "publish data where eval_ret = iif (" || @uc_condition || ",'1','0')"
+   and inline = 1
+   |
+   if ( @eval_ret = '1')
+      filter data
+      where moca_filter_level = 3
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<remarks>
+Given a MOCA result and an expression representing a filter, it returns the rows that satisfy the condition.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

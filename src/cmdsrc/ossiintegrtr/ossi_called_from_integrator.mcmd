@@ -1,0 +1,48 @@
+<command>
+<name>ossi called_from_integrator</name>
+<description>Return 1 if called from integrator.  0 otherwise </description>
+
+<argument name="evt_id" required="yes" datatype="string">When integrator calls processing algs - this is on stack</argument>
+<argument name="sys_id" required="yes" datatype="string">When integrator calls processing algs - this is on stack</argument>
+<argument name="ifd_id" required="yes" datatype="string">When integrator calls processing algs - this is on stack</argument>
+
+<argument name="uc_force_consider_called_from_int" required="yes" datatype="string">
+This is for testing.  if passed in, then this is what we return as result of command
+</argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+if ( @uc_force_consider_called_from_int is not null )
+    publish data
+    where uc_called_from_int = @uc_force_consider_called_from_int 
+else
+{
+    if ( @evt_id is not null and @sys_id is not null and @ifd_id is not null )
+        publish data where uc_called_from_int = '1'
+    else
+        publish data where uc_called_from_int = '0'
+}
+
+
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+If this command is called from integrator then this command returns 1 otherwise it returns 0.  This can be useful to have conditional logic 
+where we take a certain code path when called from integrator
+</remarks>
+
+<retcol name="uc_called_from_int" type="String">'1' or '0' to indicate if we are within integrator processing alg call</retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

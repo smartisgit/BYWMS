@@ -1,0 +1,57 @@
+<command>
+<name>o td</name>
+<description>Function to get data in a table.  Name is terse so that it can fit in policy for rules</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="moca_farg1">Table_Prefix</argument>
+<argument datatype="string" name="moca_farg2">Column to return</argument>
+
+<argument datatype="string" name="moca_farg3">Column_Name</argument>
+<argument datatype="string" name="moca_farg4">Column_Value</argument>
+
+<argument datatype="string" name="moca_farg5">Column_Name</argument>
+<argument datatype="string" name="moca_farg6">Column_Value</argument>
+
+<argument datatype="string" name="moca_farg7">Column_Name</argument>
+<argument datatype="string" name="moca_farg8">Column_Value</argument>
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+publish data
+where table_name = @moca_farg1
+and return_column = @moca_farg2
+/**/
+and col1 = @moca_farg3
+and val1 = @moca_farg4
+and col2 = nvl(@moca_farg5,'1')
+and val2 = nvl(@moca_farg6,1)
+and col3 = nvl(@moca_farg7,'1')
+and val3 = nvl(@moca_farg8,1)
+|
+{
+    [
+    select max(@return_column:raw) ret
+    from @table_name:raw
+    where @col1:raw = @val1
+    and @col2:raw = @val2
+    and @col3:raw = @val3
+    ]
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+MOCA Function to get a single row and column from a table
+</remarks>
+<exception value="eOK">Normal successful completion</exception>
+</documentation>
+</command>

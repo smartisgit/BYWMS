@@ -1,0 +1,7 @@
+<component-level>
+<name>OSSIintegtr</name>
+<description>OSSI (Smart IS) Integrator Server Functions</description>
+<sort-sequence>8002</sort-sequence>
+<library>ossiint</library>
+<editable>true</editable>
+</component-level>

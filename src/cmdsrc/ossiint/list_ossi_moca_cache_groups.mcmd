@@ -1,0 +1,56 @@
+<command>
+<name>list ossi moca cache groups</name>
+<description>List all cache groups</description>
+<type>Local Syntax</type>
+
+<argument name="uc_cache_grp" required="yes" datatype="string"></argument>
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 11919 - Clear cache API
+ */
+{
+    [[
+    import com.redprairie.moca.cache.*;
+    import java.util.concurrent.*;
+    import com.redprairie.moca.cache.infinispan.*;
+    //
+    //ConcurrentMap<String, String> cache = CacheManager.getCache(uc_my_infispan_cache, new InfinispanCacheProvider(), null, null); 
+    CacheManager.getCacheNames()
+    ]]
+    |
+    if ( @uc_cache_grp is null or @uc_cache_grp = @value )
+    {
+        publish data
+        where uc_cache_grp = @uc_cache_grp
+    }
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+This command will list all cache groups
+</remarks>
+
+<retrows>n</retrows>
+<retcol name="uc_cache_grp" type="COMTYP_CHAR">name of the cache</retcol>
+
+
+<seealso cref="clear moca cache"></seealso>
+<seealso cref="ossi polval"></seealso>
+<seealso cref="execute ossi moca and cache core"></seealso>
+<seealso cref="execute ossi moca and cache"></seealso>
+<seealso cref="clear ossi cache for table update"></seealso>
+
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

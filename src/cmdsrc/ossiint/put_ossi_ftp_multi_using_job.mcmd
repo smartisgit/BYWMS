@@ -1,0 +1,256 @@
+<command>
+<name>put ossi ftp multi using job</name>
+<description>Put files on a remote ftp server using sftp.  Handle multiple files in one session. Execute via job</description>
+
+<argument datatype="string" name="uc_env_prefix">Prefix of the environment variables</argument>
+<argument datatype="string" name="r_server"></argument>
+<argument datatype="string" name="r_port"></argument>
+<argument datatype="string" name="r_user"></argument>
+<argument datatype="string" name="r_password"></argument>
+<argument datatype="string" name="r_dir"></argument>
+<argument datatype="string" name="l_dir"></argument>
+<argument datatype="string" name="l_processed_dir"></argument>
+<argument datatype="string" name="l_file_pattern"></argument>
+<argument datatype="string" name="uc_transfer_mode"></argument>
+<argument datatype="string" name="uc_temp_ext"></argument>
+<argument datatype="string" name="uc_min_age_secs">File modified date is atleast this much</argument>
+<argument datatype="string" name="uc_sort">N for name and D for date.  Default D</argument>
+<argument datatype="string" name="uc_use_sftp">Use sftp or not</argument>
+<argument datatype="string" name="uc_new_name_expr"></argument>
+<argument datatype="string" name="uc_compress_first">If passed in, we compress files first as a zip</argument>
+<argument datatype="string" name="uc_compress_tmp_folder">if we are compressing then we need to have a place
+where we will move file first in order to then compress them there</argument>
+<argument datatype="string" name="uc_compress_file_pattern">What is the file pattern for zip.  Default to W2R.zip</argument>
+<argument datatype="string" name="uc_log_each_compress">Show in usr_ossi_job_log each compress action</argument>
+<argument datatype="string" name="uc_log_each_ftp">Log each FTP</argument>
+
+
+<type>Local Syntax</type>
+
+<local-syntax>
+<![CDATA[
+
+publish data
+where r_server         = ossi__val_or_env_var ( @r_server,         @uc_env_prefix, '_R_SERVER',        '' )
+and   r_port           = ossi__val_or_env_var ( @r_port,           @uc_env_prefix, '_R_PORT',          '' )
+and   r_user           = ossi__val_or_env_var ( @r_user,           @uc_env_prefix, '_R_USER',          '' )
+and   r_password       = ossi__val_or_env_var ( @r_password,       @uc_env_prefix, '_R_PASSWORD',      '' )
+and   r_dir            = ossi__val_or_env_var ( @r_dir,            @uc_env_prefix, '_R_DIR',           '' )
+and   l_dir            = ossi__val_or_env_var ( @l_dir,            @uc_env_prefix, '_L_DIR',           '' )
+and   l_file_pattern   = ossi__val_or_env_var ( @l_file_pattern,   @uc_env_prefix, '_L_FILE_PATTERN',  '' )
+and   l_processed_dir  = ossi__val_or_env_var ( @l_processed_dir,  @uc_env_prefix, '_L_PROCESSED_DIR', '' )
+and   uc_transfer_mode = ossi__val_or_env_var ( @uc_transfer_mode, @uc_env_prefix, '_UC_TRANSFER_MODE','' )
+and   uc_log_each_ftp  = ossi__val_or_env_var ( @uc_log_each_ftp,  @uc_env_prefix, '_UC_FTP_LOG_EACH', '0' )
+and   uc_temp_ext      = ossi__val_or_env_var ( @uc_temp_ext,      @uc_env_prefix, '_UC_TEMP_EXT',     '.tmp' )
+and   uc_min_age_secs  = ossi__val_or_env_var ( @uc_min_age_secs,  @uc_env_prefix, '_UC_MIN_AGE_SECS', '10' )
+and   uc_sort          = ossi__val_or_env_var ( @uc_sort,          @uc_env_prefix, '_UC_SORT',         'D' )
+and   uc_use_sftp      = ossi__val_or_env_var ( @uc_use_sftp,      @uc_env_prefix, '_UC_USE_SFTP',     '0' )
+and   uc_new_name_expr = ossi__val_or_env_var ( @uc_new_name_expr, @uc_env_prefix, '_UC_NEW_NAME_EXPR','' )
+and   uc_compress_first= ossi__val_or_env_var ( @uc_compress_first,@uc_env_prefix, '_UC_COMPRESS_FIRST', '0' )
+and   uc_compress_tmp_folder   = ossi__val_or_env_var ( @uc_compress_tmp_folder , @uc_env_prefix, '_UC_COMPRESS_TMP_DIR', '' )
+and   uc_compress_file_pattern = ossi__val_or_env_var ( @uc_compress_file_pattern ,@uc_env_prefix, '_UC_COMPRESS_FILE_PATTERN', 'W2R*.zip' )
+and   uc_log_each_compress = ossi__val_or_env_var ( @uc_log_each_compress ,@uc_env_prefix, '_UC_COMPRESS_LOG_EACH', '0' )
+|
+{
+   if ( @uc_compress_first = '1' and @uc_compress_tmp_folder is null )
+   {
+       set return status
+       where status = 507
+       and argname = 'uc_compress_tmp_folder'
+       and verb = 'put ossi'
+       and noun = 'ftp multi using job'
+   }
+}
+|
+if ( @r_server is not null and @l_dir is not null )
+{
+   expand environment variable where name = @l_dir
+   |
+   publish data
+   where l_dir = @value
+   |
+   expand environment variable where name = @l_processed_dir
+   |
+   publish data
+   where l_processed_dir = @value
+   |
+   publish data
+   where uc_ossi_module_id = 'OSSIAUTOFTP' || '_' || @uc_env_prefix
+   and   uc_ossi_data      = @l_dir
+   and   uc_ossi_who       = @r_user || '@' || @r_server || ':' || @r_port
+   and   uc_l_file_pattern = @l_dir || '/' || @l_file_pattern
+   and   uc_now            = sysdate
+   |
+   register ossi job or module
+   |
+   try
+   {
+      publish data
+      where uc_ossi_module_seq = ossi__register_module ( @uc_ossi_job_seq, 'FIND_FILE', 
+                                                         @uc_l_file_pattern || ',age=' || @uc_min_age_secs ||',sort=' || @uc_sort, 
+                                                         @uc_ossi_who )
+      |
+      try
+      {
+         {
+            find ossi files for ftp job
+            where pathname = @uc_l_file_pattern
+            and sort = decode ( @uc_sort, 'N', 'Y', 'N' )
+            catch (-1403,510)
+         }
+         >> res_ff
+         |
+         complete ossi job log
+         |
+         /*
+          * res_ff has all files.  But if we compress first, we will take that res_ff and make a new res_ff
+          * that will just have results of another find file but for zip files
+          */
+         if ( @uc_compress_first = '1' )
+         {
+            if ( rowcount(@res_ff) > 0 )
+            {
+               {
+                  publish data
+                  where uc_zip_filename_only = ossi__next_number ( 'usr_transfer_file_seq' ) || '.zip'
+                  |
+                  publish data
+                  where uc_zip_filepath = @uc_compress_tmp_folder || '/' || @uc_zip_filename_only
+                  and uc_zip_find_pathname = @uc_compress_tmp_folder || '/' || @uc_compress_file_pattern
+                  |
+                  publish data
+                  where uc_ossi_action_seq = ossi__register_action ( @uc_ossi_job_seq, @uc_ossi_module_seq, 'ZIP', 
+                                                                     '#files = ' || rowcount(@res_ff)||'->'||@uc_zip_filename_only, 
+                                                                     @uc_ossi_who )
+                  |
+                  try
+                  {
+                     compress ossi files
+                     where uc_res_files = @res_ff
+                     and uc_zip_filename = @uc_zip_filepath
+                     and uc_filename_colnam = 'pathname'
+                     ;
+                     complete ossi job log where uc_ossi_action_seq = @uc_ossi_action_seq
+                     ;
+                     /*
+                      * Execute find for zip files now.  Do this as opposed to simply publishing the zip file name
+                      * so that an older zip file laying around is also returned.  For these we always will do name sort
+                      */
+                     find ossi files for ftp job
+                     where pathname = @uc_zip_find_pathname
+                     and sort = 'Y'
+                     and uc_min_age_secs = 0
+                     catch (-1403,510)
+                  }
+                  catch (@?)
+                  {
+                     publish data
+                     where uc_ossi_err_code  = @?
+                     and   uc_ossi_err_descr = @!
+                     |
+                     raise ossi job error
+                     where is_job_flg = '0'
+                  }
+               } 
+               >> res_ff /* we are publishing with same name as expected by code below so it will process single zip now */
+            } /* have files */
+         } /* do we compress first or not */
+         | 
+         if ( rowcount(@res_ff) > 0 )
+         {
+            publish data
+            where uc_ossi_action_seq = ossi__register_action ( @uc_ossi_job_seq, @uc_ossi_module_seq, 'TRANSFER', 
+                                                               '#files = ' || rowcount(@res_ff), @uc_ossi_who )
+            |
+            try
+            {
+               put ossi ftp multi
+               where uc_show_detailed_results = '0'
+               and uc_new_name_expr = iif ( @uc_compress_first = '1', null, @uc_new_name_expr )
+               |
+               complete ossi job log where uc_ossi_action_seq = @uc_ossi_action_seq
+               |
+               {
+                  if ( @uc_num_ftp = @uc_num_files and @uc_num_move = @uc_num_files )
+                     publish data
+                     where uc_ossi_summ_action_id = 'SUMMARY_FULL_SUCC'
+                  else if ( @uc_num_ftp > 0 and @uc_num_move > 0 )
+                     publish data
+                     where uc_ossi_summ_action_id = 'SUMMARY_PART_SUCC'
+                  else
+                     publish data
+                     where uc_ossi_summ_action_id = 'SUMMARY_FAIL'
+                  |
+                  publish data
+                  where uc_ossi_action_seq = ossi__register_action ( @uc_ossi_job_seq, @uc_ossi_module_seq, @uc_ossi_summ_action_id,
+                                             substr(
+                                             '#ftp_err='      || @uc_num_ftp_err 
+                                          || ',#ftp_ren_err=' || @uc_num_ftp_rename_err
+                                          || ',#move_err='    || @uc_num_move_err 
+                                          || ',ftp_msg='      || @uc_ftp_err_msg 
+                                          || ',ftp_ren_msg='  || @uc_ftp_rename_err_msg
+                                          || ',mov_msg='      || @uc_move_err_msg,1,255),
+                                             @uc_ossi_who )
+                  |
+                  complete ossi job log where uc_ossi_action_seq = @uc_ossi_action_seq
+               } /* block for logging summary */
+            }
+            catch (@?)
+            {
+               publish data
+               where uc_ossi_err_code  = @?
+               and   uc_ossi_err_descr = @!
+               |
+               raise ossi job error
+               where is_job_flg = '0'
+            }
+         } /* have files to process */
+      }
+      catch (@?)
+      {
+         publish data
+         where uc_ossi_err_code  = @?
+         and   uc_ossi_err_descr = @!
+         |
+         raise ossi job error
+         where is_job_flg = '0'
+      }
+      ;
+      complete ossi job or module
+      ;
+      publish data
+      where uc_ossi_job_seq = @uc_ossi_job_seq
+      and uc_ossi_module_seq = @uc_ossi_module_seq
+      and uc_ossi_module_id = @uc_ossi_module_id
+      and uc_ossi_data = @uc_ossi_data
+      and uc_ossi_who = @uc_ossi_who
+   }
+   catch (@?)
+   {
+      publish data
+      where uc_ossi_err_code  = @?
+      and   uc_ossi_err_descr = @!
+      |
+      raise ossi job error
+      where is_job_flg = '0'
+   }
+} /* have a r_server */
+
+
+
+]]>
+</local-syntax>
+<documentation>
+<remarks>
+Put files to a remote ftp server
+</remarks>
+
+<retcol name="uc_ossi_job_seq" type="String"></retcol>
+<retcol name="uc_ossi_module_seq" type="String"></retcol>
+<retcol name="uc_ossi_module_id" type="String"></retcol>
+<retcol name="uc_ossi_data" type="String"></retcol>
+<retcol name="uc_ossi_who" type="String"></retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+</documentation>
+</command>

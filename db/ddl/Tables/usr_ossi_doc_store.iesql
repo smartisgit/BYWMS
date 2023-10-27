@@ -1,0 +1,78 @@
+#use $LESDIR/include
+#use $DCSDIR/include
+#use $MOCADIR/include
+#use $LESDIR/db/ddl/Indexes
+
+
+#include <dcsddl.h>
+#include <dcscolwid.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+
+mset command on
+[
+CREATE_TABLE(usr_ossi_doc_store)
+(
+    uc_doc_id           STRING_TY(15) NOT NULL,
+    /**/
+    uc_doc_typ_cd       STRING_TY(30),
+    uc_doc_subtyp_cd    STRING_TY(30),
+    /**/
+    wh_id               STRING_TY(WH_ID_LEN),
+    ordnum              STRING_TY(ORDNUM_LEN),
+    ship_id             STRING_TY(SHIP_ID_LEN),
+    schbat              STRING_TY(SCHBAT_LEN),
+    cponum              STRING_TY(CPONUM_LEN),
+    invnum              STRING_TY(INVNUM_LEN),
+    trknum              STRING_TY(TRKNUM_LEN),
+    /**/
+    uc_file_created_ts  STRING_TY(30),
+    uc_file_accessed_ts STRING_TY(30),
+    uc_file_modified_ts STRING_TY(60),
+    uc_filesize         STRING_TY(60),
+    uc_file_full_path   STRING_TY(1000),
+    uc_file_folder      STRING_TY(1000),
+    uc_filename_only    STRING_TY(1000),
+    uc_contents_base64  CLOB_TY,
+    /**/
+    ins_dt		DATE_TY,
+    ins_user_id		STRING_TY(40),
+    last_upd_dt		DATE_TY,
+    last_upd_user_id    STRING_TY(40)
+	            
+)
+] catch (ERR_TABLE_ALREADY_EXISTS)
+RUN_DDL
+
+#include <usr_ossi_doc_store_pk.iesql>
+
+mset command on
+create db documentation
+where table             = "usr_ossi_doc_store"
+and table_comment       = "This table will store any documents that may be downloaded to us"
+and uc_doc_id           = "Primary Key of the table"
+and uc_doc_typ_cd       = "To categorize the documents.  e.g. INV for Invoice.  MEMS for Member slip"
+and uc_doc_subtyp_cd    = "To further categorize documents.  e.g. C for colidated invoice.  N for non consolidated"
+and wh_id               = "determine what warehouse"
+and ordnum              = "determine what order applies to this file"
+and ship_id             = "determine what ship_id applies to this file"
+and schbat              = "determine what schbat applies to this file"
+and cponum              = "determine what cponum applies to this file"
+and invnum              = "determine what invnum applies to this file"
+and trknum              = "determine what trknum applies to this file"
+and uc_file_created_ts  = "Per find file, the created timestamp reported"
+and uc_file_accessed_ts = "Per find file, the accesed timestamp reported"
+and uc_file_modified_ts = "Per find file, the modified timestamp reported"
+and uc_filesize         = "File Size reported.  Storing as string"
+and uc_file_full_path   = "Full fiilepath"
+and uc_file_folder      = "Since PK cannot change, this is to change sorting"
+and uc_filename_only    = "Just the filename only"
+and uc_contents_base64  = "Contents of the file in base64 encoding"
+and ins_dt              = "Add Date/time"
+and last_upd_dt	        = "Update Date/Time"
+and ins_user_id         = "Add User Id"
+and last_upd_user_id    = "Update user Id"
+
+
+RUN_DDL
+mset command off

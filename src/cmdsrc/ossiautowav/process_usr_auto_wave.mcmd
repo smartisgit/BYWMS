@@ -1,0 +1,597 @@
+<command>
+<name>process usr auto wave</name>
+<description>This is the command that is scheduled in schedule agent ops</description>
+
+<argument name="wh_id"  datatype="string" />
+<argument name="uc_auto_wave_rule_id"  datatype="string">Rules are defined in usr_auto_wave_rule_hdr table</argument>
+ 
+<argument name="uc_ossi_job_seq" required="yes" datatype="string"></argument>
+<argument name="uc_ossi_module_seq" required="yes" datatype="string"></argument>
+<argument name="uc_ossi_who" required="yes" datatype="string"></argument>
+
+<argument name="comflg" required="yes" datatype="integer">1 or 0.  Default 1</argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+/* 
+ * Dont worry about losing numbers of schbat
+ */
+publish data
+where uc_parm_id_column = 'uc_parm_id'
+and uc_parm_value_column = 'uc_parm_val_expr'
+and uc_parm_expr_flg_column = 'uc_expr_flg'
+and uc_complete_tran_on_complete = 1
+and comflg = nvl(@comflg, 1)
+|
+publish data
+where uc_local_now = date(ossi__get_wh_local_time(@wh_id,'yyyyMMddHHmmss'))
+|
+[
+select uc_batcod_prefix,
+       filter_id uc_rule_filter_id,
+       uc_auto_alloc_flg,
+       uc_can_rpl_flg,
+       uc_chg_pckts_p_flg,
+       uc_auto_pckrel_flg,
+       uc_sch_tim_local_flg,
+       uc_auto_wave_order_by
+from usr_auto_wave_rule_hdr
+where wh_id = @wh_id
+and uc_auto_wave_rule_id = @uc_auto_wave_rule_id
+]
+|
+if ( @uc_sch_tim_local_flg = 1 )
+    publish data
+    where use_now = @uc_local_now
+else
+    publish data
+    where use_now = sysdate
+|
+publish data
+where batcod = iif(@uc_batcod_prefix = '', @uc_batcod , @uc_batcod_prefix  || '_' || to_char(@use_now, 'YYMMDD'))
+|
+/*
+ * We will register job and module only when called in testing this component independently.
+ * In actual world this is not called like that and is called as part of the run via job
+ */
+if ( @uc_ossi_job_seq is null )
+{
+    publish data
+    where uc_ossi_job_seq = ossi__register_job ( 'AUTO-WAVE-TMP',  @uc_auto_wave_rule_id, @wh_id )
+    |
+    publish data
+    where uc_ossi_module_seq = ossi__register_module ( @uc_ossi_job_seq, 'AUTO-WAVE', '', @wh_id )
+    and uc_ossi_job_seq = @uc_ossi_job_seq
+    and uc_created_job_module = 1
+}
+|
+try
+{
+    /*
+     * obtain a lock of current auto wave rule so other rules are not executed
+     */
+    get ossi database lock
+    where uc_lock_id = 'UC_AUTOWAVE_' || @wh_id
+    ;
+    /*
+     * get the various types of fields for this rule id that we will need to push in various conditoons
+     */
+    [
+    select polval uc_parm_id, rtstr1 uc_parm_val_expr, 1 uc_expr_flg
+    from poldat_view
+    where polcod = 'USR-WAVE-PLANNING'
+    and polvar = 'DEFAULT-AUTO-WAVE-ALLOC-PARAMS'
+    and rtnum1 = 1
+    and wh_id = @wh_id
+    order by polval
+    ]
+    catch (-1403,510)
+    >> res_def_alloc_parm_res
+    |
+    [
+    select filter_type uc_filter_id_rule_nam
+    from web_filter
+    where web_filter.id = @uc_rule_filter_id
+    ]
+    |
+    [
+    select web_filter_val.column_name uc_parm_id,
+           web_filter_val.value uc_parm_val_expr,
+           0 uc_expr_flg
+    from web_filter_val
+         join web_filter on web_filter.group_id = web_filter_val.group_id
+    where web_filter.id = @uc_rule_filter_id
+    ]
+    catch (-1403,510)
+    >> res_filter_res
+    |
+    [
+    select column_name uc_parm_id, uc_rule_fld_value_expr uc_parm_val_expr, 1 uc_expr_flg
+    from usr_auto_wave_rule_def_fld
+    where wh_id = @wh_id
+    and uc_auto_wave_rule_id = @uc_auto_wave_rule_id
+    and uc_auto_wave_ctxt_cd = 'P'
+    order by column_name
+    ]
+    catch (-1403,510)
+    >> res_rule_parm_plan_res
+    |
+    [
+    select column_name uc_parm_id, uc_rule_fld_value_expr uc_parm_val_expr, 1 uc_expr_flg
+    from usr_auto_wave_rule_def_fld
+    where wh_id = @wh_id
+    and uc_auto_wave_rule_id = @uc_auto_wave_rule_id
+    and uc_auto_wave_ctxt_cd = 'A'
+    order by column_name
+    ]
+    catch (-1403,510)
+    >> res_rule_parm_alloc_res
+    |
+    [
+    select column_name uc_parm_id, uc_rule_fld_value_expr uc_parm_val_expr, 1 uc_expr_flg
+    from usr_auto_wave_rule_def_fld
+    where wh_id = @wh_id
+    and uc_auto_wave_rule_id = @uc_auto_wave_rule_id
+    and uc_auto_wave_ctxt_cd = 'R'
+    order by column_name
+    ]
+    catch (-1403,510)
+    >> res_rule_parm_rel_res
+    |
+    publish ossi values as row on stack
+    where res = @res_def_alloc_parm_res
+    |
+    publish data
+    where rule_nam = nvl(@uc_filter_id_rule_nam, @rule_nam)
+    |
+    /*
+     * 050.  This is to push something on stack with multiple rows so that what happens below is for each of those rows 
+     *       For one instance they wanted to create a wave per appointmnet.  So this will push each appointment on stack and then
+     *       Everything is done for that
+     */
+    {
+        publish ossi values as row on stack
+        where res = @res_rule_parm_plan_res
+        |
+        publish data
+        where uc_wave_rule_ctxt_cmd = nvl(@uc_wave_rule_ctxt_cmd, ossi__polval ( 'USR-WAVE-PLANNING', 'AUTO-WAVE', @rule_nam, '', 'rtstr1', @wh_id ) )
+        |
+        if ( @uc_wave_rule_ctxt_cmd is not null )
+            execute server command
+            where cmd = @uc_wave_rule_ctxt_cmd
+            and inline = 1
+        else
+            publish data
+            where uc_ctxt_rownum = 0
+            and uc_auto_wave_ctxt_rowcnt = 0
+            and uc_ctxt_job_action = 'n/a'
+            and uc_ctxt_batcod = null
+    }
+    |
+    publish data
+    where schbat = ossi__next_number ( 'schbat' )
+    |
+    publish data
+    where uc_ossi_action_seq_main = ossi__register_action ( @uc_ossi_job_seq, @uc_ossi_module_seq, 'BATCOD-STACK', 
+                                                            @schbat || '=' || @uc_ctxt_job_action || ':' || @uc_ctxt_rownum || ' of ' || @uc_auto_wave_ctxt_rowcnt,
+                                                            @uc_ossi_who )
+    |
+    try
+    {
+        /* 
+         * 100.  This is the plan phase
+         */
+        {
+            publish data
+            where uc_ossi_action_seq = ossi__register_action ( @uc_ossi_job_seq, @uc_ossi_module_seq, 'PLAN', 
+                                                               @schbat || '/' || @uc_auto_wave_rule_id,
+                                                               @uc_ossi_who )
+            |
+            try
+            {
+                publish ossi values as row on stack
+                where res = @res_rule_parm_plan_res
+                |
+                publish ossi values as row on stack
+                where res = @res_filter_res
+                |
+                /*
+                 * This is putting the context values ahead of the ones in the filter itself.
+                 * So for example if we are creating waves for each appointment, this is where push the appt_id ahead of the values 
+                 */
+                filter data where moca_filter_level = 9                
+                |
+                process wave rules
+                where sumflg = 0
+                and batcod = nvl(@uc_ctxt_batcod, @batcod)
+                catch (10539,10572)
+                ;
+                [
+                select count(*) uc_cnt_sl,
+                       count(distinct ship_id) uc_cnt_ship_id
+                from shipment_line
+                where schbat = @schbat
+                ]
+            }
+            finally
+            {
+                complete ossi job log
+            }
+            |
+            if ( @uc_cnt_sl > 0 )
+            {
+                publish data
+                where uc_ossi_action_seq = ossi__register_action ( @uc_ossi_job_seq, @uc_ossi_module_seq, 'PLAN-RES', 
+                                                                   '#ship=' || @uc_cnt_ship_id || ',#shipment_line=' || @uc_cnt_sl,
+                                                                   @uc_ossi_who )
+                |
+                complete ossi job log
+                ;
+                if ( @comflg = 1 ) 
+                    commit
+                ;
+                if ( @uc_auto_alloc_flg = 1)
+                {
+                    publish ossi values as row on stack
+                    where res = @res_rule_parm_alloc_res
+                    |
+                    publish data
+                    where uc_ossi_action_seq = ossi__register_action ( @uc_ossi_job_seq, @uc_ossi_module_seq, 'ALLOC', 
+                                                                       @schbat,
+                                                                       @uc_ossi_who )
+                    |
+                    try
+                    {
+                        if(@uc_chg_pckts_p_flg = 0)
+                          hide stack variable 
+                          where name='pcksts_uom' 
+                        |
+                        allocate wave
+                        where pcksts = 'H'
+                        ;
+                        [
+                        select count(*) uc_cnt_pckwrk
+                        from pckwrk_view
+                        where schbat = @schbat
+                        ]
+                        |
+                        [
+                        select count(*) uc_cnt_rplwrk
+                        from rplwrk
+                        where schbat = @schbat
+                        ]
+                        |
+                        publish data
+                        where uc_cnt_pckwrk = @uc_cnt_pckwrk
+                        and uc_cnt_rplwrk = @uc_cnt_rplwrk
+                    }
+                    finally
+                    {
+                        complete ossi job log
+                    } /* finally of alocate */
+                } /* do allocation */
+                |
+                if ( @uc_cnt_pckwrk > 0 or @uc_cnt_rplwrk > 0 )
+                {
+                    publish data
+                    where uc_ossi_action_seq = ossi__register_action ( @uc_ossi_job_seq, @uc_ossi_module_seq, 'ALLOC-RES', 
+                                                                       '#pckwrk=' || @uc_cnt_pckwrk || ',#rplwrk=' || @uc_cnt_rplwrk,
+                                                                       @uc_ossi_who )
+                    |
+                    complete ossi job log
+                    ;
+                    if ( @comflg = 1 )
+                        commit
+                    ;
+                    /* 
+                     * CANCELL SHORTS
+                     */
+                    if ( @uc_can_rpl_flg = 1 and @uc_cnt_rplwrk > 0 )
+                    {
+                        [
+                        select distinct ship_id
+                        from rplwrk
+                        where schbat = @schbat
+                        order by 1
+                        ] 
+                        catch (-1403,510)
+                        |
+                        if ( @? = 0 )
+                        {
+                            publish data
+                            where uc_ossi_action_seq = ossi__register_action ( @uc_ossi_job_seq, @uc_ossi_module_seq, 'CAN-SHORT-PICK', 
+                                                                               @ship_id,
+                                                                               @uc_ossi_who )
+                            |
+                            try
+                            {
+                                cancel pick groups
+                                where chgmod='U'
+                                catch (-1403)
+                            }
+                            finally
+                            {
+                                complete ossi job log
+                            }
+                        } /* found rplwrk */
+                        ;
+                        publish data
+                        where uc_ossi_action_seq = ossi__register_action ( @uc_ossi_job_seq, @uc_ossi_module_seq, 'CAN-SHORT-REPLEN', 
+                                                                           @schbat,
+                                                                           @uc_ossi_who )
+                        |
+                        try
+                        {
+                            [
+                            select rplref,
+                                   wh_id
+                            from rplwrk
+                            where schbat=@schbat
+                            order by 1
+                            ]
+                            catch (-1403,510)
+                            |
+                            if ( @? = 0 )
+                            {
+                                cancel replenishment 
+                                catch(@?)
+                            }
+                        }
+                        finally
+                        {
+                            complete ossi job log
+                        }
+                        ;
+                        noop
+                    } /* do we need to cancel replens */
+                    ;
+                    if ( @uc_chg_pckts_p_flg = 1 )
+                    {
+                        publish data
+                        where uc_ossi_action_seq = ossi__register_action ( @uc_ossi_job_seq, @uc_ossi_module_seq, 'CHANGE-PCKSTS', 
+                                                                           @schbat,
+                                                                           @uc_ossi_who )
+                        |
+                        try
+                        {
+                            change held pick status
+                            where schbat = @schbat
+                            and wh_id = @wh_id 
+                            and bypass_stop_seq = 1    
+                            catch(-1403)
+                        }
+                        finally
+                        {
+                            complete ossi job log
+                            where uc_complete_tran_on_complete = iif ( @uc_auto_pckrel_flg = 1, 0, 1 )
+                        }
+                        ;
+                        noop
+                    } /* changle H to P */
+                    ;
+                    if ( @uc_auto_pckrel_flg = 1 )
+                    {
+                        publish data
+                        where uc_ossi_action_seq = ossi__register_action ( @uc_ossi_job_seq, @uc_ossi_module_seq, 'PCKREL', 
+                                                                           @schbat,
+                                                                           @uc_ossi_who )
+                        |
+                        try
+                        {
+                            publish ossi values as row on stack
+                            where res = @res_rule_parm_rel_res
+                            |
+                            perform usr inline pick release
+                        }
+                        finally
+                        {
+                            complete ossi job log
+                        }
+                    }
+                } /* pick or replens are > 0 */
+                |
+                /*
+                 * Now capture data for the wave to form a nice result set.
+                 */
+                [
+                select uc_reldte uc_wave_reldte
+                from pckbat
+                where schbat = @schbat
+                ]
+                catch (-1403,510)
+                |
+                [
+                select count(*) uc_cnt_rplwrk
+                from rplwrk
+                where schbat = @schbat
+                ]
+                |
+                [
+                select count(*)                           uc_cnt_pckwrk,
+                       nvl(sum(decode(pcksts,'R',1,0)),0) uc_cnt_pckwrk_r,
+                       nvl(sum(decode(pcksts,'L',1,0)),0) uc_cnt_pckwrk_l,
+                       nvl(sum(decode(pcksts,'P',1,0)),0) uc_cnt_pckwrk_p,
+                       nvl(sum(decode(pcksts,'H',1,0)),0) uc_cnt_pckwrk_h
+                from pckwrk_view
+                where schbat = @schbat
+                ]
+                |
+                [
+                select count ( distinct decode(shipment.uc_reldte,null, null, shipment_line.ship_id) ) uc_cnt_rel_shipment,
+                       count ( distinct shipment_line.ordnum) uc_cnt_ord,
+                       count ( distinct decode(ord.uc_reldte, null, null, ord.ordnum) ) uc_cnt_rel_ord
+                from shipment_line
+                     join shipment on shipment.ship_id = shipment_line.ship_id
+                     join ord
+                         on ord.client_id = shipment_line.client_id
+                         and ord.wh_id = shipment_line.wh_id
+                         and ord.ordnum = shipment_line.ordnum
+                where shipment_line.schbat = @schbat
+                and shipment_line.linsts not in ( 'B', 'C' )
+                ]
+                |
+                publish data
+                where wh_id = @wh_id
+                and uc_auto_wave_rule_id = @uc_auto_wave_rule_id
+                and uc_filter_id_rule_nam = @uc_filter_id_rule_nam
+                and rule_nam = @rule_nam
+                and schbat = @schbat
+                and batcod = @batcod
+                and uc_ctxt_rownum = @uc_ctxt_rownum
+                and uc_auto_wave_ctxt_rowcnt = @uc_auto_wave_ctxt_rowcnt
+                and uc_ctxt_job_action = @uc_ctxt_job_action
+                and uc_cnt_ship_id = @uc_cnt_ship_id
+                and uc_cnt_sl = @uc_cnt_sl
+                and uc_cnt_ord = @uc_cnt_ord
+                and uc_cnt_pckwrk = @uc_cnt_pckwrk
+                and uc_cnt_rplwrk = @uc_cnt_rplwrk
+                and uc_cnt_pckwrk_r = @uc_cnt_pckwrk_r
+                and uc_cnt_pckwrk_l = @uc_cnt_pckwrk_l
+                and uc_cnt_pckwrk_p = @uc_cnt_pckwrk_p
+                and uc_cnt_pckwrk_h = @uc_cnt_pckwrk_h
+                and uc_wave_reldte = @uc_wave_reldte
+                and uc_cnt_rel_shipment = @uc_cnt_rel_shipment
+                and uc_cnt_rel_ord = @uc_cnt_rel_ord
+                and uc_ossi_job_seq = @uc_ossi_job_seq
+                and uc_ossi_module_seq = @uc_ossi_module_seq
+                and comflg = @comflg
+            } /* we have some shipment lines */
+        } /* all ress in stack */
+    } /* main action for each row */
+    finally
+    {
+        complete ossi job log
+        where uc_ossi_action_seq = @uc_ossi_action_seq_main
+    }
+} /* main */
+finally
+{
+    if ( @uc_created_job_module = 1 )
+    {
+        complete ossi job log
+        ;
+        complete ossi job
+    }
+}
+
+]]>
+</local-syntax>
+<documentation>
+<remarks>
+<![CDATA[
+This command will process automatic wave.  This is for one call and will potentially create a single wave.  The rules are defined in 
+usr_auto_wave_rule_hdr table - so that is where the story starts.  Many of them may be enabled.  The job UC_W_wh_id_AUTOWAV (i.e. one wave per
+warehouse) is running.  It is lookinbg at these entries in the table and determines which one should run now.  The job itself is running every 60 
+seconds - so it sees every seconds and runs the rules it needs to.
+</p>
+The values for the wave rule (for data selection) are defined using filters.  Filter is the left side of standard wave screen.  Each rule in 
+usr_auto_wave_rule_hdr points to a filter.  The table for these entries is web_filter_val.
+</p>
+usr_auto_wave_rule_def_fld table defines the values of certain fields as needed by the various steps in this process.  The usage of a value
+is defined by the uc_auto_wave_ctxt_cd field.  uc_rule_fld_value_expr is an expression.
+<ul>
+    <li>P - means it is for planning step</li>
+    <li>A - means it is for allocation step</li>
+    <li>R - means it is for release step</li>
+</ul>
+
+It works as follows:
+<ul>
+    <li>it first determines some default settings for eventual process wave rules command.  It gets some global defaults from the policy
+        mentioned below.  These can be overridden by usr_auto_wave_rule_def_fld table for the specific rule.</li>
+    <li>Get the values of the fields for the filter define for the rule in usr_auto_wave_rule_hdr</li>
+    <li>Call process wave rules with the above on stack.  That will plan the wave and push the schbat on stack</li>
+    <li>If our rule in usr_auto_wave_rule_hdr had auto_alloc_flg set, we will call [allocate wave].  This is always allocated to H status</li>
+    <li>If rule has uc_can_rpl_flg set to 1, we will cancel shorts if they are there</li>
+    <li>If rule has uc_chg_pckts_p_flg set to 1, we will now change pcksts on picks from H to P</li>
+    <li>If rule has uc_auto_pckrel_flg set to 1, we will release picks inline now.  If not it will rely on pick releaser</li>
+    <li>Finally it publishes the output</li>
+</ul>
+
+The job schedules this command.  For example:
+<pre>
+process usr auto wave rules where wh_id = 'WMD1' and comflg = 1
+</pre>
+
+Progress is tracked in usr_ossi_job_log table.
+
+]]>
+</remarks>
+
+
+<retrows>n - returned only when a wave was successfully created.  More than one returned since we may have context command</retrows>
+<retcol name="wh_id" type="string"></retcol>
+<retcol name="schbat" type="string"></retcol>
+<retcol name="rule_nam" type="string"></retcol>
+<retcol name="uc_filter_id_rule_nam" type="string"></retcol>
+<retcol name="batcod" type="string"></retcol>
+<retcol name="uc_ctxt_rownum" type="string"></retcol>
+<retcol name="uc_auto_wave_ctxt_rowcnt" type="string"></retcol>
+<retcol name="uc_ctxt_job_action" type="string"></retcol>
+<retcol name="uc_cnt_ship_id" type="string"></retcol>
+<retcol name="uc_cnt_sl" type="string"></retcol>
+<retcol name="uc_cnt_ord" type="string"></retcol>
+<retcol name="uc_cnt_pckwrk" type="string"></retcol>
+<retcol name="uc_cnt_rplwrk" type="string"></retcol>
+<retcol name="uc_cnt_pckwrk_r" type="string"></retcol>
+<retcol name="uc_cnt_pckwrk_l" type="string"></retcol>
+<retcol name="uc_cnt_pckwrk_p" type="string"></retcol>
+<retcol name="uc_cnt_pckwrk_h" type="string"></retcol>
+<retcol name="uc_wave_reldte" type="string"></retcol>
+<retcol name="uc_cnt_rel_shipment" type="string"></retcol>
+<retcol name="uc_cnt_rel_ord" type="string"></retcol>
+<retcol name="uc_ossi_job_seq" type="string"></retcol>
+<retcol name="uc_ossi_module_seq" type="string"></retcol>
+<retcol name="comflg" type="string"></retcol>
+
+
+
+
+<policy
+    polcod="USR-WAVE-PLANNING"
+    polvar="DEFAULT-AUTO-WAVE-ALLOC-PARAMS"
+    polval="A parameter to process wave rules commnad.  Multiple rows exist e.g. with consby,imr_uom_list,etc"
+    rtstr1="is the value of these"
+    rtnum1="1 to enable a row"
+></policy>
+
+<policy 
+    polcod="USR-WAVE-PLANNING" 
+    polvar="WAVE-RULE-PARAMETER-TABLE" 
+    polval="@rule_nam"
+    rtstr1="parameter name"
+    rtstr2="table alias.column"
+>This is used to define the table alias that has this column.  rtstr2 defines alias.column
+</policy>
+
+<policy 
+    polcod="USR-WAVE-PLANNING" 
+    polvar="MISCELLANEOUS" 
+    rtnum1="1 to enable auto waving"
+>This is used to define the table alias that has this column.  rtstr2 defines alias.column
+</policy>
+
+<policy 
+    polcod="USR-WAVE-PLANNING" 
+    polvar="AUTO-WAVE" 
+    polval="Rule name"
+    rtstr1="Command to establish context"
+>
+</policy>
+
+
+
+<seealso cref="process wave rules"></seealso>
+<seealso cref="create clause for wave planning"></seealso>
+<seealso cref="allocate wave"></seealso>
+<seealso cref="perform usr inline pick release"></seealso>
+<seealso cref="list order lines available for wave planning">Only orders with uc_regdte set are considered</seealso>
+
+
+
+
+</documentation>
+</command>

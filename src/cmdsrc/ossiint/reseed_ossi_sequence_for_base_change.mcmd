@@ -1,0 +1,112 @@
+<command>
+<name>reseed ossi sequence for base change</name>
+<description>If changing the base to base 36, we need to reseed it.</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="sequence_name">Value to check</argument>
+<argument datatype="string" name="to_base">Value to check</argument>
+
+
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+publish data
+where to_base = int(@to_base)
+|
+{
+   [
+   select sysctl.*,
+          decode(btsflg, 1, 36, 10 ) uc_base
+   from sysctl
+   where numcod = @sequence_name
+   ]
+   |
+   publish data
+   where uc_sequence_nextval = ossi__next_number ( @sequence_name )
+   |
+   if ( @suflen = 0 )
+      publish data
+      where uc_sequence_nextval_no_prefix = substr(@uc_sequence_nextval, @prelen+1 )
+   else
+      publish data
+      where uc_sequence_nextval_no_prefix = substr(@uc_sequence_nextval, @prelen+1, len(@uc_sequence_nextval)-@suflen-@prelen )
+   |
+   publish data
+   where uc_sequence_nextval_no_prefix = sl_fmt__trim ( @uc_sequence_nextval_no_prefix, 'L', '0' )
+   |
+   if ( @to_base != @uc_base )
+   {
+      if ( @to_base != 36 )
+         set return status
+         where status = 507
+         and message = 'Only converting to base 36 is supported'
+      ;
+      /*
+       * If current number was a base 36 number, what would it be?  We dont want to end up ever duplicating
+       */
+      [[
+      uc_sequence_nextval_no_prefix_new_base_decimal = Integer.parseInt(uc_sequence_nextval_no_prefix, to_base);
+      ]]
+      |
+      {
+         /*
+          * Now reseed the sequence to this new value
+          */
+         reseed sequence
+         where sequence_name = @sequence_name
+         and seed = @uc_sequence_nextval_no_prefix_new_base_decimal
+         ;
+         /*
+          * Now update this sequence base 36 flag
+          */
+         [
+         update sysctl
+         set btsflg = 1
+         where numcod = @sequence_name
+         ]
+         ;
+         publish data
+         where sequence_name     = @sequence_name
+         and uc_new_next_number  = ossi__next_number ( @sequence_name )
+         and uc_new_seed_decimal = @uc_sequence_nextval_no_prefix_new_base_decimal
+         and old_base = @uc_base
+         and new_base = @to_base
+         and uc_base_changed_flg = '1'
+      }
+   }
+   else
+   {
+      publish data
+      where sequence_name     = @sequence_name
+      and uc_new_next_number  = ossi__next_number ( @sequence_name )
+      and uc_new_seed_decimal = -1
+      and old_base = @uc_base
+      and new_base = @to_base
+      and uc_base_changed_flg = '0'
+   }
+}
+
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+This component can be used to change a base 10 sequence to a base 36 sequence.  It will see current value of the sequence
+(in base 10) and assume it is base 36 (i.e. very high number).  It will reseed the sequence to that and then change
+sequence base 36 to 1.
+
+Net impact will be that we will skip a lot of numbers but we will not have any duplicates.
+
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

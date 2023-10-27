@@ -1,0 +1,29 @@
+<trigger>
+<name>process usr issue</name>
+<on-command>remove code</on-command>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ */
+check usr codmst exclusion
+  catch (-1403,510)
+|
+if (@? = 0)
+process usr issue
+  where uc_table_name = 'CODMST'
+    and uc_action = 'REMOVE'
+]]></local-syntax>
+<fire-sequence>10000</fire-sequence>
+<documentation>
+
+<remarks>
+This trigger process issue for deleting code.
+</remarks>
+
+<seealso cref="process usr issue"></seealso>
+
+</documentation>
+</trigger>

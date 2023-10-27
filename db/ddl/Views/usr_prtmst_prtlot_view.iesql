@@ -1,0 +1,39 @@
+#use $DCSDIR/include
+#include <dcsddl.h>
+#include <dcscolwid.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+#use $SALDIR/include
+
+#include <salcolwid.h>
+
+mset command on
+
+[drop view usr_prtmst_prtlot_view] catch(@?)
+;
+get ossi table column list for default logic 
+where table_name = 'prtlot' 
+and uc_output_col_select_clause = 'uc_ctxt_clause_prtlot_sel' 
+and uc_output_col_group_clause = 'uc_ctxt_clause_prtlot_group'
+and column_source_prefix = 'prtlot.'
+and column_name_prefix = 'uc_pl_'
+|
+get ossi table column list for default logic 
+where table_name = 'prtmst' 
+and uc_output_col_select_clause = 'uc_ctxt_clause_prtmst_sel' 
+and uc_output_col_group_clause = 'uc_ctxt_clause_prtmst_group'
+and column_source_prefix = 'prtmst.'
+and column_name_prefix = 'uc_pm_'
+|
+[
+create view usr_prtmst_prtlot_view
+as
+select prtmst.wh_id, prtmst.prt_client_id, prtmst.prtnum, prtlot.lotnum,
+       @uc_ctxt_clause_prtmst_sel:raw,
+       @uc_ctxt_clause_prtlot_sel:raw
+from prtmst_view prtmst
+     left outer join prtlot on prtlot.prt_client_id = prtmst.prt_client_id and prtlot.prtnum = prtmst.prtnum and prtlot.wh_id = prtmst.wh_id
+]
+RUN_DDL
+
+mset command on

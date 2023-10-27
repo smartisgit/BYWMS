@@ -1,0 +1,10 @@
+<project project-dir='.' js-dir='${project-dir}' app-id='${appId}' hf-compliant='true'>
+	<target name='les.usr.usrossiappmonmnt' type='js' source-dir='${js-dir}'>
+		<include name = 'MainStore.js' />
+		<include name = 'UsrossiappmonmntStore.js' />
+		<include name = 'UsrossiappmonparmmntStore.js' />
+		<include name = 'MainView.js' />
+		<include name = 'MainController.js' />
+		<include name = 'App.js' />
+	</target>
+</project>

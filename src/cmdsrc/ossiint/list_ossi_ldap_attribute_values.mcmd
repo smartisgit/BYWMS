@@ -1,0 +1,216 @@
+<command>
+<name>list ossi ldap attribute values</name>
+<description>Get the LDAP attribute values</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="url"></argument>
+<argument datatype="string" name="bind_dn"></argument>
+<argument datatype="string" name="bind_password"></argument>
+<argument datatype="string" name="auth_type"></argument>
+
+
+<argument datatype="string" name="ldap_client"></argument>
+
+<argument datatype="string" name="search_filter"></argument>
+<argument datatype="string" name="search_base"></argument>
+
+<argument datatype="string" name="uc_ldap_pk">What defines the PK of this 
+A/D node.  If null we assume distinguishedName
+</argument>
+
+<argument datatype="string" name="uc_ena_flg_expr">Expression that decides if this row is enabled
+</argument>
+
+<argument datatype="string" name="uc_query_by_base">If 1 then we query by search base</argument>
+
+
+<argument datatype="string" name="uc_attr_name_list">A coma-separated list
+of what to fetch for a given PK value.  Each member of list is a 3-tuple 
+separated by :.  
+1. Name of the column as returned
+2. A/D name of the column
+3. Type.  Currently has to be S for string
+</argument>
+
+
+<argument datatype="string" name="uc_emulate_ldap_file">If you do not have access to A/D for develpoment, you can
+pass path to a file here.  If this is passed, then we do not connect to LDAP.  Instead we will read every line in this
+file and assume it has data listed in same order as the requested uc_attr_name_list.  And separated by coma.  We will
+simply return each column and name it as specified in uc_attr_name_list.  The first column in  result set will be 
+uc_ldap_pk value and its value will be line# in the file.
+</argument>
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+publish data
+where  uc_ldap_pk = nvl(@uc_ldap_pk, 'distinguishedName' )
+and    uc_ena_flg_expr = nvl(@uc_ena_flg_expr, "decode(@uc_account_control = '66050', '0', '1' )")
+and    uc_query_by_base = nvl(@uc_query_by_base, 1)
+|
+if ( @uc_emulate_ldap_file is not null )
+    publish data where uc_emulating_ldap = '1'
+else
+    publish data where uc_emulating_ldap = '0'
+|
+if ( @ldap_client is null and @uc_emulating_ldap = '0' )
+    publish data where uc_connect_to_ldap = '1'
+else
+    publish data where uc_connect_to_ldap = '0'
+|
+if ( @uc_connect_to_ldap = '1' and @url is null )
+   noop
+else
+{
+    if ( @uc_connect_to_ldap = '1' )
+        connect to ldap server
+    |
+    try
+    {
+        convert list 
+        where string = @uc_attr_name_list
+        and type = 'L'
+        >> uc_attr_res
+        |
+        [[
+        ret_r = new SimpleResults();
+        String trace_prefix = "### search_base:" + search_base + ";filter:" + search_filter + "###";
+        //
+        moca.trace( trace_prefix + "-Start, query_by_base=" + uc_query_by_base);
+        ret_r.addColumn ( "uc_ldap_pk", MocaType.STRING );
+        while ( uc_attr_res.next() )
+        {
+            return_column = uc_attr_res.getString("retstr").split(':')[0];
+            fetch_column  = uc_attr_res.getString("retstr").split(':')[1];
+            fetch_type    = uc_attr_res.getString("retstr").split(':')[2];
+            //
+            ret_r.addColumn ( return_column, (fetch_type == "I" ? MocaType.INTEGER : MocaType.STRING) );
+        }
+        //
+        // First fetch the PK
+        //
+        if ( uc_emulating_ldap == "0" )
+        {
+            moca.trace( trace_prefix + "  Find-" + uc_ldap_pk );
+            res_pk = moca.executeInline ( " find ldap attribute values" +
+                                          " where search_filter = @search_filter" +
+                                          " and attr_name = @uc_ldap_pk" +
+                                          " and search_base = @search_base" );
+            moca.trace( trace_prefix + "  Find Done" );
+        }
+        else
+            res_pk = moca.executeInline ( "read file where filename = @filename catch(@?)", [filename:uc_emulate_ldap_file] );
+        while ( res_pk.next() )
+        {
+            moca.trace( trace_prefix + "  res_pk looop start" );
+            if ( uc_emulating_ldap == "0" )
+            {
+                uc_ldap_pk_val = res_pk.getString ( "value" );
+
+                if ( uc_query_by_base == 1 )
+                {
+                    ldap_query = "(cn=*)";
+                    use_search_base = uc_ldap_pk_val;
+                }
+                else if ( uc_query_by_base == 2 )
+                {
+                    ldap_query = "(cn=*)";
+                    use_search_base = "cn=" + uc_ldap_pk_val + "," + search_base;
+                }
+                else
+                {
+                    ldap_query = "(" + uc_ldap_pk + "=" + uc_ldap_pk_val + ")";
+                    use_search_base = search_base;
+                }
+                moca.trace( trace_prefix + "  ldap_query=" + ldap_query + ",use_search_base=" + use_search_base );
+            }
+            else
+            {
+                uc_ldap_emul_data_line = res_pk.getString ( "text" ); // This is the list of fields in same order as request
+                if ( uc_ldap_emul_data_line  != null && uc_ldap_emul_data_line.length() > 0 )
+                   uc_ldap_pk_val = uc_emulate_ldap_file + ".." + res_pk.getString ( "line" ); // This is the line# of the file
+                else
+                   uc_ldap_pk_val = null
+            }
+            moca.trace( trace_prefix + "  uc_ldap_pk_val=" + uc_ldap_pk_val );
+            //
+            if ( uc_ldap_pk_val  != null && uc_ldap_pk_val.length() > 0 )
+            {
+                ret_r.addRow();
+                ret_r.setValue ( "uc_ldap_pk", uc_ldap_pk_val );
+                //
+                // Now for this PK get other attributes 
+                //
+                uc_attr_res.reset();
+                while ( uc_attr_res.next() )
+                {
+                    fetch_seq     = uc_attr_res.getInt ( "count" );
+                    return_column = uc_attr_res.getString("retstr").split(':')[0];
+                    fetch_column  = uc_attr_res.getString("retstr").split(':')[1];
+                    fetch_type    = uc_attr_res.getString("retstr").split(':')[2];
+                    //
+                    moca.trace( trace_prefix + "    Get:" + fetch_seq + "," + return_column + "," +  fetch_column + "," + fetch_type );
+                    if ( uc_emulating_ldap == "0" )
+                    {
+                        moca.trace( trace_prefix + "    Find this:" +  fetch_column );
+                        ldap_pk_data_res = moca.executeInline  ( " find ldap attribute values" +
+                                                                 " where search_filter = @search_filter" +
+                                                                 " and attr_name = @attr_name" +
+                                                                 " and search_base = @search_base",
+                                                                 [search_filter:ldap_query,
+                                                                  attr_name:fetch_column,
+                                                                  search_base:use_search_base] );
+                    }
+                    else
+                        ldap_pk_data_res = moca.executeCommand ( "publish data where value = ossi__get_fld_from_list ( @line_text, @fetch_seq, ',')",
+                                                                 [line_text:uc_ldap_emul_data_line,
+                                                                  fetch_seq:fetch_seq] );
+                    if ( ldap_pk_data_res.next() )
+                        ret_r.setValue ( return_column, ldap_pk_data_res.getString ("value") );
+                } // wend attribute list
+            } // not null ldap value
+        } // wend res_pk
+        moca.trace( trace_prefix + "-End" );
+        [ret_r:ret_r]
+        ]]
+    }
+    finally
+    {
+        if ( @uc_connect_to_ldap = '1' )
+            close ldap server connection
+    }
+    |
+    publish data combination where res = @ret_r
+    |
+    if ( @uc_ena_flg_expr is not null )
+        execute server command
+        where cmd = "publish data where uc_ena_flg = " || @uc_ena_flg_expr
+        and inline = 1
+    else
+        publish data where uc_ena_flg = '1'
+    |
+    filter data
+    where moca_filter_level = 2
+    and uc_ena_flg = @uc_ena_flg
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+This component returns ldap attribute values as a recordset
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

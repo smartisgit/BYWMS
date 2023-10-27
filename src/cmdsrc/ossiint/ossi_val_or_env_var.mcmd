@@ -1,0 +1,59 @@
+<command>
+<name>ossi val_or_env_var</name>
+<description>FUNCTION: if passed in value is null get from environment variable</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+
+publish data
+where val            = @moca_farg1
+and   env_var_prefix = @moca_farg2
+and   env_var_suffix = @moca_farg3
+and   default        = @moca_farg4
+|
+if ( @val is not null )
+   publish data
+   where ret = @val
+else
+{
+   execute server command
+   where cmd = "publish data where ret = @@" || @env_var_prefix || @env_var_suffix
+   |
+   if ( @ret is null )
+      publish data where ret = @default
+   else
+      publish data where ret = @ret
+}
+
+]]>
+</local-syntax>
+
+<argument name="moca_farg1" required="yes" datatype="string">value to test</argument>
+<argument name="moca_farg2" required="no" datatype="string">prefix of env var</argument>
+<argument name="moca_farg3" required="no" datatype="string">Suffix of env var</argument>
+<argument name="moca_farg3" required="no" datatype="string">Default</argument>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+
+We test a value.  If it is null we get it from environment
+</p>
+]]>
+</remarks>
+
+<retrows>MOCA Function - So one row is returned</retrows>
+
+<exception value="eOK">The command completed successfully.</exception>
+<exception value="510">If variable was not passed and no default was passed.</exception>
+
+<seealso cref="get session variable"></seealso>
+</documentation>
+
+</command>

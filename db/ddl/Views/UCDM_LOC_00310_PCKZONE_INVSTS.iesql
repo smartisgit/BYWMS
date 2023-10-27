@@ -1,0 +1,34 @@
+#use $DCSDIR/include
+
+#include <dcsddl.h>
+
+#include <dcscolwid.h>
+
+#include <dcstbldef.h>
+
+#include <sqlDataTypes.h>
+
+
+#use $SALDIR/include
+
+#include <salcolwid.h>
+
+mset command on
+
+[
+DROP_VIEW(UCDM_LOC_00310_PCKZONE_INVSTS)
+] catch (ERR_CANNOT_DROP_TABLE_NOT_FOUND)
+RUN_DDL
+
+mset command off
+
+CREATE_VIEW(UCDM_LOC_00310_PCKZONE_INVSTS)
+select pck_zone_invsts.*,
+        pck_zone.pck_zone_cod,
+		pck_zone.wh_id
+   from pck_zone_invsts
+   join pck_zone
+     on pck_zone.pck_zone_id = pck_zone_invsts.pck_zone_id
+RUN_DDL
+
+mset command on

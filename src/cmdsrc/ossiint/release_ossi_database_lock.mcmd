@@ -1,0 +1,87 @@
+<command>
+<name>release ossi database lock</name>
+<description>Release lock obtained by get ossi database lock</description>
+
+<argument name="uc_lock_id" required="yes" datatype="string">The identifier to lock</argument>
+<argument name="uc_lock_owner" required="yes" datatype="string">S for session and T for transaction.  Default is T</argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+
+publish data
+where uc_my_database      = dbtype()
+and   uc_my_env           = @@MOCA_ENVNAME
+and   uc_lock_owner       = nvl(@uc_lock_owner, 'T' )
+|
+{
+   if ( @uc_my_database = 'MSSQL' )
+   {
+      /* In SQLServer lock ids are already part of the database so I am not concatenating envirionment to it */
+      publish data
+      where use_uc_lock_id      = @uc_lock_id
+      and   use_uc_lock_owner   = decode( @uc_lock_owner, 'T', 'Transaction', 'Session' )
+      |
+      {
+         publish data
+         where uc_my_sql = "declare @ret int; exec @ret = sp_releaseapplock '" || @use_uc_lock_id || "','" || @use_uc_lock_owner || "'"
+                        || "; select @ret uc_release_status"
+         |
+         [/*#nobind*/
+         sp_executesql @uc_my_sql
+         ]
+         |
+         if ( @uc_release_status >= 0 )
+            noop /* >=0 means ok */
+         else
+            set return status
+            where status = ossi__e ( 'eUSR_OSSI_FAILED_USER_LOCK' )
+            and uc_db_err = string(@uc_lock_status)
+      }
+   }
+   else
+   {
+      set return status
+      where status = 32113
+      and detail = 'Application locks supported for SQLServer only at this time'
+   }
+}
+
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This component will release a user-defined lock from the database.  Typically this will not be needed because locks obtained
+are automatically released by commit or rollback.
+</p>
+]]>
+</remarks>
+
+<retrows>0</retrows>
+<retcol name="@*" type="string">No colums returned</retcol>
+
+<example>
+<p>
+release ossi database lock
+where uc_lock_id = 'SAAD1'
+</p>
+</example>
+<exception value="eOK">The command completed successfully.</exception>
+<exception value="32113">not implmented yet on oracle</exception>
+<exception value="eUSR_OSSI_FAILED_USER_LOCK">The database call returned an error.  Database error is in the message</exception>
+
+<seealso cref="get ossi database lock"></seealso>
+
+</documentation>
+
+</command>

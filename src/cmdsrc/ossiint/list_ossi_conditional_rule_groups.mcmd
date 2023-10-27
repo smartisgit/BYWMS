@@ -1,0 +1,41 @@
+<command>
+<name>list ossi conditional rule groups</name>
+<description>Returns a list of distinct uc_rule_subgrp_id</description>
+<argument name="lngdsc" required="yes" datatype="string"></argument>
+<argument name="codval" required="yes" datatype="string"></argument>
+<argument name="short_dsc" required="yes" datatype="string"></argument>
+<argument name="colnam" required="no" datatype="integer"></argument>
+<argument name="srtseq" required="no" datatype="integer"></argument>
+<argument name="rqdflg" required="no" datatype="integer"></argument>
+<argument name="img_id" required="no" datatype="integer"></argument>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20200512 Haseeb.Ahmed - 11118 - Create a new web screen to maintain rules engine where we have condition and action
+ */
+publish data
+  where uc_rule_grp_id = @uc_rule_grp_id
+|
+[select distinct uc_rule_subgrp_id
+   from usr_rule_engine_cond_expr
+  where uc_rule_grp_id = @uc_rule_grp_id
+]
+]]>
+</local-syntax>
+
+
+<documentation>
+<remarks>
+Get all list of conditional rule groups
+</remarks>
+
+<retcol name="uc_rule_subgrp_id" type="String">Rule Subgroup ID</retcol>
+
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

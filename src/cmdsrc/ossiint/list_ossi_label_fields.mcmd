@@ -1,0 +1,46 @@
+<command>
+<name>list ossi label fields</name>
+<description>Get the label fields and cache data</description>
+
+<argument name="label_name" required="yes" datatype="string">name of the label</argument>
+<argument name="printer_type" required="no" datatype="string"></argument>
+
+<argument name="uc_fetch_typ" required="no" datatype="string">By default it is FLDS meaning the fields.  Other option is CMD for getting comand</argument>
+<argument name="uc_inhibit_ossi_cache" required="no" datatype="string">If we pass in 1 here then we will not use cache.  From front-end it should be like that</argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+
+publish data
+where uc_fetch_typ = nvl(@uc_fetch_typ, 'FLDS' )
+|
+{
+    execute ossi moca and cache
+    where uc_cache_grp = 'OSSI__LABEL_FLDS'
+    and uc_moca_cmd = "list ossi label fields core"
+    and uc_inline = 1
+    and uc_cache_key = @label_name || '__' || @printer_type || '__' || @uc_fetch_typ
+    and uc_force_ossi_cache1 = '1'
+    catch(-1403,510)
+}
+
+]]>
+</local-syntax>
+<documentation>
+<remarks>
+Here we parse a label file and fetch either the fields or the command from it
+</remarks>
+
+<retrows>n</retrows>
+
+<retcol name="uc_label_command" type="string">When uc_fetch_typ = CMD</retcol>
+<retcol name="uc_label_field" type="string">When uc_fetch_typ = FLDS</retcol>
+<retcol name="uc_label_field_length" type="string">When uc_fetch_typ = FLDS</retcol>
+
+</documentation>
+
+
+</command>

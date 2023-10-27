@@ -1,0 +1,81 @@
+<command>
+<name>ossi multi_instr</name>
+<description>Like instring but we check several values in the source string</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="moca_farg1">Source String</argument>
+<argument datatype="string" name="moca_farg2">look for this.  It can be a list</argument>
+<argument datatype="string" name="moca_farg3">Delimiter of the list</argument>
+<argument datatype="string" name="moca_farg4">Optional:  Return Type.  I means return index, > 0 if found 0 if not.  S means return the substring that was found or null if not found</argument>
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161208 saad.ahmad - 7154 - Hub base
+ * 20210418 saad.ahmad - 11988 - Autostore project
+ */
+publish data
+where source_string   = nvl(@moca_farg1,'~~~~~~~~~~~~~~~~~~~~~')
+and   look_for_list   = nvl(@moca_farg2,'^^^^^^^^^^^^^^^^^^^^^')
+and   delim           = nvl(@moca_farg3,',')
+and   return_type     = nvl(@moca_farg4, 'I' )
+|
+publish data
+where source_string = @delim || @source_string || @delim
+|
+{
+   convert list 
+   where string  = @look_for_list
+   and separator = @delim
+   and type      = 'L'
+   >> res
+   |
+   {
+      [[
+      Integer found_at = -1;
+      String  check_str = "";
+
+      while ( res.next() )
+      {
+         found_at = source_string.indexOf ( delim + res.getString("retstr") + delim );
+         if ( found_at >= 0 )
+         {
+            check_str = res.getString("retstr");
+            break;
+         }
+      }
+
+      [found_at:found_at,found:check_str]
+      ]]
+      |
+      publish data
+      where ret_found_at = @found_at + 1
+      and   ret_substr   = @found
+      |
+      if ( @return_type = 'I' )
+         publish data where ret = @ret_found_at
+      else
+         publish data where ret = @ret_substr
+   }
+}
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+MOCA Function to get a substring of a string but index can be a string value.  The logic is to look up the substring
+and find the index
+
+The same function can be used to use the substring value in a comparison.  Pass in BW to imply between or = for
+equal
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

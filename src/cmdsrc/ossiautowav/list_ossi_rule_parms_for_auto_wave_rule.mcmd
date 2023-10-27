@@ -1,0 +1,57 @@
+<command>
+<name>list ossi rule parms for auto wave rule</name>
+<description>This command will list the rule parms for auto wave rule</description>
+<type>Local Syntax</type>
+<local-syntax>
+
+<![CDATA[
+
+    [ select polval column_name
+      from poldat
+      where polcod = 'USR-WAVE-PLANNING'
+      and polvar = 'DEFAULT-AUTO-WAVE-ALLOC-PARAMS'
+      and polval != 'RULE_NAM'
+      and wh_id_tmpl = '----'
+    ] catch (-1403,510)
+    &
+    [ select rule_parm.parm_id column_name
+      from rule_parm
+      join web_filter
+      on web_filter.filter_type = rule_parm.rule_nam
+      join usr_auto_wave_rule_hdr
+      on usr_auto_wave_rule_hdr.filter_id = web_filter.id
+      where usr_auto_wave_rule_hdr.wh_id = @wh_id
+      and usr_auto_wave_rule_hdr.uc_auto_wave_rule_id = nvl(@uc_auto_wave_rule_id, usr_auto_wave_rule_hdr.uc_auto_wave_rule_id)
+    ] catch (-1403,510)
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This will list all rule parms for auto wave rule
+</p>
+]]>
+</remarks>
+<retrows>n</retrows>
+<retcol name="column_name" type="COMTYP_CHAR">Parameter ID</retcol>
+
+<example>
+<![CDATA[
+<p>
+</p>
+]]>
+
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+<seealso cref="process usr auto wave"></seealso>
+
+</documentation>
+
+
+</command>

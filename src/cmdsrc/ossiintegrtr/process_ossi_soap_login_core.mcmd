@@ -1,0 +1,88 @@
+<command>
+<name>process ossi soap login core</name>
+<description>Make the l</description>
+<type>Local Syntax</type>
+
+<argument name="url" datatype="string"></argument>
+<argument name="sys_id" datatype="string"></argument>
+<argument name="uc_soap_request_userid" datatype="string"></argument>
+<argument name="uc_soap_request_password" datatype="string"></argument>
+<argument name="uc_soap_request_namespace_tag" datatype="string"></argument>
+<argument name="uc_soap_request_envelope" datatype="string"></argument>
+<argument name="uc_soap_action" datatype="string"></argument>
+
+<local-syntax>
+<![CDATA[
+
+publish data
+where uc_soap_request_envelope = nvl(@uc_soap_request_envelope, 'http://schemas.xmlsoap.org/soap/envelope/' )
+|
+{
+    get ossi soap request commmand
+    where les_cmd_prefix = 'uc_soap_request_login'
+    |
+    {
+        execute server command
+        where cmd = @uc_use_syntax
+        and inline = 1
+        |
+        publish data
+        where uc_soap_request_payload = @uc_request_xml
+        |
+        {
+            get ossi soap request commmand
+            where les_cmd_prefix = 'uc_soap_request_envelope'
+            |
+            execute server command
+            where cmd = @uc_use_syntax
+            and inline = 1
+            |
+            publish data
+            where uc_request_xml = @uc_request_xml
+            |
+            {
+                do ossi http request
+                where body = @uc_request_xml
+                |
+                if ( @body_decoded is not null )
+                {
+                    get ossi soap request commmand
+                    where les_cmd_prefix = 'uc_soap_request_login_parse'
+                    |
+                    execute server command
+                    where cmd = @uc_use_syntax
+                    and inline = 1
+                    |
+                    publish data
+                    where uc_soap_login_token = @uc_soap_login_token
+                    and uc_used_body_login = @uc_request_xml
+                    and uc_body_decoded_login = @body_decoded
+                    and uc_elapsed_login = @elapsed
+                    and uc_soap_request_envelope_login = @uc_soap_request_envelope
+                    and uc_token_src_login = 'www'
+                }
+            } /* have the complete request */
+        } /* have payload */
+    } /* have request login */
+}
+
+]]>
+</local-syntax>
+<documentation>
+<private>
+</private>
+<remarks>
+<![CDATA[
+<p>
+This component is used to check missing eo columns.
+</p>
+]]>
+</remarks>
+<retcol name="none" type="COMTYP_STRING">Nothing is returned</retcol>
+
+<seealso cref="sl_check seq">
+</seealso>
+
+<exception value="eOK">Normal successful completion</exception>
+</documentation>
+</command>

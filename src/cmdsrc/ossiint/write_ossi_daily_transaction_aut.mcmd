@@ -1,0 +1,45 @@
+<command>
+<name>write ossi daily transaction aut</name>
+<description>Logs a daily transaction entry</description>
+
+<argument name="actcod" required="no" datatype="string"></argument>
+<argument name="oprcod" required="no" datatype="string"></argument>
+<argument name="wh_id" required="yes" datatype="string"></argument>
+<argument name="usr_id" required="yes" datatype="string"></argument>
+<argument name="trndt" required="yes" datatype="string"></argument>
+<argument name="cmnt" required="no" datatype="string"></argument>
+<argument name="subnum" required="yes" datatype="string"></argument>
+<argument name="devcod" required="yes" datatype="string"></argument>
+<argument name="trnqty" required="yes" datatype="string"></argument>
+<argument name="var_nam" required="yes" datatype="string"></argument>
+<argument name="to_value" required="yes" datatype="string"></argument>
+<argument name="fr_value" required="yes" datatype="string"></argument>
+<argument name="excp_code" required="no" datatype="string"></argument>
+
+
+<type>Local Syntax</type>
+<transaction>new</transaction>
+<local-syntax>
+<![CDATA[
+
+write daily transaction 
+
+]]>
+</local-syntax>
+
+
+<documentation>
+<remarks>
+<![CDATA[
+    <p>
+    This is simply to create dlytrn in a new transction.  One use is for printing log
+    </p>
+]]>
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+<seealso cref="write usr daily transaction for print"></seealso>
+
+</documentation>
+</command>

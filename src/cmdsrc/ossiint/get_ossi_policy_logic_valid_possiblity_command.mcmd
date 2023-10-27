@@ -1,0 +1,42 @@
+<command>
+<name>get ossi policy logic valid possiblity command</name>
+<description>Get the valid possibilities that fill the combo box 
+when you add a value in OSSI Policy Logic Maintenance</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+parse ossi policy logic
+|
+/*
+ * Colnam is the column to use from the vp command
+ */
+[select rtstr1 vp_cmd,
+        rtstr2 colnam
+   from poldat_view 
+  where polcod = 'USR-POLICY-LOGIC-VALID-POSSIBILITY' 
+    and polvar = @polcod 
+    and polval = @polvar
+    and wh_id = nvl(@wh_id, @@wh_id) 
+    and rtnum1 = 1
+] 
+]]>
+</local-syntax>
+<argument name="uc_policy_logic" required="yes" datatype="string"></argument>
+<documentation>
+
+<remarks>
+This command is used to get the valid possibilities that fill the combo box 
+when you add a value in OSSI Policy Logic Maintenance.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

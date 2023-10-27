@@ -1,0 +1,100 @@
+<command>
+<name>get ossi table column list for default logic core</name>
+<description>We have a poicy where we can define the column lists for various tables which can be used for determining defaults</description>
+
+<argument name="table_name" required="yes" datatype="string">Table that we want to query for</argument>
+<argument name="column_source_prefix" required="yes" datatype="string">A prefix for every column for select list use source column</argument>
+<argument name="column_name_prefix" required="yes" datatype="string">A prefix for every column for select list use name of the column</argument>
+<argument name="column_list_no_prefix" required="yes" datatype="string">Which columns should not have prefix.  We dont want it for PK </argument>
+
+<argument name="uc_col_ctxt_polcod" required="yes" datatype="string"></argument>
+<argument name="uc_col_ctxt_polvar" required="yes" datatype="string"></argument>
+
+
+
+<type>Local Syntax</type>
+
+<local-syntax>
+<![CDATA[
+
+publish data
+where column_source_prefix = nvl(@column_source_prefix, '')
+and column_name_prefix = nvl(@column_name_prefix, '')
+and column_list_no_prefix = ',' || @column_list_no_prefix || ','
+|
+{
+    [
+    select rtstr1              column_name,
+           nvl(rtstr2, rtstr1) column_alias
+    from poldat_view
+    where polcod = @uc_col_ctxt_polcod
+    and polvar = @uc_col_ctxt_polvar
+    and polval = upper(@table_name)
+    and wh_id = '----'
+    and rtnum1 = 1
+    order by srtseq
+    ]
+    catch (-1403,510)
+    >> res_cols
+    |
+    {
+        [[
+        StringBuffer sel_clause = new StringBuffer("");
+        StringBuffer group_clause = new StringBuffer("");
+        boolean first = true;
+        //
+        while ( res_cols.next() )
+        {
+            if ( !first )
+            {
+                sel_clause.append ( ",");
+                group_clause.append ( ",");
+            }
+            //
+            if ( column_list_no_prefix.indexOf ( "," + res_cols.getString("column_alias").toLowerCase() + "," ) >= 0 )
+                sel_clause.append ( column_source_prefix + res_cols.getString("column_name") + " " + res_cols.getString("column_alias") );
+            else
+                sel_clause.append ( column_source_prefix + res_cols.getString("column_name") + " " + 
+                                    column_name_prefix   + res_cols.getString("column_alias") );
+            group_clause.append ( column_source_prefix + res_cols.getString("column_name") );
+            first = false;
+        }
+        [sel_clause:sel_clause.toString(), group_clause:group_clause.toString()]
+        ]]
+    }
+}
+  
+]]>
+
+</local-syntax>
+
+<documentation>
+
+<remarks>
+<![CDATA[
+  <p>
+   This component calls the change and publishes old values that we are interested in
+  </p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+<retcol name="sel_clause" type="String">select clause.  Has column name for every part of list</retcol>
+<retcol name="group_clause" type="String">group clause.  Only column source</retcol>
+
+
+<exception value="eOK">Normal successful completion</exception>
+
+<policy
+    polcod="USR-OSSI-DEFAULT-CTXT-COLUMNS - or passed as uc_col_ctxt_polcod"
+    polvar="COLUMN-LIST or passed as uc_col_ctxt_polvar"
+    polval="table name in upper case"
+    rtstr1="column name"
+    rtstr2="optionally a column alias"
+></policy>
+
+<seealso cref="get ossi table column list for default logic"></seealso>
+
+
+</documentation>
+</command>

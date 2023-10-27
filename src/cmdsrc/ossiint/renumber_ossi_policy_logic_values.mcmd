@@ -1,0 +1,71 @@
+<command>
+<name>renumber ossi policy logic values</name>
+<description>Renumbers the polcod/polvar list into intervals of 10</description>
+
+<argument name="uc_rule_grp_id" required="yes" datatype="string"></argument>
+<argument name="uc_rule_subgrp_id" required="yes" datatype="string"></argument>
+<argument name="uc_rule_value" required="yes" datatype="string"></argument>
+<argument name="seqnum" required="yes" datatype="string">This user does not see.  Ever ascending value based on max and add 1</argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+* Chris.Holdren - 200506 - Added polval.equals("----") back in since everything was getting srtseq=0
+*/
+parse ossi policy logic
+|
+{
+    list ossi smart rule values
+    >> res
+    |
+    [[
+    int interval = 10;
+    int srtseq = 10;
+    while (res.next())
+    {
+        String polval = res.getString("uc_rule_value");
+        // Help text starts at 0
+        if (srtseq == 10 && polval.equals("----"))
+        {
+            srtseq = 0;
+        }
+	srtseq = res.getInt("srtseq")+interval;
+        moca.executeInline(" change ossi policy logic value" +
+                           " where uc_rule_grp_id  = @uc_rule_grp_id" +
+                           " and uc_rule_subgrp_id = @uc_rule_subgrp_id" +
+                           " and uc_rule_value     = @uc_rule_value" +
+                           " and seqnum            = @seqnum" +
+                           " and srtseq            = @srtseq" +
+                           " and ena_flg           = @ena_flg" +
+                           " and uc_rule_expr      = @uc_rule_expr",
+                           [uc_rule_grp_id:uc_rule_grp_id,
+                            uc_rule_subgrp_id:uc_rule_subgrp_id,
+                            uc_rule_value:res.getString("uc_rule_value"),
+                            seqnum:res.getString("seqnum"),
+                            srtseq:srtseq,
+                            ena_flg:res.getInt("ena_flg"),
+                            uc_rule_expr:res.getString("uc_rule_expr")] );
+        
+    }
+    ]]
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<remarks>
+This command may be used to renumber policy logiv values.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

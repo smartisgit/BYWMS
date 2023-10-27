@@ -1,0 +1,8 @@
+<component-level>
+<name>OSSIIssue</name>
+<description>OSSI Issue Logging Server Functions</description>
+<sort-sequence>8003</sort-sequence>
+<package>com.redprairie.les.oracular.issue</package>
+<editable>true</editable>
+<library>ossiint</library>
+</component-level>

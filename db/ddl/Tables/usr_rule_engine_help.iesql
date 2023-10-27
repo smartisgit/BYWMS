@@ -1,0 +1,55 @@
+#use $LESDIR/include
+#use $DCSDIR/include
+#use $MOCADIR/include
+#use $LESDIR/db/ddl/Indexes
+
+
+#include <dcsddl.h>
+#include <dcscolwid.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+
+
+mset command on
+[
+CREATE_TABLE(usr_rule_engine_help)
+(
+    uc_rule_engine_table_name   STRING_TY(60) NOT NULL,
+    uc_rule_grp_id              STRING_TY(500) NOT NULL,
+    uc_rule_subgrp_id           STRING_TY(500) NOT NULL,
+    uc_rule_id                  STRING_TY(500) NOT NULL,
+    /**/
+    uc_rule_grp_catg            STRING_TY(500),
+    uc_rule_grp_id_srtseq       INTEGER_TY,
+    /**/
+    uc_short_help               CLOB_TY,
+    uc_long_help                CLOB_TY,
+    ins_dt		DATE_TY,
+    ins_user_id		STRING_TY(40),
+    last_upd_dt		DATE_TY,
+    last_upd_user_id    STRING_TY(40)
+)
+] catch (ERR_TABLE_ALREADY_EXISTS)
+RUN_DDL
+
+#include <usr_rule_engine_help_pk.iesql>
+
+mset command on
+create db documentation
+where table             = "usr_rule_engine_help"
+and table_comment       = "This table contains the help for the rules.  This shows up on the maintainence screens"
+and uc_rule_engine_table_name = "Which table is it for usr_rule_engine_cond_expr or usr_rule_engine_expr"
+and uc_rule_grp_id      = "As specified in the tables."
+and uc_rule_subgrp_id   = "As specified in the tables.  Ok to add row with ----  That will be for the row that provides help for the uc_rule_grp_id"
+and uc_rule_id          = "As specified in the tables.  Ok to add row with ----  usr_rule_engine_expr will always have ----"
+and uc_rule_grp_catg    = "Only needed for cases where uc_rule_subgrp_id is ----.  This is used to create a list of all uc_rule_grp_ids within a table to show when user has not selected a specific value in dropdown"
+and uc_rule_grp_id_srtseq = "Relating to above.  Where is this uc_rule_grp_id shown within category"
+and uc_short_help       = "Only needed when uc_rule_subgrp_id is ---- to create main page of categories"
+and uc_long_help        = "Detailed help"
+and ins_dt              = "Add Date/time"
+and last_upd_dt	        = "Update Date/Time"
+and ins_user_id         = "Add User Id"
+and last_upd_user_id    = "Update user Id"
+
+RUN_DDL
+mset command off

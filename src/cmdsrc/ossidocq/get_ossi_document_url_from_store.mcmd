@@ -1,0 +1,53 @@
+<command>
+<name>get ossi document url from store</name>
+<description>Given a document id returned from the list command, get a URL that access it directly
+</description>
+<type>Local Syntax</type>
+
+<argument name="uc_doc_upload_q_id" required="yes" datatype="string">As retuend from the lis tcommand</argument>
+
+
+<local-syntax>
+<![CDATA[
+
+publish data
+where uc_upload_id = nvl(@uc_upload_id, @uc_doc_upload_q_id )
+|
+{
+    execute ossi blob service
+    where uc_az_service = 'blob url'
+    and uc_upload_id = @uc_upload_id
+    |
+    publish data
+    where uc_doc_store_url = @cmd_result
+    and uc_upload_id = @uc_upload_id
+}
+
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+   Blob Storage provides an API to get direct URL for the specific blob as known on the server
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+<retcol name="uc_upload_id" type="COMTYP_CHAR">Identifier of document</retcol>
+<retcol name="uc_doc_store_url" type="COMTYP_CHAR">URL</retcol>
+
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+<seealso cref="list ossi documents from store"></seealso>
+
+</documentation>
+
+</command>

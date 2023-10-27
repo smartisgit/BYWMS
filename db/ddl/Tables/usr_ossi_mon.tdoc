@@ -1,0 +1,31 @@
+
+mset command on
+
+create db documentation
+ where table = "usr_ossi_mon"
+   and table_comment = "" 
+   and uc_monitor_id = "Name of the monitor"
+   and uc_monitor_descr = "description of the monotor"
+   and ena_flg = "is it enabled?"
+   and uc_check_cmd = "Command that is used to check if an issue exists.  Returns multiple rows where each row implies issue.  Raise -1403 to indicate no issue"
+   and uc_fix_cmd = "Work on each row and fix the issue. Will commit or rollback"
+   and uc_raise_ems_alert_on_fail_flg = "If fix command fails - should we raise an EMS alert?"
+   and uc_log_mon_dlytrn_flg = "Should we log dlytrn ech time a row is returned?"
+   and uc_mon_srtseq = "To mutually sort the monitors"
+   and uc_sch_active_tim_start  = "Start time while this rule is active.  Time as HH:MI:SS.  Time is in 24 hour clock - system time"
+   and uc_sch_active_tim_end    = "End time while this rule is active.  Time as HH:MI:SS.  Time is in 24 hour clock - system time"
+   and uc_sch_inactive_tim_start= "Start time while this rule is not active.  Time as HH:MI:SS.  Time is in 24 hour clock - system time"
+   and uc_sch_inactive_tim_end  = "End time while this rule is not active.  Time as HH:MI:SS.  Time is in 24 hour clock - system time"
+   and uc_sch_interval          = "Time in seconds since last run.  This much time must have passed since last run of this moinitor"
+   and uc_sch_active_dow_list   = "Schedule is active on these days of week.  Coma-separated list.  Days are 1234567 where 1 is monday and 7 is Sunday"
+   and uc_sch_active_dom_list   = "Schedule is active on these days of month.  Coma-separated list. Current date day of month is compared against this list"
+   and uc_sch_inactive_dom_list = "Schedule is not active on these days of month.  Coma-separated list.  Current date day of month is compared against this list"
+   and uc_cust_flg = "This flag will be set if row is modified in a non-development enviornment"
+   and ins_dt = "Date/time when added"
+   and last_upd_dt = "Date/Time when updated"
+   and ins_user_id = "Who created it?"
+   and last_upd_user_id = "Who updated it?"
+   
+/
+mset command off
+

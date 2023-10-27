@@ -1,0 +1,29 @@
+<command>
+<name>get ossi policy logic help text</name>
+<description>Get policy logic help text</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+list ossi policy logic values
+  where polval = '----'
+
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This command is used to get policy logic help text.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

@@ -1,0 +1,149 @@
+<command>
+<name>generate ossi data version control documentation base</name>
+<description>Generate blank documents so that we dont get broken links
+</description>
+<type>Local Syntax</type>
+
+<argument name="uc_use_lesdir" required="yes" datatype="string">Where to place the stuff</argument>
+<argument name="path_to_docs" required="yes" datatype="string">Relative path to get to docs folder</argument>
+<argument name="url" required="yes" datatype="string">Alternate URL</argument>
+
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+publish data
+where uc_use_lesdir = nvl(@uc_use_lesdir, @@LESDIR)
+and path_to_docs = nvl(@path_to_docs, '../../docs' )
+|
+publish data
+where uc_rev_log_main_folder = @uc_use_lesdir || '/uc_rev_log'
+|
+if ( @url is null )
+{
+    get server information
+}
+|
+publish data
+where mode = 'w'
+and exec_map = "sl_alg:[select alg_id pk from sl_alg_def]"
+            ||";sl_alt_evt_arg:[select evt_id pk from sl_evt_def]"
+            ||";sl_comm_mthd:[select comm_mthd_id pk from sl_comm_mthd_def]"
+            ||";sl_eo:[select eo_id || '__' || eo_ver pk from sl_eo_def]"
+            ||";sl_evt:[select evt_id pk from sl_evt_def]"
+            ||";sl_i_ifd:[select ifd_id || '__' || ifd_ver pk from sl_ifd_def where ifd_typ_cd = 'I']"
+            ||";sl_o_ifd:[select ifd_id || '__' || ifd_ver pk from sl_ifd_def where ifd_typ_cd = 'O']"
+            ||";sl_o_ifd_sys_map:[select ifd_id || '__' || ifd_ver pk from sl_ifd_def where ifd_typ_cd = 'O']"
+            ||";sl_sql_crsr_component:[select ss.retr_mthd_id || '__' || decode(ri.sys_id, null, 'seg_' || ri.ifd_id || '_' || ri.ifd_ver || '_' || ri.ifd_seg_id , 'sys_' || ri.sys_id) || '__' || ltrim(to_char(ss.sql_component_seq)) pk from sl_sql_crsr_component ss join sl_retr_mthd_impl_def ri on ri.retr_mthd_id = ss.retr_mthd_id and ri.retr_mthd_impl_genid = ss.retr_mthd_impl_genid]"
+            ||";sl_sys:[select sys_id pk from sl_sys_def]"
+            ||";sl_sys_comm:[select sys_id pk from sl_sys_def]"
+            ||";sl_sys_comm_val:[select sys_id || '__' || comm_mode_cd || '__' || comm_dir_cd || '__' || comm_mthd_id || '__' || comm_mthd_attr pk from sl_sys_comm_val]"
+|
+{
+    convert list
+    where string = @exec_map
+    and type = 'L'
+    and separator = ';'
+    |
+    {
+        publish data
+        where uc_rev_folder = ossi__get_fld_from_list ( @retstr, 1, ':' )
+        and uc_cmd = ossi__get_fld_from_list ( @retstr, 2, ':' )
+        |
+        {
+            publish data
+            where my_path = @uc_rev_log_main_folder || '/' || @uc_rev_folder
+            |
+            {
+                create directory 
+                where directory = @my_path
+                catch(@?)
+                ;
+                /* First remove all files in the folder */
+                find file 
+                where pathname = @my_path || '/*'
+                catch (-1403,510)
+                |
+                if ( @? = 0 )
+                    remove file
+                    where filnam = @pathname
+                    catch (@?)
+                ;
+                noop
+            }
+            |
+            Remote ( @url )
+                execute server command 
+                where cmd = @uc_cmd
+                and inline = 1
+                catch (-1403,510)
+            |
+            if ( @? = 0 )
+            {
+                get ossi head for integration documentation
+                where doc_title = 'Integration Object:' || @pk
+                |
+                publish data
+                where filnam = ossi__html_val ( @pk, 1 ) || '.html'
+                and path = @my_path
+                |
+                {
+                    if ( @filnam is not null )
+                        write output file 
+                        where data = @uc_typical_file_header
+                                  || "<h4>Object exists as base with no customizations</h4>"
+                                  || @uc_typical_file_footer
+                    ;
+                    publish data
+                    where uc_rev_folder = @uc_rev_folder
+                    and pk = @pk
+                    and path = @path
+                    and filnam = @filnam
+                    and uc_cmd = @uc_cmd
+                }
+            } /* multiple rows for pk */
+        } /* have work stuff */
+    } /* convert list */
+} /* main block */
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This lays out files which say no changes so that we can overlay changes on top of that
+</p>
+]]>
+</remarks>
+
+<retrows>n</retrows>
+
+<retcol name="uc_rev_folder" type="COMTYP_CHAR"></retcol>
+<retcol name="pk" type="COMTYP_CHAR"></retcol>
+<retcol name="path" type="COMTYP_CHAR"></retcol>
+<retcol name="filnam" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_cmd" type="COMTYP_CHAR"></retcol>
+
+
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+<seealso cref="get ossi head for integration documentation"></seealso>
+
+</documentation>
+
+
+
+</command>

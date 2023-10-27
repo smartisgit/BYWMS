@@ -1,0 +1,20 @@
+<trigger>
+<name>process usr issue</name>
+<on-command>remove part serial type</on-command>
+<local-syntax>
+<![CDATA[
+process usr issue
+  where uc_table_name = 'PRT_SER_TYP'
+    and uc_action = 'REMOVE'
+]]></local-syntax>
+<fire-sequence>10000</fire-sequence>
+<documentation>
+
+<remarks>
+This trigger process issue for deleting part serial type.
+</remarks>
+
+<seealso cref="process usr issue"></seealso>
+
+</documentation>
+</trigger>

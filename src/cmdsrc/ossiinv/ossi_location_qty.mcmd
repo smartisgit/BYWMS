@@ -1,0 +1,72 @@
+<command>
+<name>ossi location_qty</name>
+<description>get unit quantity in a location.  Function so it can be used as expression</description>
+
+<argument name="moca_farg1" required="yes" datatype="string">stoloc</argument>
+<argument name="moca_farg2" required="yes" datatype="string">wh</argument>
+<argument name="moca_farg3" required="yes" datatype="string">load</argument>
+<argument name="moca_farg4" required="yes" datatype="string">prtnum</argument>
+<argument name="moca_farg5" required="yes" datatype="string">client</argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+/*
+ * Revision Log
+ * 2021-11-30 saad.ahmad 12608 - Initial
+ */
+
+publish data 
+where stoloc = @moca_farg1
+and wh_id = nvl(@moca_farg2, @@WH_ID)
+and lodnum = @moca_farg4
+and prtnum = @moca_farg3
+and prt_client_id = @moca_farg4
+|
+{
+    if ( @lodnum is null ) hide stack variable where name = 'lodnum'
+    |
+    if ( @prtnum is null ) hide stack variable where name = 'prtnum'
+    |
+    if ( @prt_client_id is null ) hide stack variable where name = 'prtnum'
+    |
+    [
+    select nvl(sum(untqty),0) untqty
+    from invlod
+         join invsub on invsub.lodnum = invlod.lodnum
+         join invdtl on invdtl.subnum = invsub.subnum
+    where invlod.wh_id = @wh_id
+    and invlod.stoloc = @stoloc
+    and @+invdtl.prt_client_id
+    and @+invdtl.prtnum
+    and @+invlod.lodnum
+    ]
+}
+
+]]>
+</local-syntax>
+<documentation>
+<remarks>
+<![CDATA[
+    <p>
+    Get the total quantity in a location as a moca function
+    </p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+
+<retcol name="untqty" type="string"></retcol>
+
+
+
+<example>
+</example>
+
+<exception value="eOK">Normal successful completion</exception>
+
+
+</documentation>
+</command>

@@ -1,0 +1,21 @@
+#use $LESDIR/include
+#use $DCSDIR/include
+#use $MOCADIR/include
+#
+#include <dcsddl.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+
+mset command on
+
+
+[
+CREATE_INDEX_BEGIN(usr_ossi_job_log, usr_ossi_job_log_sk_modall)
+(
+    uc_ossi_module_id, uc_ossi_job_id, uc_ossi_action_id, uc_ossi_job_seq, uc_ossi_start_dt, uc_ossi_end_dt, uc_ossi_err_code
+)
+CREATE_INDEX_TABLESPACE(PCKWRK_HDR_PK_TBLSPC, PCKWRK_HDR_PK_STORAGE)
+CREATE_INDEX_END
+]
+catch(ERR_TABLE_ALREADY_EXISTS, ERR_INDEX_ALREADY_EXISTS)
+RUN_DDL

@@ -1,0 +1,50 @@
+<command>
+<name>get ossi data from cache</name>
+<description>Get data from a cached variable</description>
+<type>Local Syntax</type>
+
+<argument datatype="String" name="uc_cache_name"></argument>
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+publish data
+where uc_cache_name = upper(@uc_cache_name )
+|
+{
+   /* 
+    * Catching all errors because when not found it does not return a good error 
+    */
+   get os var where var = @uc_cache_name
+   catch (@?)
+   |
+   if ( @? != 0 or @value is null )
+      set return status where status = -1403
+   else
+   {
+      publish data
+      where uc_cache_value = @value
+   }
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+MOCA Function to get a policy value
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

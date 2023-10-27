@@ -1,0 +1,52 @@
+<command>
+<name>ossi mls_text</name>
+<description>FUNCTION: MLS text</description>
+
+<argument name="moca_farg1" required="yes" datatype="string">mls id</argument>
+<argument name="moca_farg2" required="yes" datatype="string">default value</argument>
+<argument name="moca_farg3" required="yes" datatype="string">locale id</argument>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+publish data
+where mls_id = @moca_farg1
+and uc_default_value = @moca_farg2
+and locale_id = nvl(nvl(@moca_farg3, @@LOCALE_ID),'US_ENGLISH')
+|
+{
+   get mls text
+   catch(@?)
+   |
+   if ( @? != 0 or @mls_text is null )
+      publish data
+      where mls_text = nvl(@uc_default_value, @mls_id )
+   else
+      publish data
+      where mls_text = @mls_text
+}
+
+]]>
+</local-syntax>
+
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+Get MLS Text
+</p>
+]]>
+</remarks>
+
+<retrows>MOCA Function - So one row is returned</retrows>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+</documentation>
+
+</command>

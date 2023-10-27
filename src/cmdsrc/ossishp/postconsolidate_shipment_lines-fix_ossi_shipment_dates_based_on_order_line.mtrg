@@ -1,0 +1,101 @@
+<trigger>
+<name>fix usr shipment dates based on order line</name>
+<on-command>postconsolidate shipment lines</on-command>
+
+<description>Restore dates on shipment based on order lines in it </description>
+<fire-sequence>1000</fire-sequence>
+
+<local-syntax>
+<![CDATA[
+
+if(@ship_id is not null and @uc_inhibit_change_hook != '1')
+{
+    if ( ossi__polval ( 'USR-OSSI-DATA-CHANGE-HOOK', 'CMD_POSTCONSOLIDATE_SHIPMENT_LINES_POST', 'FIX-SHIPMENT-DATES-FROM-ORD', '', 'rtnum1', nvl(@wh_id,@@WH_ID)) != 0 )
+    {
+        [
+        update shipment
+        set early_shpdte = (
+                               select min(ol.early_shpdte) 
+                               from shipment_line sl 
+                                    join ord_line ol 
+                                        on ol.client_id = sl.client_id 
+                                        and ol.wh_id = sl.wh_id
+                                        and ol.ordnum = sl.ordnum
+                                        and ol.ordlin = sl.ordlin
+                                        and ol.ordsln = sl.ordsln
+                               where sl.ship_id = shipment.ship_id
+                               and sl.linsts not in ( 'B', 'C' )
+                           ),
+            late_shpdte  = (
+                               select max(ol.late_shpdte) 
+                               from shipment_line sl 
+                                    join ord_line ol 
+                                        on ol.client_id = sl.client_id 
+                                        and ol.wh_id = sl.wh_id
+                                        and ol.ordnum = sl.ordnum
+                                        and ol.ordlin = sl.ordlin
+                                        and ol.ordsln = sl.ordsln
+                               where sl.ship_id = shipment.ship_id
+                               and sl.linsts not in ( 'B', 'C' )
+                           ),
+            early_dlvdte= (
+                               select min(ol.early_dlvdte) 
+                               from shipment_line sl 
+                                    join ord_line ol 
+                                        on ol.client_id = sl.client_id 
+                                        and ol.wh_id = sl.wh_id
+                                        and ol.ordnum = sl.ordnum
+                                        and ol.ordlin = sl.ordlin
+                                        and ol.ordsln = sl.ordsln
+                               where sl.ship_id = shipment.ship_id
+                               and sl.linsts not in ( 'B', 'C' )
+                           ),
+            late_dlvdte = (
+                               select max(ol.late_dlvdte) 
+                               from shipment_line sl 
+                                    join ord_line ol 
+                                        on ol.client_id = sl.client_id 
+                                        and ol.wh_id = sl.wh_id
+                                        and ol.ordnum = sl.ordnum
+                                        and ol.ordlin = sl.ordlin
+                                        and ol.ordsln = sl.ordsln
+                               where sl.ship_id = shipment.ship_id
+                               and sl.linsts not in ( 'B', 'C' )
+                           )
+        where ship_id = @ship_id
+        ] 
+        catch (-1403,510)
+    }
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+
+We can run order consolidation such that we ignore dates.  To do that we set all dates on order lines temporarily to same date
+and then let standard planning run.  In that case standard shipment panning ends up putting random dates on shipment since it 
+is under a core assumption that all lines are the same.
+
+]]>
+</remarks>
+
+
+<seealso cref="consolidate shipment lines by field lists"></seealso>
+<seealso cref="consolidate shipment lines by fields"></seealso>
+<seealso cref="consolidate shipment lines mainline"></seealso>
+<seealso cref="consolidate usr shipment lines with standard fields"></seealso>
+<seealso cref="execute usr shipment consolidation rule without dates"></seealso>
+
+<policy
+    polcod="USR-OSSI-DATA-CHANGE-HOOK"
+    polvar="CMD_POSTCONSOLIDATE_SHIPMENT_LINES_POST"
+    polval="FIX-SHIPMENT-DATES-FROM-ORD"
+    rtnum1="1 to enable the functioality and 0 to disable"
+></policy>
+
+</documentation>
+
+</trigger>

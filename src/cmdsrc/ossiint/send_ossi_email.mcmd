@@ -1,0 +1,78 @@
+<command>
+<name>send ossi email</name>
+<description>This is a wrapper to send email command so that the policies etc are implicitly read</description>
+
+<argument name="mail_from" required="yes" datatype="string">from address</argument>
+<argument name="send_to" required="yes" datatype="string">to address</argument>
+<argument name="subject" required="yes" datatype="string">subject</argument>
+<argument name="message" required="yes" datatype="string">message</argument>
+<argument name="document" required="yes" datatype="string">a local file name that becomes content</argument>
+<argument name="attachments" required="yes" datatype="string">semi colon list of files to attach</argument>
+
+<argument name="uc_inhibit_send_email" required="yes" datatype="string">For testing - if we pass in '1' then it does not sned email</argument>
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+
+get ossi global email settings
+|
+if ( @uc_email_enabled = 1 and @uc_inhibit_send_email != '1' )
+{
+    publish data
+    where wh_id = nvl(@wh_id,@@WH_ID)
+    and mail_from = nvl(@mail_from, @uc_default_mail_from )
+    |
+    send email
+    |
+    filter data
+    where moca_filter_level = 1
+    and mail_from = @mail_from
+    and send_to = @send_to
+    and subject = @subject
+    and hostname = @hostname
+    and port = @port
+    and enableTLS = @enableTLS
+    and user = @user
+    and password = @password
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<remarks>
+This is a wrapper for core send email command
+</remarks>
+
+<retrows>0 or 1.  If email is sent then 1 row is retruned</retrows>
+<retcol name="status" type="string">A message describing the status.</retcol>
+
+<retcol name="status" type="string">A message describing the status.</retcol>
+<retcol name="mail_from" type="string">from address used for emailing</retcol>
+<retcol name="send_to" type="string">To address list for emailing</retcol>
+<retcol name="subject" type="string">Subject of email message</retcol>
+<retcol name="hostname" type="string">mail server hostname</retcol>
+<retcol name="port" type="string">port</retcol>
+<retcol name="enableTLS" type="integer">Was TLS used</retcol>
+<retcol name="user" type="string">user for authentication</retcol>
+<retcol name="password" type="string">password for authentication</retcol>
+
+
+
+<exception value="eOK">Normal successful completion</exception>
+
+<seealso cref="get ossi global email settings"></seealso>
+<seealso cref="send email"></seealso>
+
+</documentation>
+
+</command>

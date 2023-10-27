@@ -1,0 +1,123 @@
+<command>
+<name>move inventory</name>
+<description>Override to default fields not passed in and required</description>
+
+<argument name="@*" required="yes" datatype="string">Whatever standard command needs</argument>
+<argument name="uc_inhibit_move_inventory_rules" required="yes" datatype="integer">For testing perofrmance or any other exceptions</argument>
+
+<argument name="uc_force_move_inventory_rules_when_from_create_inventory" required="yes" datatype="integer">
+By default behavior when called from create inventory is via policy referenced here.  If this is 1 then we call hooks regardless.
+This can be useful for testing or in some odd case where create inventory call is in our control and we want to call the hooks.
+</argument>
+
+
+<argument name="caller" required="yes" datatype="string">When create inventory calls it, then this is passed in as CREATE_INVENTORY</argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+/*
+ * Revision Log
+ * 2021-11-30 saad.ahmad 12608 - Initial
+ */
+
+if ( @uc_inhibit_change_hook = '1')
+    ^move inventory where @*
+else
+{
+    /*
+     * If we are called inline from create inventory then by default we dont want to call move inventory level hooks
+     * If we have uc_force_move_inventory_rules_when_from_create_inventory as 1 then we dont do this optimization
+     */
+    if ( 
+           (
+               @caller = 'CREATE_INVENTORY' and 
+               ossi__polval ( 'USR-OSSI-DATA-CHANGE-HOOK', 'CMD_MOVE_INVENTORY', 'INHIBIT-WHEN-CALLED-FROM-CREATE-INVENTORY', '', 'rtnum1', nvl(@wh_id,@@WH_ID)) = 1 
+           )
+           and @uc_force_move_inventory_rules_when_from_create_inventory != 1
+       )
+        publish data
+        where uc_inhibit_move_inventory_rules = 1
+    |
+    if ( @uc_inhibit_move_inventory_rules != 1 )
+    {
+        publish ossi move inventory location attributes 
+        >> uc_res_move_inv_attr
+        |
+        {
+            publish data combination
+            where res = @uc_res_move_inv_attr
+            |
+            {
+                process ossi pre tasks for crud action using rules
+                where uc_transaction_action = 'A'
+                and table_name = 'CMD_MOVE_INVENTORY'
+                and uc_rule_grp_id = 'OSSI-MOVE-INVENTORY-PRE'
+                and uc_rule_subgrp_id = null
+                and uc_rule_grp_id_set= null
+                and uc_set_default_mode = null
+                and uc_column_prefix_old = null
+                and uc_crud_pre_tasks_les_cmd = null
+            }
+            |
+            filter data
+            where moca_filter_level = 1
+            and uc_res_move_inv_attr = @uc_res_move_inv_attr
+        } /* scope */
+    } /* executing rules */
+    |
+    ^move inventory
+    |
+    filter data
+    where moca_filter_level = 1
+    and uc_inhibit_move_inventory_rules = @uc_inhibit_move_inventory_rules
+    and uc_res_move_inv_attr = @uc_res_move_inv_attr
+}  
+
+]]>
+</local-syntax>
+<documentation>
+<remarks>
+<![CDATA[
+    <p>
+    This is move inventory execept we are calling rules engine before it.  It works as follows
+    - we have a mode for testing where this is bypassed
+    - In normal mode, we dont call any triggers if called from create inventory.  It is controlled via policy if we want to still call it from create inventory
+      But suggested to not do it for performance reasons
+    - [publish ossi move inventory location attributes] is called to establish context.  its result is saved in a resultset so that it can be available for trigger as well
+      idea is that this is source and dst location attributes
+    - - Then call [process ossi pre tasks for crud action using rules] to default variables and call pre-triggers.  Variables are pushed to stack
+    - Then publish output
+    </p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+<retcol name="@*" type="integer">Whatever standard returns</retcol>
+<retcol name="uc_inhibit_move_inventory_rules" type="integer">Input returned</retcol>
+<retcol name="uc_res_move_inv_attr" type="results">returned so that passed to trigger</retcol>
+
+
+<policy
+    polcod="USR-OSSI-DATA-CHANGE-HOOK"
+    polvar="CMD_MOVE_INVENTORY"
+    polval="INHIBIT-WHEN-CALLED-FROM-CREATE-INVENTORY"
+    rtnum1="1 means that if we are called from within create inventory we dont call move inventory hooks"
+></policy>
+
+
+<seealso cref="publish ossi move inventory location attributes">To establish context</seealso>
+<seealso cref="process ossi pre tasks for crud action using rules">To default values and call pre trigger</seealso>
+
+
+
+<example>
+</example>
+
+<exception value="eOK">Normal successful completion</exception>
+
+
+</documentation>
+</command>

@@ -1,0 +1,82 @@
+<command>
+<name>register usr shipment fully released</name>
+<description>Determine if a shipment is fully released</description>
+ 
+<argument name="ship_id"></argument>
+<argument name="wh_id"></argument>
+<argument name="uc_reg_oper_cd"></argument>
+
+
+<type>Local Syntax</type>
+
+<local-syntax>
+<![CDATA[
+
+
+if ( @uc_reg_oper_cd = 'R' or @uc_reg_oper_cd = 'U' )
+{
+    [
+    select uc_reldte old_uc_reldte,
+	       decode(@uc_reg_oper_cd, 'R', sysdate, null) as uc_new_reldte
+    from shipment
+    where ship_id = @ship_id
+    ]
+    catch (-1403,510)
+    |
+    if ( @? = 0 )
+    {
+        [
+        update shipment
+        set uc_reldte = @uc_new_reldte:date
+        where ship_id = @ship_id
+        ]
+        ;
+        write daily transaction
+        where actcod = 'UC_SREL'
+        and ship_id = @ship_id
+        and var_nam = 'uc_reldte'
+        and fr_value = @old_uc_reldte
+        and to_value = @uc_new_reldte
+        ;
+        publish data
+        where ship_id = @ship_id
+        and uc_reldte = @uc_new_reldte
+        and old_uc_reldte = @old_uc_reldte
+        and wh_id = @wh_id
+        and uc_reg_oper_cd = @uc_reg_oper_cd
+    }
+}
+  
+]]>
+
+</local-syntax>
+
+<documentation>
+
+<remarks>
+<![CDATA[
+  <p>
+  This component is for:
+  1. Set shipment uc_reldte.  That can come in handy to see when a shipment was actually releaed
+
+  It retrns a row when shipment is determined to be released anew.  Another trigger could hang on this command
+  If that needs to really be sensitive to the release of shipment as opposed to release by cmbcod
+
+  </p>
+]]>
+</remarks>
+
+<retcol name="ship_id" type="(varies according to field type)">Shipment processed</retcol>
+<retcol name="uc_reldte" type="(varies according to field type)">Release date</retcol>
+<retcol name="old_uc_reldte" type="(varies according to field type)">Previous release date</retcol>
+<retcol name="uc_reg_oper_cd" type="(varies according to field type)">Operation done</retcol>
+<retcol name="wh_id" type="(varies according to field type)"></retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+
+
+<seealso cref="register usr shipment or wave fully released"></seealso>
+
+
+</documentation>
+</command>

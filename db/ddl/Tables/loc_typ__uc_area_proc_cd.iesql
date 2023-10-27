@@ -1,0 +1,27 @@
+#use $DCSDIR/include
+#include <dcsddl.h>
+#include <dcscolwid.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+
+#use $SALDIR/include
+#include <salcolwid.h>
+
+mset command on
+
+[
+ALTER_TABLE_TABLE_INFO(loc_typ)
+ALTER_TABLE_ADD_COLUMN_START(uc_area_proc_cd)
+     STRING_TY(20)
+ALTER_TABLE_ADD_COLUMN_END
+] catch (-2705,-1430 )
+RUN_DDL
+
+create db column comment
+where table_name   = 'loc_typ'
+and column_name    = 'uc_area_proc_cd'
+and column_comment = 'Area processing code.  e.g. MHE_ASRS_S means it is an AsRS location type(area).  MHE_ASRS_I means ASRS induction etc.  Idea is that code may be written to rely on these codes'
+RUN_DDL
+
+mset command off
+

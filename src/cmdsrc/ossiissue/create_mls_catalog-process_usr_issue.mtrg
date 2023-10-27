@@ -1,0 +1,27 @@
+<trigger>
+<name>process usr issue</name>
+<on-command>create mls catalog</on-command>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ * 20170920 haseeb.ahmed.sisc - 7879 - Need to create a rules engine to support a matrix for order notes (BELIJST400)
+ */
+if ( @locale_id = 'US_ENGLISH' and @cust_lvl != '100')
+  process usr issue
+  where uc_table_name = 'LES_MLS_CAT'
+    and uc_action = 'ADD'
+]]></local-syntax>
+<fire-sequence>10000</fire-sequence>
+<documentation>
+
+<remarks>
+This trigger process issue for creating mls catalog.
+</remarks>
+
+<seealso cref="process usr issue"></seealso>
+
+</documentation>
+</trigger>

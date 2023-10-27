@@ -1,0 +1,2 @@
+polcod,polvar,polval,wh_id_tmpl,srtseq,rtstr1,rtstr2,rtnum1,rtnum2,rtflt1,rtflt2,grp_nam
+USR-OSSI-DOC-UPLOAD-Q,SETUP,ZIP-BEFORE-UPLOAD,----,1,If rtnum1 = 1 when we are uploading we will zip it first,,1,0,0.0,0.0,OSSISVN_12314

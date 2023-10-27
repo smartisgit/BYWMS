@@ -1,0 +1,80 @@
+<command>
+<name>ossi get_client_grp</name>
+<description>FUNCTION: Get a client group and cache to session variable</description>
+
+<argument name="moca_farg1" required="yes" datatype="string">Client Id</argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* saad.ahmad - 11919 - July-17-2021
+*/
+publish data
+where client_id = @moca_farg1
+and my_null_client_grp_value = '<<<null>>>'
+|
+if ( @client_id is null )
+    publish data
+    where client_grp = null
+else
+{
+    publish data
+    where sess_var_client_grp = 'ossi_get_client_grp_' || @client_id
+    |
+    publish data
+    where client_grp = ossi__sess_var ( @sess_var_client_grp)
+    catch (-1403,510)
+    |
+    if ( @? != 0 )
+    {
+        [
+        select max(client_grp) client_grp
+        from client_grp_client
+        where client_id = @client_id
+        ]
+        |
+        {
+            save session variable
+            where name = @sess_var_client_grp
+            and value = nvl(@client_grp, @my_null_client_grp_value )
+            ;
+            publish data
+            where client_grp = @client_grp
+        }
+    }
+    else
+        publish data
+        where client_grp = decode ( @client_grp, @my_null_client_grp_value, null, @client_grp)
+}
+        
+
+]]>
+</local-syntax>
+
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This function makes it easy to get client_grp.  Sometimes we have one client stuff represented as multiple clients.  Then client_grp_client
+combines them.  This will return the client_grp.  It gets one row from there so if client_id is in multiple groups then it should not be used.
+
+the value is saved in session variable for performance reasons so that if repeated calls are made in the same transaction, there is little
+peformance penalty.
+</p>
+]]>
+</remarks>
+
+<retrows>MOCA Function - So one row is returned</retrows>
+<retcol name="client_grp" type="COMTYP_CHAR">Client group value from the client_grp_client table.  If not found null</retcol>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+<seealso cref="execute ossi all conditional rules"></seealso>
+</documentation>
+
+</command>

@@ -1,0 +1,86 @@
+<command>
+<name>write ossi daily transaction for print</name>
+<description>Logs a daily transaction entry</description>
+
+<argument name="uc_create_dlytrn_in_new_trx" required="no" datatype="integer"></argument>
+<argument name="uc_print_file_exec_id" required="no" datatype="integer"></argument>
+<argument name="uc_print_file_uc_doc_id" required="no" datatype="integer"></argument>
+
+
+<argument name="actcod" required="no" datatype="string"></argument>
+<argument name="oprcod" required="no" datatype="string"></argument>
+<argument name="wh_id" required="yes" datatype="string"></argument>
+<argument name="usr_id" required="yes" datatype="string"></argument>
+<argument name="trndt" required="yes" datatype="string"></argument>
+<argument name="cmnt" required="no" datatype="string"></argument>
+<argument name="subnum" required="yes" datatype="string"></argument>
+<argument name="devcod" required="yes" datatype="string"></argument>
+<argument name="trnqty" required="yes" datatype="string"></argument>
+<argument name="var_nam" required="yes" datatype="string"></argument>
+<argument name="to_value" required="yes" datatype="string"></argument>
+<argument name="fr_value" required="yes" datatype="string"></argument>
+<argument name="excp_code" required="no" datatype="string"></argument>
+<type>Local Syntax</type>
+
+<local-syntax>
+<![CDATA[
+
+if ( @uc_print_file_exec_id is not null )
+    publish data
+    where actcod = 'UC_PRNDFR'
+else
+    publish data
+    where actcod = 'UC_PRNLOG'
+|
+if ( @uc_create_dlytrn_in_new_trx is null )
+    publish data
+    where uc_create_dlytrn_in_new_trx = decode ( @actcod, 'UC_PRNLOG', 1, 0 )
+|
+publish data
+where oprcod = @oprcod
+and wh_id = nvl(@wh_id, @@wh_id) 
+and usr_id = nvl(@gen_usr_id, nvl(@usr_id, @@USR_ID))
+and trndt = sysdate 
+/* BUG 1187 -- some report names are more than 20 characters long which is allowed space in this column so we truncate it to first 20 */
+and adj_ref1 = substr(nvl(nvl(@rpt_id, @uc_report_name),@label_name),1,20)
+and cmnt = nvl(@filnam, @filename )
+and subnum = nvl(@subnum,@ctnnum) 
+and devcod = nvl(@devcod, @@devcod) 
+and trnqty = nvl(@copies,1) 
+and var_nam = 'printer|options|delflg|uc_recursive_call|uc_is_label' 
+and to_value = substr(@printer || '|' || @options || '|' || @delflg  || '|' || @uc_recursive_call || '|' || @uc_is_label,1,200)
+and fr_value = substr('Called From:' || @uc_called_from,1,200)
+and excp_code = nvl(@uc_err_code, '0') || '|' || nvl(@uc_err_descr, '0') 
+/**/
+and adj_ref2 = substr(@uc_print_file_exec_id, 1, 20)
+and traknm   = @uc_print_file_uc_doc_id
+|
+if ( @uc_create_dlytrn_in_new_trx = 1 )
+    write ossi daily transaction aut
+else
+    write daily transaction
+
+]]>
+</local-syntax>
+
+
+<documentation>
+<remarks>
+<![CDATA[
+    <p>
+    Changed Made: 2015-10-21 -- AIUBCJ0
+    BUG 1187 -- Added logic to truncate the report name in adj_ref1 field if it is more than allowed 20 chracters
+    
+    Changed Made: 2014-12-04 -- AIUBCJ0
+    Added the Operation Code to the Transaction - If the Label is being printed again from the reprint components, an Operation Code of 'REPRINT' will be sent, otherwise, it remains NULL
+
+    </p>
+]]>
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+<seealso cref="write usr daily transaction aut"></seealso>
+<seealso cref="print file"></seealso>
+
+</documentation>
+</command>

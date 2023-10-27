@@ -1,0 +1,20 @@
+#use $LESDIR/include
+#use $DCSDIR/include
+#use $MOCADIR/include
+ 
+#include <dcsddl.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+
+mset command on
+[
+CREATE_PK_PRE( usr_www_call_hdr, usr_www_call_hdr_pk )
+(uc_www_call_seq) 
+CREATE_PK_INDEX_INFO
+CREATE_PK_POST
+]
+catch (-1779,-4902,-2260)
+
+RUN_DDL
+
+mset command off

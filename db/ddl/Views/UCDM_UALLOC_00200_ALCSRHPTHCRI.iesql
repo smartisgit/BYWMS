@@ -1,0 +1,37 @@
+#use $DCSDIR/include
+
+#include <dcsddl.h>
+
+#include <dcscolwid.h>
+
+#include <dcstbldef.h>
+
+#include <sqlDataTypes.h>
+
+
+#use $SALDIR/include
+
+#include <salcolwid.h>
+
+mset command on
+
+[
+DROP_VIEW(UCDM_UALLOC_00200_ALCSRHPTHCRI)
+] catch (ERR_CANNOT_DROP_TABLE_NOT_FOUND)
+RUN_DDL
+
+mset command off
+
+CREATE_VIEW(UCDM_UALLOC_00200_ALCSRHPTHCRI)
+select alloc_search_path_criteria.*,
+        dscmst.lngdsc,
+		alloc_search_path.wh_id
+   from alloc_search_path_criteria
+   join alloc_search_path
+     on alloc_search_path.alloc_search_path_id = alloc_search_path_criteria.alloc_search_path_id
+   join dscmst
+     on dscmst.colnam = 'alloc_search_path_id'
+    and dscmst.colval = alloc_search_path.alloc_search_path_id
+RUN_DDL
+
+mset command on

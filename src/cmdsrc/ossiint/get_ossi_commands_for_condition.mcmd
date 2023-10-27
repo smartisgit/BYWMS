@@ -1,0 +1,125 @@
+<command>
+<name>get ossi commands for condition</name>
+<description>Get the commands to release</description>
+
+<argument name="uc_rule_grp_id" required="yes" datatype="string"></argument>
+<argument name="uc_rule_subgrp_id" required="yes" datatype="string"></argument>
+<argument name="uc_rule_id" required="yes" datatype="string"></argument>
+<argument name="uc_rule_id_wild_card_01" required="yes" datatype="string"></argument>
+<argument name="uc_rule_id_wild_card_02" required="yes" datatype="string"></argument>
+<argument name="uc_rule_id_wild_card_03" required="yes" datatype="string"></argument>
+<argument name="uc_rule_id_wild_card_04" required="yes" datatype="string"></argument>
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+publish data
+where wh_id = nvl(@wh_id , @@WH_ID )
+|
+publish ossi polval as projection with evaluated expressions 
+where polcod = 'USR-CTXT-' || @uc_rule_grp_id
+and polvar = @uc_rule_subgrp_id
+and wh_id = @wh_id
+|
+{
+    [
+    select rules.*
+    from
+    (
+        select 1 main_ord,
+               srtseq,
+               uc_rule_id,
+               uc_condition_expr,
+               uc_execute_cmd
+        from usr_rule_engine_cond_expr
+        where uc_rule_grp_id = @uc_rule_grp_id
+        and uc_rule_subgrp_id = @uc_rule_subgrp_id
+        and uc_rule_id = @uc_rule_id
+        and ena_flg = 1
+        union all
+        select 2 main_ord,
+               srtseq,
+               uc_rule_id,
+               uc_condition_expr,
+               uc_execute_cmd
+        from usr_rule_engine_cond_expr
+        where uc_rule_grp_id = @uc_rule_grp_id
+        and uc_rule_subgrp_id = @uc_rule_subgrp_id
+        and uc_rule_id = @uc_rule_id_wild_card_01
+        and ena_flg = 1
+        union all
+        select 3 main_ord,
+               srtseq,
+               uc_rule_id,
+               uc_condition_expr,
+               uc_execute_cmd
+        from usr_rule_engine_cond_expr
+        where uc_rule_grp_id = @uc_rule_grp_id
+        and uc_rule_subgrp_id = @uc_rule_subgrp_id
+        and uc_rule_id = @uc_rule_id_wild_card_02
+        and ena_flg = 1
+        union all
+        select 4 main_ord,
+               srtseq,
+               uc_rule_id,
+               uc_condition_expr,
+               uc_execute_cmd
+        from usr_rule_engine_cond_expr
+        where uc_rule_grp_id = @uc_rule_grp_id
+        and uc_rule_subgrp_id = @uc_rule_subgrp_id
+        and uc_rule_id = @uc_rule_id_wild_card_03
+        and ena_flg = 1
+        union all
+        select 5 main_ord,
+               srtseq,
+               uc_rule_id,
+               uc_condition_expr,
+               uc_execute_cmd
+        from usr_rule_engine_cond_expr
+        where uc_rule_grp_id = @uc_rule_grp_id
+        and uc_rule_subgrp_id = @uc_rule_subgrp_id
+        and uc_rule_id = @uc_rule_id_wild_card_04
+        and ena_flg = 1
+    ) rules
+    order by main_ord, srtseq
+    ]
+}
+   
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+Get the conditions and rules to use for a rule context
+</p>
+]]>
+</remarks>
+
+<retrows>n</retrows>
+
+
+<retcol name="main_ord" type="COMTYP_CHAR"></retcol>
+<retcol name="srtseq" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_rule_id" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_condition_expr" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_execute_cmd" type="COMTYP_CHAR"></retcol>
+
+
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+<seealso cref="release ossi pick using rules"></seealso>
+
+</documentation>
+
+
+</command>

@@ -1,0 +1,144 @@
+<command>
+<name>transfer ossi document to remote server</name>
+<description>Transfer an RDF file to a remote server for conversion to PDF</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+publish data 
+  where uc_remote_url = nvl(@uc_remote_url, @@UC_DOC_Q_UPLOAD_RDF_CNV_URL)
+|
+if (@uc_dest_filename is null)
+{
+  sl_split filename
+    where full_file_name = @filepath
+  |
+  publish data
+    where uc_dest_filename = @s_filename
+}
+|
+{
+   read file
+     where filnam = @filepath
+       and mode = 'B'
+   |
+   encode to base64
+     where bin_data = @data
+}
+|
+remote (@uc_remote_url)
+{
+   if (@uc_remote_trace_flg = 1) set trace where filename = 'xfr.log' and activate = 1
+   |
+   publish data
+     where rdf_file = @@LESDIR || '/temp/' || @uc_dest_filename || '.rdf'
+       and pdf_file = @@LESDIR || '/temp/' || @uc_dest_filename || '.pdf'
+   |
+   {
+      /* Write the RDF file to LESDIR/temp */
+      decode from base64
+        where str = @base64_encoded
+      |
+      convert binary column to pointer
+        where colnam = 'base64_decoded'
+      |
+      write output file
+        where filnam = @rdf_file
+          and mode = "wb"
+          and data_ptr = @result_ptr 
+          and data_len = @result_len
+          and charset = null
+          and data = null
+      ;
+      execute os command 
+        where cmd = 'VBActiveReportToPDF "' || @rdf_file || '" "' || @pdf_file || '"'
+      >> res
+      |
+      /* Last line of the output will contain the error if there is one */
+      [[
+      String message;
+      while (res.next())
+      {
+         message = res.getString("result");
+      }
+      [message:message]
+      ]]
+      |
+      if (@message like 'ERROR:%')
+      {
+         set return status 
+           where status = '99999' 
+             and message = @message
+      }        
+      ;
+      /* Return the PDF file in Base64 */
+      /*
+      read file
+        where filnam = @pdf_file
+          and mode = 'B'
+      |
+      encode to base64
+        where bin_data = @data 
+      */
+      /* "read file" was stopping at NULL characters in version 2008, so do it in Groovy */
+      publish data 
+        where file = @pdf_file
+      |
+      [[
+      import java.io.*;
+      
+      byte[] arr = read(new File(file));
+      
+      public byte[] read(File file) throws IOException {
+          ByteArrayOutputStream ous = null;
+          InputStream ios = null;
+          try {
+              byte[] buffer = new byte[4096];
+              ous = new ByteArrayOutputStream();
+              ios = new FileInputStream(file);
+              int read = 0;
+              while ((read = ios.read(buffer)) != -1) {
+                  ous.write(buffer, 0, read);
+              }
+          }finally {
+              try {
+                  if (ous != null)
+                      ous.close();
+              } catch (IOException e) {
+              }
+      
+              try {
+                  if (ios != null)
+                      ios.close();
+              } catch (IOException e) {
+              }
+          }
+          return ous.toByteArray();
+      }
+      
+      String base64_encoded = new sun.misc.BASE64Encoder().encode(arr);
+      [base64_encoded:base64_encoded]
+      ]]
+   }
+   |
+   if (@uc_remote_remove_file_flg != 0)
+   {
+      remove file
+        where filename = @rdf_file
+      |
+      remove file
+        where filename = @pdf_file  
+   }
+   |
+   if (@uc_remote_trace_flg = 1) set trace where filename = 'xfr.log' and activate = 0
+   |
+   publish data
+     where base64_encoded = @base64_encoded
+}
+
+]]>
+</local-syntax>
+<argument name="filepath" required="yes" datatype="string"></argument>
+<argument name="uc_remote_url" datatype="string"></argument>
+<argument name="uc_dest_filename" datatype="string"></argument>
+</command>

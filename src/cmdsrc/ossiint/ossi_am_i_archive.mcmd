@@ -1,0 +1,26 @@
+<command>
+<name>ossi am_i_archive</name>
+<description>Find if we are on archive or not</description>
+<type>Local Syntax</type>
+
+
+<local-syntax>
+<![CDATA[
+/* Returns 0 if we are not on archive  
+   Returns 1 if we are on archive 
+ */
+publish data 
+  where value = decode(@@UC_MY_ARCH_HOST, null, 1, 0)
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+MOCA Function to get if we are on archive or not
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

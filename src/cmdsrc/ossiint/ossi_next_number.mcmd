@@ -1,0 +1,31 @@
+<command>
+<name>ossi next_number</name>
+<description>Generate next number</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="moca_farg1">Next number name</argument>
+
+
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+generate next number where numcod = @moca_farg1
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+MOCA Function to get next number
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

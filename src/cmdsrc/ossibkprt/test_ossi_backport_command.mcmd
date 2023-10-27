@@ -1,0 +1,26 @@
+<command>
+<name>test ossi backport command</name>
+<description>Sample backport command</description>
+<type>Local Syntax</type>
+
+
+
+<local-syntax>
+<![CDATA[
+
+noop
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+Sample
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+
+</command>

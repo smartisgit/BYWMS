@@ -1,0 +1,250 @@
+<command>
+<name>run ossi monitor</name>
+<description>Run the monitor</description>
+
+<argument datatype="string" name="uc_ossi_job_id"></argument>
+<argument datatype="string" name="uc_ossi_who"></argument>
+<argument datatype="string" name="uc_monitor_id">The monitor Name - Default will run all</argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+publish data
+where uc_ossi_job_id = nvl(@uc_ossi_job_id, 'UC_OSSI_APPMON' )
+and polcod = 'USR-OSSI-APP-MONITOR'
+and uc_sess_var_rownum = 'uc_mon_rownum'
+and uc_sch_tim_local_flg = 0
+|
+publish data
+where uc_ossi_who = nvl( @uc_ossi_who,  nvl(ossi__polval_nc ( @polcod, 'SETUP', 'USERID','','', @wh_id ),'SUPER') )
+|
+if ( ossi__polval_nc ( @polcod, 'SETUP', 'INSTALLED', '', 'rtnum1', @wh_id ) = 1 )
+{
+    sl_set user
+    where i_user_id = @uc_ossi_who
+    ;
+    publish data
+    where uc_ossi_job_seq = ossi__register_job ( @uc_ossi_job_id,
+                                                  'monitor_id='|| @uc_monitor_id,
+                                                @uc_ossi_who )
+    |
+    try
+    {
+        save session variable
+        where name = @uc_sess_var_rownum
+        and value = '0'
+        ;
+        list ossi app monitors
+        where ena_flg = 1
+        catch (-1403,510)
+        >> res
+        |
+        publish data
+        where uc_cnt_mon = rowcount(@res)
+        |
+        if ( @uc_cnt_mon > 0 )
+        {
+            publish data combination
+            where res = @res
+            |
+            {
+                save session variable
+                where name = @uc_sess_var_rownum
+                and value = string(int(ossi__sess_var(@uc_sess_var_rownum,'0','Y')) + 1)
+                ;
+                publish data
+                where var_mon_pass = 'var_' || @uc_monitor_id || '_pass'
+                and var_mon_fail = 'var_' || @uc_monitor_id || '_fail'
+                and var_mon_ems  = 'var_' || @uc_monitor_id || '_ems'
+                and var_mon_tot  = 'var_' || @uc_monitor_id || '_tot'
+                and uc_rownum    = ossi__sess_var ( @uc_sess_var_rownum,'0','Y')
+                |
+                check ossi allowed to run job
+                where uc_interval_chk_job_id = @uc_ossi_job_id
+                and uc_interval_chk_module_id = @uc_monitor_id
+                |
+                if ( @uc_allowed_to_run = 1 )
+                {
+                    save session variable
+                    where name = @var_mon_pass
+                    and value = '0'
+                    ;
+                    save session variable
+                    where name = @var_mon_fail
+                    and value = '0'
+                    ;
+                    save session variable
+                    where name = @var_mon_tot
+                    and value = '0'
+                    ;
+                    save session variable
+                    where name = @var_mon_ems
+                    and value = '0'
+                    ;
+                    {
+                        publish data
+                        where uc_ossi_module_seq = ossi__register_module ( @uc_ossi_job_seq, @uc_monitor_id, @uc_rownum || ' of ' || @uc_cnt_mon, @uc_ossi_who )
+                        |
+                        {
+                            publish data
+                            where uc_ossi_action_seq = ossi__register_action ( @uc_ossi_job_seq, @uc_ossi_module_seq, 'RUN-CHECK',
+                                                                               @uc_check_cmd,
+                                                                               @uc_ossi_who )
+                            |
+                            {
+                                execute server command
+                                where cmd = @uc_check_cmd
+                                and inline = 1
+                                catch(@?)
+                                >> res
+                                |
+                                publish data
+                                where uc_ossi_err_code = iif ( @? = 0 or @? = -1403 or @? = 510, 0, @? )
+                                and uc_ossi_err_descr = iif ( @? = 0 or @? = -1403 or @? = 510, '', @! )
+                                |
+                                complete ossi job log
+                                |
+                                publish data
+                                where uc_check_rowcount = rowcount(@res)
+                                |
+                                /* Continue only if the check command returned rows with no error */
+                                if ( @uc_ossi_err_code = 0 and @uc_check_rowcount > 0 )
+                                {
+                                    publish data combination
+                                    where res = @res
+                                    |
+                                    {
+                                        /* this variable is for counting each row */
+                                        save session variable
+                                        where name = @var_mon_tot
+                                        and value = string(int(ossi__sess_var ( @var_mon_tot) ) + 1)
+                                        ;
+                                        publish data
+                                        where uc_check_rownum = ossi__sess_var ( @var_mon_tot, '0', 'Y' )
+                                        |
+                                        publish data
+                                        where uc_ossi_action_seq = ossi__register_action ( @uc_ossi_job_seq, @uc_ossi_module_seq, 'RUN=' || @uc_fix_cmd,
+                                                                                           @uc_mon_key_data || '..' || @uc_check_rownum || ' of ' || @uc_check_rowcount,
+                                                                                           @uc_ossi_who )
+                                        |
+                                        {
+                                            execute server command
+                                            where cmd = @uc_fix_cmd
+                                            and inline = 1
+                                            catch(@?)
+                                            |
+                                            publish data
+                                            where uc_ossi_err_code = @?
+                                            and   uc_ossi_err_descr = @!
+                                            |
+                                            {
+                                                complete ossi job log
+                                                ;
+                                                if ( @uc_ossi_err_code = 0 )
+                                                {
+                                                    [commit] catch(@?)
+                                                    ;
+                                                    save session variable
+                                                    where name = @var_mon_pass
+                                                    and value = string(int(ossi__sess_var ( @var_mon_pass) ) + 1)
+                                                }
+                                                else
+                                                {
+                                                    [rollback] catch(@?)
+                                                    ;
+                                                    /* See if ems alert is to be raised, if so raise it */
+                                                    if ( @uc_raise_ems_alert_on_fail_flg = 1 )
+                                                    {
+                                                        save session variable
+                                                        where name = @var_mon_ems
+                                                        and value = string(int(ossi__sess_var ( @var_mon_ems) ) + 1)
+                                                        ;
+                                                        raise ossi ems alert for monitor failure
+                                                        where monitor_id = @uc_monitor_id
+                                                        and   uc_fix_stat= @uc_ossi_err_code
+                                                        and   uc_fix_stat_msg = @uc_ossi_err_descr
+                                                        and   uc_mon_key_data = @uc_mon_key_data
+                                                    }
+                                                    ;
+                                                    save session variable
+                                                    where name = @var_mon_fail
+                                                    and value = string(int(ossi__sess_var ( @var_mon_fail) ) + 1)
+                                                }
+                                                ;
+                                                if (@uc_log_mon_dlytrn_flg = 1)
+                                                {
+                                                    /*
+                                                     *
+                                                     * We never want to log dlytrn if our fix is an EMS event
+                                                     */
+                                                    [
+                                                    select 1
+                                                    from poldat_view
+                                                    where polcod = 'EMS'
+                                                    and polvar = 'EVENTS'
+                                                    and wh_id = nvl(@wh_id, '----')
+                                                    and upper(rtstr1) = upper(@uc_fix_cmd)
+                                                    and rownum < 2
+                                                    ]
+                                                    catch (-1403)
+                                                    |
+                                                    if (@? != 0)
+                                                    {
+                                                        write daily transaction
+                                                        where actcod  = 'UC_MONFIX'
+                                                        and   cmnt    = 'Called From:' || @uc_fix_cmd || ',status=' || @uc_ossi_err_code || ',msg=' || @uc_ossi_err_descr
+                                                        and   var_nam = 'key_data'
+                                                        and   to_value= @uc_mon_key_data
+                                                        and   fr_value= @uc_monitor_id
+                                                        and   wh_id   = nvl(@wh_id,'----')
+                                                    }
+                                                } /* do not log dlytrn */
+                                                ;
+                                                [commit] catch(@?)
+                                            } /* block with fix error code */
+                                        } /* fix action */
+                                    } /* each row of check command */
+                                } /* got some data from issues */
+                            } /* action check */
+                            ;
+                            complete ossi job log /* complete the whole module */
+                        } /* whole module */
+                    } /* run this module? */
+                    ;
+                    publish data
+                    where var_mon_pass = 'var_' || @uc_monitor_id || '_pass'
+                    and   var_mon_fail = 'var_' || @uc_monitor_id || '_fail'
+                    and   var_mon_tot  = 'var_' || @uc_monitor_id || '_tot'
+                    and   var_mon_ems  = 'var_' || @uc_monitor_id || '_ems'
+                    |
+                    publish data
+                    where uc_monitor_id  = @uc_monitor_id
+                    and   uc_run_this_mon= @uc_run_this_mon
+                    and   num_issues     = ossi__sess_var ( @var_mon_tot,  '-1' )
+                    and   num_fixed_ok   = ossi__sess_var ( @var_mon_pass, '-1' )
+                    and   num_fixed_fail = ossi__sess_var ( @var_mon_fail, '-1' )
+                    and   num_ems_raised = ossi__sess_var ( @var_mon_ems,  '-1' )
+                } /* names of sess vars */
+            } /* publish dara combination */
+        } /* cnt_mon > 0 */
+    } /* try of job */
+    finally
+    {
+        complete ossi job
+    }
+} /* mon is installed */
+
+]]>
+</local-syntax>
+<documentation>
+<remarks>
+Run the monitor.  Designed to put as a job
+</remarks>
+<exception value="eOK">Normal successful completion</exception>
+</documentation>
+</command>

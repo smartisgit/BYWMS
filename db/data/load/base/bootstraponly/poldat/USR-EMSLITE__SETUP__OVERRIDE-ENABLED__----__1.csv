@@ -1,0 +1,2 @@
+polcod,polvar,polval,wh_id_tmpl,srtseq,rtstr1,rtstr2,rtnum1,rtnum2,rtflt1,rtflt2,grp_nam
+USR-EMSLITE,SETUP,OVERRIDE-ENABLED,----,1,if rtnum1= 1 then we use this override.  If 0 it will go to default logic,If rtnum1=1 and then rtnum2=0 then we have turned off EMS completely,1,1,0.0,0.0,OSSISVN_12567

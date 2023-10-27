@@ -1,0 +1,16 @@
+SUBDIR=incsrc libsrc
+
+all: $(SUBDIR)
+
+$(SUBDIR): FRC
+	cd "$(MAKEDIR)\$@"
+	$(MAKE) -nologo -fmakefile.nt $(TARGET)
+
+clean: 
+	$(MAKE) -nologo -fmakefile.nt TARGET=clean
+
+install: 
+	$(MAKE) -nologo -fmakefile.nt TARGET=install
+
+FRC:
+

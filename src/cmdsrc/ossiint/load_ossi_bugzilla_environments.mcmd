@@ -1,0 +1,65 @@
+<command>
+<name>load ossi bugzilla environments</name>
+<description>Load the environments table</description>
+
+<argument name="uc_env_list" required="yes" datatype="string">Full file name of the source file</argument>
+
+<type>Local Syntax</type>
+
+
+<local-syntax>
+<![CDATA[
+
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+publish data
+where uc_env_list_default = ""
+|
+publish data
+where uc_env_list = nvl(@uc_env_list, @uc_env_list_default )
+|
+{
+   convert list
+   where string = @uc_env_list
+   and type = 'L'
+   |
+   {
+      publish data
+      where uc_env_name = ossi__get_fld_from_list ( @retstr, 1, '#' )
+      and uc_env_description = ossi__get_fld_from_list ( @retstr, 2, '#' )
+      and uc_env_url = ossi__get_fld_from_list ( @retstr, 3, '#' )
+      |
+      {
+         publish data
+         where uc_ins_stmt = "insert into ossi_rollout_env (uc_env_name,uc_env_description,uc_env_url ) values (@uc_env_name,@uc_env_description,@uc_env_url ) "
+         |
+         execute ossi bugzilla dml
+         where uc_dml_stmt = @uc_ins_stmt
+      }
+   }
+   ;
+   execute ossi bugzilla select
+   where uc_select_stmt = "select * from ossi_rollout_env"
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+Add environments to bugzilla
+</remarks>
+
+<retcol name="uc_env_name" type="String"></retcol>
+<retcol name="uc_env_description" type="String"></retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

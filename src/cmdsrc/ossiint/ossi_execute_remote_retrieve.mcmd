@@ -1,0 +1,109 @@
+<command>
+<name>ossi execute remote retrieve</name>
+<description>
+Retrieve data from a remote data source.  It provides abstraction for typical operations
+like executing data in another commit context or using openquery (in SQLServer)
+</description>
+<type>C Function</type>
+<function>ossiExecuteRemoteRetrieve</function>
+<argument name="sl_cmd" required="yes" datatype="string">
+Command to execute.  A SQL statement must be enclosed between a pair
+of square brackets [sql]
+</argument>
+
+<argument name="sl_linked_server" required="no" datatype="string">
+   Linked server name.  Applicable for SQLServer only
+</argument>
+
+<argument name="sl_outside_trans" required="no" datatype="string">
+   Y or N.  If Y, the command will run
+   in another process.  Also on sqlsever implicit_transations will
+   be turned off
+</argument>
+
+
+<argument name="sl_use_openquery" required="no" datatype="string">
+   Y or N.  Use openquery to run the query.
+</argument>
+
+<argument name="sl_view_name_prefix" required="no" datatype="string">
+   Prefix of the views on this linked server.  If provided the 
+   string will be replaced with nothing in the SQL statment before
+   executing it using openquery
+</argument>
+
+<argument name="sl_db_linked_server" required="no" datatype="string">
+   Name of the database link server that was created in the database
+</argument>
+
+<argument name="sl_describe_only" required="no" datatype="string">
+   Describe only; i.e. return a resultset with the columns
+</argument>
+<documentation>
+
+
+<remarks>
+<![CDATA[
+
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+This command may be used to execute a command.  If a SQL statement is to be
+provided then it must be provided between square brackets.
+<br/>
+Sometimes it is important to run the SQL outside the original transaction.
+The sl_no_trans may be used in this case.  If provided then the SQL will
+run in another process.  In addition to this, the implicit_transactions will
+be turned off in the other environment.
+<br/>
+sl_linked_server may be used to provide the linked server name (applicable on
+SQLServer only).  If provided it is possible to run the query using the 
+openquery interface.  This behaviour is controlled by environment variables
+OSSI_LINKED_SERVER_name of the linked srever.
+<br/>
+The value of the environment variable is specified as a list of name-value pairs.  The applicable names are:
+<br/>
+use_openquery.  A Y or N may be provided to force use of openquery
+<br/>
+view_name_prefix.  A string that will be replaced with null.  This is useful
+when the option to run the query using openquery is optional.  In those cases
+the SQL may be referring to the table using a view.
+<br/>
+db_link_server. Name of the database link server
+]]>
+</remarks>
+
+<retrows>The return set depends on the command being executed</retrows>
+
+<example>
+Example:
+- Assume a table exists on a remote database called test_table
+- In order to access the data, a linked server is create on the SQLServer database 
+  to access the remote data - say test_link
+- In order to access the remote table, a view is created on the SQServer.  
+  As a convention the view name could be var_link_test_table
+- Now it is possible to query this table using something like:
+[select * from var_link_test_table] or 
+[select * from openquery(test_link, 'select * from test_table]
+
+- In order to run this, following command may be used in the retrieve method
+
+   ossi execute remote retrieve
+   where sl_cmd           = '[select * from var_link_test_table]'
+   and   sl_no_trans      = 'Y'
+   and   sl_linked_server = 'test_link'
+
+- It may be desirable in certain cases to run the query using the openquery
+  interface.  In those cases we may use the sl_use_openquery parameter
+  along with sl_view_name_prefix
+- Openquery use may be controlled by environment variable 
+  OSSI_LINKED_SERVER_TEST_LINK as well.  e.g. variable may be set to
+  "use_openquery=Y;view_name_prefix=var_link_"
+</example>
+
+<exception value="eOK">Normal successful completion</exception>
+</documentation>
+</command>

@@ -1,0 +1,20 @@
+<trigger>
+<name>process usr issue</name>
+<on-command>create carrier pro number</on-command>
+<local-syntax>
+<![CDATA[
+process usr issue
+  where uc_table_name = 'CAR_PRO_NUM'
+    and uc_action = 'ADD'
+]]></local-syntax>
+<fire-sequence>10000</fire-sequence>
+<documentation>
+
+<remarks>
+This trigger process issue for creating carrier pro numer.
+</remarks>
+
+<seealso cref="process usr issue"></seealso>
+
+</documentation>
+</trigger>

@@ -1,0 +1,71 @@
+<command>
+<name>create ossi general policy for auto waving</name>
+<description>This command will create general setting of auto waving</description>
+ 
+<argument name="uc_auto_wave_setting_cd" required="yes"   datatype="string">Autowave setting code</argument>
+<argument name="uc_auto_wave_rule_id" required="yes"   datatype="string">Wave Rule</argument>
+<argument name="srtseq"   required="no" datatype="string">Policy Sort Sequence</argument>
+<argument name="uc_gnrl_ena_flg"  required="no"  datatype="string">General Setting enabled, Return Number1</argument>
+<argument name="uc_setting_1" required="no"  datatype="string">Setting 1, Return String1</argument>
+<argument name="uc_setting_2" required="no"  datatype="string">Setting 2, Return String1</argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+   if (@srtseq is null)
+   {
+       [
+       select max(srtseq) + 1 new_srtseq
+       from poldat 
+       where polcod = 'USR-WAVE-PLANNING'
+       and polvar = 'WAVE-RULE-PARAMETER-TABLE'
+       and wh_id_tmpl = '----'
+       ]
+   }
+   |
+   create policy 
+     where polcod = 'USR-WAVE-PLANNING'
+       and polvar = 'WAVE-RULE-PARAMETER-TABLE'
+       and polval = @uc_auto_wave_rule_id
+       and wh_id_tmpl = '----'
+       and srtseq = nvl(@srtseq, @new_srtseq)
+       and rtstr1 = @uc_setting_1
+       and rtstr2 = @uc_setting_2
+       and rtnum1 = @uc_gnrl_ena_flg
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This will create a general policy of auto waving.
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+<retcol name="@*" type="COMTYP_STRING">Policy columns</retcol>
+<exception value="eOK">The command completed successfully.</exception>
+
+<example>
+<![CDATA[
+<p>
+</p>
+]]>
+
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+<seealso cref="list ossi general policies for auto waving"></seealso>
+<seealso cref="change ossi general policy for auto waving"></seealso>
+<seealso cref="remove ossi general policy for auto waving"></seealso>
+
+</documentation>
+
+
+</command>

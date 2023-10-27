@@ -1,0 +1,54 @@
+<command>
+<name>list ossi auto wave rules</name>
+<description>This command will list the auto wave rules</description>
+ 
+<argument name="@*" required="no" datatype="string">All fields in usr_auto_wave_rule_hdr</argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+    [
+     select *
+     from usr_auto_wave_rule_hdr
+     where 1 = 1
+     and @*
+     order by wh_id, uc_auto_wave_rule_id
+    ] catch(-1403, 510)
+
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This will list all the auto wave rules 
+</p>
+]]>
+</remarks>
+
+<retrows>n</retrows>
+
+<retcol name="@*" type="COMTYP_CHAR">All fields in usr_auto_wave_rule_hdr</retcol>
+
+<example>
+<![CDATA[
+<p>
+</p>
+]]>
+
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+<seealso cref="process usr auto wave rules"></seealso>
+<seealso cref="list ossi auto wave rules ready for processing"></seealso>
+
+
+</documentation>
+
+
+</command>

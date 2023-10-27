@@ -1,0 +1,131 @@
+<command>
+<name>list ossi shipments for release registration</name>
+<description>This commands finds shipments that are allocated and are eligible for start of release</description>
+ 
+<argument name="wh_id" required="yes" datatype="string"></argument>
+<argument name="ship_id" required="yes" datatype="string"></argument>
+<argument name="schbat" required="yes" datatype="string"></argument>
+<argument name="skip_rpl_chk" datatype="integer"></argument>
+<argument name="pcksts" datatype="string"></argument>
+
+
+<argument name="comflg" required="yes" datatype="integer">we will publish it out as well</argument>
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+publish data
+where skip_rpl_chk = nvl(@skip_rpl_chk, 0 )
+and comflg = nvl(@comflg, 0)
+and pcksts = nvl(@pcksts,'P')
+|
+if ( @ship_id is null ) hide stack variable where name = 'ship_id'
+|
+if ( @schbat is null ) hide stack variable where name = 'schbat'
+|
+{
+    [
+    select ff.*,
+           @comflg comflg,
+           @skip_rpl_chk skip_rpl_chk
+    from
+    (
+        select shipment.ship_id,
+               shipment.wh_id
+        from shipment
+             join shipment_line 
+                 on shipment_line.ship_id = shipment.ship_id 
+                 and /*#nobind */ shipment_line.linsts not in ( 'B', 'C' ) /*#bind*/
+             join pckbat on pckbat.schbat = shipment_line.schbat
+        where 1=1
+        /*
+         * if we are not doing replenishment check then we bypass it
+         * but by default we make sure there are no replens
+         */
+        and (
+                @skip_rpl_chk = 1
+                or
+                not exists 
+                (
+                    select 1
+                    from rplwrk
+                    where rplwrk.ship_id = shipment.ship_id
+                )
+            )
+        and exists
+            (
+                select 1
+                from pckwrk_dtl
+                     join pckwrk_hdr on pckwrk_hdr.wrkref = pckwrk_dtl.wrkref
+                where pckwrk_dtl.ship_id = shipment.ship_id
+                and pckwrk_hdr.pcksts = @pcksts
+            )
+        /*
+         * pip should be cleared.  This is clause  is based on looking at the logic in previous versions
+         */
+        and not exists 
+            (
+                select 1
+                from pckwrk_dtl
+                     join pckwrk_hdr on pckwrk_hdr.wrkref = pckwrk_dtl.wrkref
+                where pckwrk_dtl.ship_id = shipment.ship_id
+                and pckwrk_hdr.pipflg = 1
+            )
+        /* Not checking for pckwrk pcksts because if alcdte is null and have pckwrk then we need to work on them */
+        and @+shipment.ship_id
+        and @+shipment_line.schbat
+        and @+shipment.wh_id
+        and shipment.alcdte is null
+        /*#nobind*/
+        and pckbat.batsts not in ( 'AINP' )
+        /*#bind*/
+        group by
+               shipment.ship_id,
+               shipment.wh_id
+        order by 2,1
+    ) ff
+    ]
+    catch (-1403,510)
+}    
+   
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This lists all the shipments that should go through first phase of pick release, i.e. registration where shipment.alcdte is set
+and triggers fire that work on that
+</p>
+]]>
+</remarks>
+
+<retrows>n</retrows>
+
+<retcol name="wh_id" type="COMTYP_CHAR"></retcol>
+<retcol name="ship_id" type="COMTYP_CHAR"></retcol>
+<retcol name="comflg" type="COMTYP_INT">This is echoed</retcol>
+<retcol name="skip_rpl_chk" type="COMTYP_INT">This is echoed</retcol>
+
+
+<example>
+<![CDATA[
+<p>
+</p>
+]]>
+
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+<seealso cref="process pick release registration"></seealso>
+
+
+</documentation>
+
+</command>

@@ -1,0 +1,118 @@
+<command>
+<name>create ossi job log aut</name>
+<description>Create an entry into the job log</description>
+<type>Local Syntax</type>
+
+<transaction>new</transaction>
+
+<argument name="uc_ossi_job_seq" required="yes" datatype="Integer">Job Number</argument>
+<argument name="uc_ossi_module_seq" required="no" datatype="Integer">Default 0</argument>
+<argument name="uc_ossi_action_seq" required="no" datatype="Integer">Default 0</argument>
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+{
+   if ( @uc_ossi_get_new != '' )
+   {   
+      [
+      select uc_ossi_job_seq
+      from   usr_ossi_job_log 
+      where  uc_ossi_job_seq = @uc_ossi_job_seq 
+      and    uc_ossi_module_seq = 0
+      and    uc_ossi_action_seq = 0
+      for update
+      ]
+      catch (-1403,510)
+      ;
+      [
+      select min(uc_ossi_job_id) uc_ossi_job_id
+      from   usr_ossi_job_log
+      where  uc_ossi_job_seq = @uc_ossi_job_seq
+      and    uc_ossi_module_seq = 0
+      and    uc_ossi_action_seq = 0
+      ]
+      |
+      if ( @uc_ossi_get_new = 'UC_OSSI_MODULE_SEQ' )
+         [
+         select  nvl(max(uc_ossi_module_seq),0) + 1 uc_ossi_module_seq,
+                 0 uc_ossi_action_seq,
+                 @uc_ossi_job_id uc_ossi_job_id
+         from   usr_ossi_job_log
+         where  uc_ossi_job_seq = @uc_ossi_job_seq
+         ]
+      else
+      {
+         [
+         select min(uc_ossi_module_id) uc_ossi_module_id
+         from   usr_ossi_job_log
+         where  uc_ossi_job_seq = @uc_ossi_job_seq
+         and    uc_ossi_module_seq = @uc_ossi_module_seq
+         ]
+         |
+         [
+         select nvl(max(uc_ossi_action_seq),0) + 1 uc_ossi_action_seq, 
+                @uc_ossi_module_id uc_ossi_module_id,
+                @uc_ossi_job_id    uc_ossi_job_id
+         from   usr_ossi_job_log
+         where  uc_ossi_job_seq = @uc_ossi_job_seq
+         and    uc_ossi_module_seq = @uc_ossi_module_seq
+         ]
+      }
+   }
+   |
+   publish data 
+   where uc_ossi_start_ts = ossi__ts ( null ) 
+   and uc_ossi_start_dt = sysdate
+   |
+   create record
+   where table = 'usr_ossi_job_log'
+   |
+   publish data
+   where @+uc_ossi_job_seq
+   and   @+uc_ossi_module_seq
+   and   @+uc_ossi_action_seq
+}
+
+]]>
+</local-syntax>
+
+<argument name="uc_ossi_get_new" required="no" datatype="String">
+Pass in UC_OSSI_MODULE_SEQ or UC_OSSI_ACTION_SEQ or blank.  Based on what is passed in, a new number is fetched
+</argument>
+<argument name="uc_ossi_job_seq" required="yes" datatype="Integer">Job Number</argument>
+<argument name="uc_ossi_module_seq" required="no" datatype="Integer">Default 0</argument>
+<argument name="uc_ossi_action_seq" required="no" datatype="Integer">Default 0</argument>
+
+
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+
+Do work in own commit context
+
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+<retcol name="uc_ossi_job_seq" type="COMTYP_INT">Job Sequence Number</retcol>
+<retcol name="uc_ossi_module_seq" type="COMTYP_INT">Job Module Sequence Number</retcol>
+<retcol name="uc_ossi_action_seq" type="COMTYP_INT">Job Action Sequence Number</retcol>
+
+
+<exception value="eOK">The command completed successfully.</exception>
+<exception value="510">If variable was not passed and no default was passed.</exception>
+
+</documentation>
+
+</command>

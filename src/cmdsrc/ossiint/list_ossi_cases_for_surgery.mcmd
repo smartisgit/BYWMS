@@ -1,0 +1,130 @@
+<command>
+<name>list ossi cases for surgery</name>
+<description>Used in OSSI Surgery By Case</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+if (@uc_adhoc_filter_file is not null)
+{
+   get ossi clause from adhoc filter file
+     where column = 'subnum'
+}
+else 
+{
+   publish data
+     where clause = '1=1'
+}
+|
+get ossi issue filter for surgery
+  where @*
+|
+get ossi les command
+  where les_cmd_id = 'uc_case_surgery_issue'
+catch (-1403,510)
+|
+if (@? != 0)
+{
+   publish data
+     where syntax = null
+}
+|
+[select x.*, 
+        '' uc_issue 
+   from (select ib.subnum, 
+                il.wh_id, 
+                il.stoloc, 
+                count(distinct id.dtlnum) uc_num_invdtl, 
+                count(distinct ib.subnum) uc_num_invsub, 
+                min(id.prtnum) prtnum, 
+                min(p.dsp_prtnum) dsp_prtnum, 
+                count(distinct id.prtnum) uc_num_prtnum, 
+                min(id.lotnum) lotnum, 
+                count(distinct id.prtnum || '|' || id.lotnum) uc_num_prtnum_lotnum, 
+                nvl(@uc_issue_filter_value, @uc_issue_filter) uc_issue_filter 
+           from invlod il 
+           join invsub ib
+             on il.lodnum = ib.lodnum 
+           join invdtl id
+             on ib.subnum = id.subnum 
+           join prtmst_view p
+             on id.prtnum = p.prtnum 
+            and id.prt_client_id = p.prt_client_id 
+            and il.wh_id = p.wh_id 
+          where 1=1 
+          group by ib.subnum, 
+                il.wh_id, 
+                il.stoloc 
+        ) x 
+  where wh_id = @wh_id 
+    and @+subnum 
+    and @+stoloc 
+    and @+uc_num_invdtl 
+    and @+uc_num_invsub 
+    and @+prtnum 
+    and @+dsp_prtnum 
+    and @+uc_num_prtnum 
+    and @+lotnum 
+    and @+uc_num_prtnum_lotnum 
+    and @clause:raw 
+    and @* 
+  order by 1 
+] catch (-1403) >> res 
+|/**
+ * If subnum is specified, display it to correct issues
+ * such as "Invalid Inventory Identifier"
+ */
+
+if (@? != 0 and @subnum is not null)
+{
+   publish data
+     where subnum = @subnum
+       and wh_id = @wh_id
+       and stoloc = ''
+       and uc_num_invdtl = 0
+       and uc_num_invsub = 0
+       and prtnum = ''
+       and dsp_prtnum = ''
+       and uc_num_prtnum = 0
+       and lotnum = ''
+       and uc_num_prtnum_lotnum = ''
+       and uc_issue_filter = ''
+       and uc_issue = ''
+}
+>> res
+|
+add ossi issue for surgery
+  where res = @res
+    and syntax = @syntax
+    and uc_issue_filter_value = nvl(@uc_issue_filter_value, @uc_issue_filter)
+]]>
+</local-syntax>
+
+
+<documentation>
+<remarks>
+Get all ossi surgery cases
+</remarks>
+
+<retcol name="subnum" type="String">Uniquely identified invsub record.</retcol>
+<retcol name="wh_id" type="String">Warehouse ID</retcol>
+<retcol name="stoloc" type="String">Indicates the storage location for this pallet.</retcol>
+<retcol name="uc_num_invdtl" type="String">Inventery Detail Number</retcol>
+<retcol name="uc_num_invsub" type="String">INVSUB number</retcol>
+<retcol name="prtnum" type="String">Item Number</retcol>
+<retcol name="dsp_prtnum" type="String">DSP Item Number</retcol>
+<retcol name="uc_num_prtnum" type="String">Prtnum count</retcol>
+<retcol name="lotnum" type="String">Lot number of the inventory tracked by this detail.</retcol>
+<retcol name="uc_num_prtnum_lotnum" type="String">PRT and Lot Number count</retcol>
+<retcol name="uc_issue_filter" type="String">Issue filter</retcol>
+<retcol name="uc_issue" type="String">Issues</retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

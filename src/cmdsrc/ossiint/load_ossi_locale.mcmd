@@ -1,0 +1,280 @@
+<command>
+<name>load ossi locale</name>
+<description>
+Add a new locale
+</description>
+
+<argument name="new_locale_id" required="no" datatype="string">New locale to load</argument>
+<argument name="default_les_mls_cat" required="no" datatype="string"></argument>
+<argument name="default_dscmst" required="no" datatype="string"></argument>
+<argument name="default_prtdsc" required="no" datatype="string"></argument>
+<argument name="default_sys_dsc_mst" required="no" datatype="string"></argument>
+<argument name="default_all" required="no" datatype="string"></argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+
+[
+select ena_flg,
+       locale_id new_locale_id
+  from locale_mst
+ where locale_id = nvl(@new_locale_id, locale_id)
+   and locale_id != 'US_ENGLISH'
+   and ena_flg = 1
+]
+catch (-1403,510)
+|
+if ( @? = 0 and @ena_flg = 1 )
+{
+   if ( @default_all = '1' or @default_les_mls_cat = '1' )
+   {
+      publish data
+      where uc_cols = ossi__table_columns_as_list ( 'LES_MLS_CAT' )
+      |
+      publish data
+      where uc_ins = ossi__replace ( @uc_cols, 'grp_nam', '''OSSI_INIT_LANG''')
+      |
+      publish data
+      where uc_ins = ossi__replace ( @uc_ins, 'locale_id', "'" || @new_locale_id || "'" )
+      |
+      /*
+       * First the les_mls_cat
+       */
+      [
+      insert into les_mls_cat 
+      (
+         @uc_cols:raw
+      )
+      select @uc_ins:raw
+      from les_mls_cat m1
+      where 1=1
+      and locale_id = 'US_ENGLISH'
+      and not exists (
+                        select 1
+                        from les_mls_cat m2
+                        where m2.mls_id = m1.mls_id
+                        and m2.prod_id = m1.prod_id
+                        and m2.appl_id = m1.appl_id
+                        and m2.frm_id = m1.frm_id
+                        and m2.vartn = m1.vartn
+                        and m2.srt_seq = m1.srt_seq
+                        and m2.cust_lvl = m1.cust_lvl
+                        and m2.locale_id = @new_locale_id 
+                     )
+      ]
+      catch (-1403,510)
+   }
+   ;
+   if ( @default_all = '1' or @default_dscmst = '1' )
+   {
+      publish data
+      where uc_cols = ossi__table_columns_as_list ( 'DSCMST' )
+      |
+      publish data
+      where uc_ins = ossi__replace ( @uc_cols, 'grp_nam', '''OSSI_INIT_LANG''')
+      |
+      publish data
+      where uc_ins = ossi__replace ( @uc_ins, 'locale_id', "'" || @new_locale_id || "'" )
+      |
+      [
+      insert into dscmst ( @uc_cols:raw )
+      select @uc_ins:raw
+      from dscmst d1
+      where 1=1
+      and locale_id = 'US_ENGLISH'
+      and not exists (
+                        select 1
+                        from dscmst d2
+                        where d2.colnam = d1.colnam
+                        and d2.colval = d1.colval
+                        and d2.locale_id = @new_locale_id
+                     ) 
+      ]
+      catch (-1403,510)
+   }
+   ;
+   if ( @default_all = '1' or @default_sys_dsc_mst = '1' )
+   {
+      publish data
+      where uc_cols = ossi__table_columns_as_list ( 'SYS_DSC_MST' )
+      |
+      publish data
+      where uc_ins = ossi__replace ( @uc_cols, 'grp_nam', '''OSSI_INIT_LANG''')
+      |
+      publish data
+      where uc_ins = ossi__replace ( @uc_ins, 'locale_id', "'" || @new_locale_id || "'" )
+      |
+      [
+      insert into sys_dsc_mst ( @uc_cols:raw )
+      select @uc_ins:raw
+      from sys_dsc_mst d1
+      where 1=1
+      and locale_id = 'US_ENGLISH'
+      and not exists (
+                        select 1
+                        from sys_dsc_mst d2
+                        where d2.colnam = d1.colnam
+                        and d2.colval = d1.colval
+                        and d2.cust_lvl = d1.cust_lvl
+                        and d2.locale_id = @new_locale_id
+                     ) 
+      ]
+      catch (-1403,510)
+   }
+   ;
+   if ( @default_all = '1' or @default_les_grid_config = '1' )
+   {
+      publish data
+      where uc_cols = ossi__table_columns_as_list ( 'les_grid_config' )
+      |
+      publish data
+      where uc_ins = ossi__replace ( @uc_cols, 'grp_nam', '''OSSI_INIT_LANG''')
+      |
+      publish data
+      where uc_ins = ossi__replace ( @uc_ins, 'locale_id', "'" || @new_locale_id || "'" )
+      |
+      [
+      insert into les_grid_config ( @uc_cols:raw )
+      select @uc_ins:raw
+      from les_grid_config d1
+      where 1=1
+      and locale_id = 'US_ENGLISH'
+      and not exists (
+                        select 1
+                        from les_grid_config d2
+                        where d2.usr_id = d1.usr_id
+                        and d2.appl_id = d1.appl_id
+                        and d2.frm_id = d1.frm_id
+                        and d2.grid_nam = d1.grid_nam
+                        and d2.grid_fld_nam = d1.grid_fld_nam
+                        and d2.locale_id = @new_locale_id
+                     ) 
+      ]
+      catch (-1403,510)
+      ;
+      [commit]
+   }
+   ;
+   if ( @default_all = '1' or @default_les_var_inp = '1' )
+   {
+      publish data
+      where uc_cols = ossi__table_columns_as_list ( 'les_var_inp' )
+      |
+      publish data
+      where uc_ins = ossi__replace ( @uc_cols, 'grp_nam', '''OSSI_INIT_LANG''')
+      |
+      publish data
+      where uc_ins = ossi__replace ( @uc_ins, 'locale_id', "'" || @new_locale_id || "'" )
+      |
+      [
+      insert into les_var_inp ( @uc_cols:raw )
+      select @uc_ins:raw
+      from les_var_inp d1
+      where 1=1
+      and locale_id = 'US_ENGLISH'
+      and not exists (
+                        select 1
+                        from les_var_inp d2
+                        where d2.var_nam = d1.var_nam
+                        and d2.appl_id = d1.appl_id
+                        and d2.frm_id = d1.frm_id
+                        and d2.addon_id = d1.addon_id
+                        and d2.cust_lvl = d1.cust_lvl
+                        and d2.locale_id = @new_locale_id
+                     ) 
+      ]
+      catch (-1403,510)
+      ;
+      [commit]
+   }
+   ;
+   if ( @default_all = '1' or @default_help_fil_mst = '1' )
+   {
+      publish data
+      where uc_cols = ossi__table_columns_as_list ( 'help_fil_mst' )
+      |
+      publish data
+      where uc_ins = ossi__replace ( @uc_cols, 'grp_nam', '''OSSI_INIT_LANG''')
+      |
+      publish data
+      where uc_ins = ossi__replace ( @uc_ins, 'locale_id', "'" || @new_locale_id || "'" )
+      |
+      [
+      insert into help_fil_mst ( @uc_cols:raw )
+      select @uc_ins:raw
+      from help_fil_mst d1
+      where 1=1
+      and locale_id = 'US_ENGLISH'
+      and not exists (
+                        select 1
+                        from help_fil_mst  d2
+                        where d2.help_fil_id = d1.help_fil_id
+                        and d2.locale_id = @new_locale_id
+                     ) 
+      ]
+      catch (-1403,510)
+      ;
+      [commit]
+   }
+   ;
+   if ( @default_all = '1' or @default_prtdsc = '1' )
+   {
+      publish data
+      where uc_cols = ossi__table_columns_as_list ( 'PRTDSC' )
+      |
+      publish data
+      where uc_ins = ossi__replace ( @uc_cols, 'grp_nam', '''OSSI_INIT_LANG''')
+      |
+      publish data
+      where uc_ins = ossi__replace ( @uc_ins, 'locale_id', "'" || @new_locale_id || "'" )
+      |
+      [
+      insert into prtdsc ( @uc_cols:raw )
+      select @uc_ins:raw
+      from prtdsc d1
+      where 1=1
+      and locale_id = 'US_ENGLISH'
+      and not exists (
+                        select 1
+                        from prtdsc d2
+                        where d2.colnam = d1.colnam
+                        and d2.colval = d1.colval
+                        and d2.locale_id = @new_locale_id
+                     ) 
+      ]
+      catch (-1403,510)
+      ;
+      [commit]
+   }
+}
+;
+noop
+
+]]>
+</local-syntax>
+
+
+<documentation>
+
+<remarks>
+
+</remarks>
+
+<retcol name="nothing" type="string"></retcol>
+
+<retrows>0</retrows>
+
+<example>
+load ossi locale
+where default_all = '1'
+and new_locale_id = 'FRENCH'
+
+</example>
+<exception value="eOK">Normal successful completion</exception>
+
+<seealso cref="sl_change gen_maint"></seealso>
+
+</documentation>
+</command>

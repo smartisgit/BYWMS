@@ -1,0 +1,86 @@
+<command>
+<name>submit ossi command for delayed integration execution</name>
+<description>Pass in a full command (with args) that we want to to be executed after the result IFD (for BY WMS, i.e. to DCS which was syncd) is fully created
+</description>
+<type>Local Syntax</type>
+
+<argument name="uc_command_call" datatype="string"></argument>
+<argument name="uc_submit_unique_calls_only" datatype="integer">Default is 1.  If 1 we look up the call exactly to see if is already in the buffer
+and if there we dont add it again</argument>
+
+<local-syntax>
+<![CDATA[
+
+publish data
+where uc_my_sess_var = 'uc_delayed_int_execution_list'
+and uc_new_buffer = ''
+and uc_submit_unique_calls_only = nvl(@uc_submit_unique_calls_only, 1 )
+|
+{
+    if ( @uc_command_call is not null )
+    {
+        publish data
+        where uc_current_buffer = ossi__sess_var ( @uc_my_sess_var, '', 'Y' )
+        |
+        /*
+         * Since input has all arguments on it, we generally do not want to submit to the buffer duplicate calls.
+         * So we look up here first and if we find it already then do not submit again
+         * Also note that our final buffer will always start with noop call and will always end in a trailing ;
+         * Having a trailing semi-coloin is ok per moca.  e.g. following works just fine:
+         * execute server command where cmd = 'publish data where a=1;'
+         * So this way we can easily look-up with a ; on both ends of the passed in call to look for the case where it may already exist.
+         */
+        if ( @uc_submit_unique_calls_only = 0 or instr(@uc_current_buffer, ';' || @uc_command_call || ';') = 0 )
+        {
+            if ( @uc_current_buffer is null )
+                publish data
+                where uc_new_buffer = "noop;" || @uc_command_call || ";"
+            else
+                publish data
+                where uc_new_buffer = @uc_current_buffer || @uc_command_call || ";"
+            |
+            save session variable
+            where name = @uc_my_sess_var
+            and value = @uc_new_buffer
+            |
+            publish data
+            where uc_buffer_action = 'append'
+            and uc_new_buffered_command = @uc_new_buffer
+        }
+        else
+            publish data
+            where uc_buffer_action = 'none'
+            and uc_new_buffered_command = @uc_current_buffer
+    }
+}
+
+]]>
+</local-syntax>
+<documentation>
+<private>
+</private>
+<remarks>
+<![CDATA[
+<p>
+See documentation of [process ossi delayed execution for integration] to understand the desired functionality.  This command is called to add logic
+to the internal buffer that is then executed after the result IFD is fully created.
+</p>
+]]>
+</remarks>
+<retrows>1 or 0.  1 if input was passed</retrows>
+<retcol name="uc_buffer_action" type="COMTYP_STRING">append to indicate that we appended.  none means that since the call already existed we did 
+not append it</retcol>
+<retcol name="uc_new_buffered_command" type="COMTYP_STRING">After adding the passed in buffer - what is the new cummulative buffer</retcol>
+
+<seealso cref="ossi called_from_integrator">This functionality works only for integrations and those which are to DCS system (synchronous delivery).
+So if we are calling it in the middle of a MOCA command, that should have called this component first to see if that is being called in context of integration
+and only then should it call this API
+</seealso>
+<seealso cref="process ossi table data change hook">This shows one usage of this command.  We want the [register ossi object created core] call to be 
+delayed so that we call it once for the order (for example) and not for each order line repeatedly</seealso>
+
+<seealso cref="process ossi delayed execution for integration"></seealso>
+
+<exception value="eOK">Normal successful completion</exception>
+</documentation>
+</command>

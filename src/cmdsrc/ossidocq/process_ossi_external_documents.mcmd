@@ -1,0 +1,160 @@
+<command>
+<name>process ossi external documents</name>
+<description></description>
+<type>Local Syntax</type>
+<argument name="uc_poll_folder" datatype="string"></argument>
+<argument name="uc_poll_sleep_time" datatype="string"></argument>
+<argument name="uc_poll_file_pattern" datatype="string"></argument>
+<argument name="uc_prc_folder" datatype="string"></argument>
+<argument name="uc_err_folder" datatype="string"></argument>
+<argument name="uc_sort_by_name" datatype="string"></argument>
+<argument name="uc_filename_delim" datatype="string"></argument>
+<argument name="uc_expr_wh_id" datatype="string"></argument>
+<argument name="uc_expr_dest" datatype="string"></argument>
+<argument name="uc_expr_gen_usr_id" datatype="string"></argument>
+<argument name="uc_expr_doc_pgm_cd" datatype="string"></argument>
+<argument name="uc_expr_doc_pgm_id" datatype="string"></argument>
+<argument name="uc_expr_ship_id" datatype="string"></argument>
+<argument name="uc_expr_ordnum" datatype="string"></argument>
+<argument name="uc_expr_trlr_id" datatype="string"></argument>
+<local-syntax>
+<![CDATA[
+
+publish data
+  where uc_poll_folder = @uc_poll_folder
+    and uc_poll_sleep_time = nvl(@uc_poll_sleep_time, 300)
+    and uc_poll_file_pattern = nvl(@uc_poll_file_pattern, '*.done') 
+    and uc_prc_folder = nvl(@uc_prc_folder, @uc_poll_folder || '/processed')
+    and uc_err_folder = nvl(@uc_err_folder, @uc_poll_folder || '/error')
+    and uc_sort_by_name = iif(@uc_sort_by_name is not null, @uc_sort_by_name, 'filename')
+    and uc_filename_delim = nvl(@uc_filename_delim, '~') /* This is a delimiter to parse the filename into components for determining context */
+    and uc_expr_wh_id = @uc_expr_wh_id /* A MOCA expression to determine the wh id.  All expressions below are for respective columns. */
+    and uc_expr_dest = @uc_expr_dest 
+    and uc_expr_gen_usr_id = @uc_expr_gen_usr_id
+    and uc_expr_doc_pgm_cd = @uc_expr_doc_pgm_cd
+    and uc_expr_doc_pgm_id = @uc_expr_doc_pgm_id
+    and uc_expr_ship_id = @uc_expr_ship_id
+    and uc_expr_ordnum = @uc_expr_ordnum
+    and uc_expr_trlr_id = @uc_expr_trlr_id
+|
+/*
+Logic will be as follows: 
+
+Look for files in uc_poll_folder for pattern uc_poll_file_pattern.  Sort based on Uc_sort_by_name.  For each file. 
+Remove the â€œ.doneâ€� from the name (use the input parameter).  What is remaining is the raw file.  Could be a pdf or out file. 
+Also see (optionally) that there is a context file.  Name before the â€œpdfâ€� or â€œoutâ€� is the same for context file. 
+Resolve the â€œexprâ€� input variables.  We will publish following variables on stack. 
+Parse the resulting file name (without extension) on the Uc_filename_delim.  And publish uc_filename_part_nn to stack.  Support 10 
+Parse the folder name from the current folder as folder 0 and moving backwards.  Name them as uc_folder_nn. 
+Idea is that â€œexprâ€� input above could utilize embedded data in filename or folders to determine some data. 
+If we have a context file, idea is that it will be able to provided data for the context table.
+What we resolve from uc_expr is there by default.
+
+It will be an XML file as follows: 
+<smart_doc_context> 
+    <context> 
+        <!--Multiple parm and values passed> 
+        <parm></parm> 
+        <value></value> 
+    </context> 
+</smart_doc_context> 
+
+The data will be loaded into the local document tables.  From there it will move to the cloud. 
+Once a file is processed, move to processed or error folder based on input. 
+*/
+find file 
+  where pathname = @uc_poll_folder || '/' || @uc_poll_file_pattern
+>> res
+|
+if (rowcount(@res) > 0)
+{
+  sort result set 
+    where result_set = @res 
+      and sort_list = @uc_sort_by_name
+  |
+  if (@type = 'F')
+  {
+    publish data
+      where uc_filename_without_path = @filename
+    |
+    [[
+      Map<String,Object> map = new TreeMap<String,Object>();
+      String filename_without_suffix = filename;
+      String suffix = uc_poll_file_pattern.replace("*", "");
+      if (filename.endsWith(suffix))
+      {
+        filename_without_suffix = filename_without_suffix.substring(0, filename_without_suffix.length()-suffix.length());
+      }
+      map.put("filename_without_suffix", filename_without_suffix);
+      if (uc_filename_delim != null && uc_filename_delim.length() > 0)
+      {
+        String[] filenameArr = filename_without_suffix.split(uc_filename_delim);
+        for (int i=0; i<filenameArr.length && i<10; i++)
+        {
+          map.put("uc_filename_part_" + (i+1), filenameArr[i]);
+        } 
+      } 
+      int folderIndex = 0;
+      File file = new File(pathname);
+      File dir = file.getParentFile();
+      while (dir != null)
+      {
+        if (dir.getName().length() == 0)
+        {
+          break;
+        }
+        map.put("uc_folder_" + folderIndex++, dir.getName());
+        dir = dir.getParentFile();
+      }  
+    map;
+    ]]
+    |
+    if (@uc_expr_wh_id is not null) execute server command where cmd = "publish data where wh_id = " || @uc_expr_wh_id
+    |
+    if (@uc_expr_dest is not null) execute server command where cmd = "publish data where dest = " || @uc_expr_dest
+    |
+    if (@uc_expr_gen_usr_id is not null) execute server command where cmd = "publish data where gen_usr_id = " || @uc_expr_gen_usr_id
+    |
+    if (@uc_expr_doc_pgm_cd is not null) execute server command where cmd = "publish data where doc_pgm_cd = " || @uc_expr_doc_pgm_cd
+    |
+    if (@uc_expr_doc_pgm_id is not null) execute server command where cmd = "publish data where doc_pgm_id = " || @uc_expr_doc_pgm_id
+    |
+    if (@uc_expr_ship_id is not null) execute server command where cmd = "publish data where ship_id = " || @uc_expr_ship_id
+    |
+    if (@uc_expr_ordnum is not null) execute server command where cmd = "publish data where ordnum = " || @uc_expr_ordnum
+    |
+    if (@uc_expr_trlr_id is not null) execute server command where cmd = "publish data where trlr_id = " || @uc_expr_trlr_id
+    |
+    enqueue ossi document output for upload
+      where filename = @pathname
+    |
+    move file 
+      where from = @pathname 
+        and to = @uc_prc_folder || '/' || @uc_filename_without_path
+    |
+    publish data 
+      where to = @to
+  } catch (@?)
+  |
+  publish data 
+    where uc_error_code = @? 
+      and uc_error_message = @!
+  |
+  if (@type = 'F' and @uc_error_code != 0)
+  {
+    move file 
+      where from = @pathname 
+        and to = @uc_err_folder || '/' || @filename
+  }
+  |
+  publish data 
+    where filename = @filename 
+      and pathname = @pathname
+      and to = @to
+      and uc_error_code = @uc_error_code
+      and uc_error_message = @uc_error_message
+}
+
+]]>
+</local-syntax>
+</command>

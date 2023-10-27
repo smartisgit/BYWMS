@@ -1,0 +1,77 @@
+<command>
+<name>list ossi label fields core</name>
+<description>For a given label name, list the fields within it</description>
+
+<argument name="label_name" required="yes" datatype="string">name of the label</argument>
+<argument name="printer_type" required="no" datatype="string"></argument>
+
+<argument name="uc_fetch_typ" required="no" datatype="string">By default it is FLDS meaning the fields.  Other option is CMD for getting comand</argument>
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+publish data
+where uc_fetch_typ = nvl(@uc_fetch_typ, 'FLDS' )
+|
+{
+    find ossi file in path list
+    where uc_object_type = 'LBL'
+    and uc_object_name = @label_name
+    |
+    if ( @uc_object_found_pathname is not null )
+    {
+        sl_cat file 
+        where filename = @uc_object_found_pathname
+        catch(@?) /* doing this because it may be in middle of pick release etc */
+        |
+        if (@? = 0 and @data is not null )
+        {
+            publish data
+            where text = @data
+            |
+            [[
+            String start = '^XA'
+            String end = '^XZ'
+            String text = text
+            int startIndex = text.indexOf(start)
+            if(startIndex != -1) {
+                startIndex += start.length()
+                int endIndex = text.indexOf(end, startIndex)
+                text = end == -1 ? text.substring(startIndex) :  text.substring(startIndex, endIndex)
+            }
+            def matcher = text =~ /~([^~]*)~/
+            def list = []
+            while(matcher.find()) list << matcher.group(1)
+            list
+            ]]
+            |
+            if ( @uc_fetch_typ = 'CMD' and lower(@value) like 'cmd=%' )
+                publish data
+                where uc_label_command = ossi__get_fld_from_list ( ossi__get_fld_from_list ( @value, 2 ,'='), 1, ',' )
+            else if ( @uc_fetch_typ = 'FLDS' and lower(@value) not like 'cmd=%' )
+                publish data
+                where uc_label_field = ossi__get_fld_from_list ( @value, 1, ',' )
+                and uc_label_field_length = ossi__get_fld_from_list ( @value, 2, ',' )
+        }
+    }
+}
+
+]]>
+</local-syntax>
+<documentation>
+<remarks>
+Here we parse a label file and fetch either the fields or the command from it
+</remarks>
+
+<retrows>n</retrows>
+
+<retcol name="uc_label_command" type="string">When uc_fetch_typ = CMD</retcol>
+<retcol name="uc_label_field" type="string">When uc_fetch_typ = FLDS</retcol>
+<retcol name="uc_label_field_length" type="string">When uc_fetch_typ = FLDS</retcol>
+
+</documentation>
+
+</command>

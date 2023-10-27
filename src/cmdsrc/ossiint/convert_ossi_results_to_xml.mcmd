@@ -1,0 +1,36 @@
+<command>
+<name>convert ossi results to xml</name>
+<description>Convert results to xml</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+
+start xml parser
+|
+{
+   convert result set to xml
+     where resultset = nvl(@resultset, @res)
+   |
+   get xml
+}
+
+
+]]>
+</local-syntax>
+<argument name="res" required="yes" datatype="resultset"></argument>
+<documentation>
+
+<remarks>
+This command comvets a resultset to an XML equivalent.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

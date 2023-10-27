@@ -1,0 +1,165 @@
+<command>
+<name>combine ossi columns from multiple results</name>
+<description>We are passed in upto 10 results.  we then combine columns from all of them in the resultset</description>
+
+<argument name="uc_cmb_res_cnt" required="no" datatype="integer">Defaults to 10</argument>
+<argument name="uc_cmb_res1" required="no" datatype="results"></argument>
+<argument name="uc_cmb_res2" required="no" datatype="results"></argument>
+<argument name="uc_cmb_res3" required="no" datatype="results"></argument>
+<argument name="uc_cmb_res4" required="no" datatype="results"></argument>
+<argument name="uc_cmb_res5" required="no" datatype="results"></argument>
+<argument name="uc_cmb_res6" required="no" datatype="results"></argument>
+<argument name="uc_cmb_res7" required="no" datatype="results"></argument>
+<argument name="uc_cmb_res8" required="no" datatype="results"></argument>
+<argument name="uc_cmb_res9" required="no" datatype="results"></argument>
+<argument name="uc_cmb_res10" required="no" datatype="results"></argument>
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+publish data
+where uc_cmb_res_cnt = nvl(@uc_cmb_res_cnt,10)
+|
+{
+    /*
+     * Following code allows for passing in 10 recordsets.
+     * we first create the result set to return.  For this we are going through all
+     * structures and appending columns.  If column already exists from a previous add
+     * we dont add it again
+     * Then after that we add 1 row to result set.
+     * And then we add the rows in the result set one at a time.  Here we add by name.
+     * that handles the case properly if the two sets have same column.  Second will
+     * overrides the first
+     */
+    [[
+    SimpleResults[] uc_cmb_resa = [uc_cmb_res1,uc_cmb_res2,uc_cmb_res3,uc_cmb_res4,uc_cmb_res5,
+                                   uc_cmb_res6,uc_cmb_res7,uc_cmb_res8,uc_cmb_res9,uc_cmb_res10];
+    ret = new SimpleResults();
+    //
+    // Create the return rs.  Going through all input and add columns to the return
+    //
+    for ( ii = 0; ii < uc_cmb_res_cnt; ii++ )
+    {
+        for ( jj = 0; jj < ((uc_cmb_resa[ii]!=null)?uc_cmb_resa[ii].getColumnCount():0); jj++ )
+        {
+            //
+            // Add column only if ret does not have that column name already
+            if ( ret.getColumnNumber( uc_cmb_resa[ii].getColumnName(jj) ) < 0 )
+                ret.addColumn ( uc_cmb_resa[ii].getColumnName(jj), uc_cmb_resa[ii].getColumnType(jj) );
+        }
+    }
+    //
+    // Now go through all of them and add data from them to ret
+    //
+    ret.addRow();
+    for ( ii = 0; ii < uc_cmb_res_cnt; ii++ )
+    {
+        if ( uc_cmb_resa[ii]!=null )
+        {
+            uc_cmb_resa[ii].reset(); // go to first row
+            if ( uc_cmb_resa[ii].next() )
+            {
+                for ( jj = 0; jj < uc_cmb_resa[ii].getColumnCount(); jj++ )
+                {
+                    //
+                    // Setting the column in ret by name.  That automatically implies that if a later
+                    // rs has same column name, that overwrites the value in ret and that is what we want
+                    ret.setValue ( uc_cmb_resa[ii].getColumnName(jj), uc_cmb_resa[ii].getValue(jj) )
+                }
+            }
+        }
+    }
+    [ret:ret]
+    ]]
+    |
+    publish data combination where ret = @ret
+}
+    
+]]>
+</local-syntax>
+
+
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+We often have code pattern where multiple snippets return some columns and we then need to combine them to form final output.
+filter data is able to go back levels and take the data but then we need to list all columns to make final result.
+
+Using this we can combine all of those res together.  Refer to the example for reference.  That shows the typical usage where we have a starting
+multi-row recordset and based on some conditions we add columns to it.  note that this component always returns 1 row so to handle
+nulti-row, we have a filte data to create a one row recordset.  Then we have other recordsets that are created based on that row
+and each is moved to a recordset variable.  Then we call the component at the end.
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+<retcol name="@*" type="(based on data being used)">Based on the input resultsets</retcol>
+
+<example>
+<code>
+[select * from sl_sys_def order by sys_id]
+|
+{
+    /* 
+     * This  filter data takes one of the rows and makes a res of that one row
+     * This is important because our component deals with 1 row
+     */
+    filter data where moca_filter_level = 2 >> res1
+    |
+    if ( @sys_id = 'SEAMLES' )
+        publish data
+        where col_seamles_a = 'aa' || @sys_id
+        and col_seamles_b = 2
+        and col_seamles_c = sysdate
+        >> res2
+    |
+    if ( @sys_id = 'DCS' )
+        publish data
+        where col_dcs_a = 'aaa' || @sys_id
+        and col_dcs_b = 22
+        and col_dcs_c = sysdate + 1
+        >> res3
+    |
+    /*
+     * This demonstrates the case if we have a res with no columns
+     */
+    if ( @sys_id = 'HOST' )
+        noop >> res4
+    |
+    /*
+     * vs here where we have no rows but have columns so we want to see
+     * these columns in our final res
+     */
+    if ( @sys_id = 'SL_DOC' )
+        [
+        select 'xxx' col_sl_doc_a
+        from dual
+        where 1=2
+        ]
+        catch (-1403,510)
+        >> res5
+    |
+    combine ossi columns from multiple results
+    where uc_cmb_res1 = @res1
+    and uc_cmb_res2 = @res2
+    and uc_cmb_res3 = @res3
+    and uc_cmb_res4 = @res4
+    and uc_cmb_res5 = @res5
+    and uc_cmb_res6 = null /* a null value is ok - ignored*/
+    and uc_cmb_res_cnt = 7 /* passing 7 so we handle the case where 7th is not passed in */
+}
+</code>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+<seealso cref="filter data"></seealso>
+</documentation>
+
+</command>

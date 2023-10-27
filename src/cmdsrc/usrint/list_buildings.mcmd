@@ -1,0 +1,82 @@
+<command>
+
+<name>list buildings</name>
+
+<description>List Buildings</description>
+
+<type>Local Syntax</type>
+
+<local-syntax>
+<![CDATA[
+    if(@excludeLogicals = 1)
+    {
+        publish data where logicalFilterClause = ' (aremst.logic_flg is null 
+                  or (aremst.logic_flg is not null and aremst.logic_flg != 1))'
+    }
+    |
+    publish data where filterByClause = nvl(@filterByClause, ' 1 = 1 ')
+                   and logicalFilterClause = nvl(@logicalFilterClause, ' 1 = 1')
+    |
+    [select bldg_mst.*,
+            count(distinct loc.arecod) area_cnt,
+            count(loc.stoloc) loc_cnt
+       from bldg_mst
+       left join (
+          select aremst.arecod,
+                 aremst.wh_id,
+                 aremst.bldg_id,
+                 locmst.stoloc
+            from aremst
+            left join locmst
+              on locmst.arecod = aremst.arecod
+             and locmst.wh_id = aremst.wh_id
+           where @logicalFilterClause:raw) loc
+         on loc.wh_id = bldg_mst.wh_id
+        and loc.bldg_id = bldg_mst.bldg_id
+       left join adrmst
+         on adrmst.adr_id = bldg_mst.adr_id
+      where @+bldg_mst.wh_id
+        and @+bldg_mst.bldg_id
+        and @filterByClause:raw
+        and @*
+      group by bldg_mst.bldg_id,
+               bldg_mst.wh_id,
+               bldg_mst.business_unt,
+               bldg_mst.adr_id,
+               bldg_mst.fluid_load_flg,
+               bldg_mst.sort_attr_locsts,
+               bldg_mst.sort_default_flg,
+               bldg_mst.u_version,
+               bldg_mst.ins_dt,
+               bldg_mst.last_upd_dt,
+               bldg_mst.ins_user_id,
+               bldg_mst.last_upd_user_id,
+               adrmst.adrnam,
+               uc_def_wrks_arecod,
+               uc_unfinished_goods
+      order by bldg_mst.wh_id,
+               bldg_mst.bldg_id,
+               adrmst.adrnam]
+]]>
+</local-syntax>
+
+<argument name="@*">Any building field value</argument>
+
+<documentation>
+
+<remarks>
+<![CDATA[
+  <p>
+  This command is used to list the buildings. </p>
+]]>
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+<exception value="eDB_NO_ROWS_AFFECTED">Specified building not found</exception>
+<seealso cref="create building"></seealso>
+<seealso cref="change building"></seealso>
+<seealso cref="remove building"></seealso>
+
+</documentation>
+
+</command>

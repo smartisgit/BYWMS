@@ -1,0 +1,22 @@
+#use $LESDIR/include
+#use $DCSDIR/include
+#use $MOCADIR/include
+#include <usrcolwid.h>
+#include <usrddl.h>
+#include <dcsddl.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+
+
+mset command on
+[
+CREATE_PK_CONSTRAINT_BEGIN(usr_data_change_hist_log, usr_data_change_hist_log_pk )
+(uc_data_change_hist_id,uc_data_change_typ_cd) 
+CREATE_PK_CONSTRAINT_USING_INDEX
+CREATE_PK_CONSTRAINT_END
+]
+catch (ERR_INDEX_ALREADY_EXISTS,ERR_PRIMARY_KEY_ALREADY_EXISTS,-4902)
+
+RUN_DDL
+
+mset command off

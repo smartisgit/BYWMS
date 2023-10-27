@@ -1,0 +1,64 @@
+<command>
+<name>get ossi clause for primary key from stack</name>
+<description>Given a table name.  Look up stack for its PK columns and construct a snippet as name=value and name=value
+</description>
+<type>Local Syntax</type>
+
+<argument name="table_name" required="yes" datatype="string">Name of the table</argument>
+
+
+<local-syntax>
+<![CDATA[
+
+{
+    [[
+    boolean first = true;
+    StringBuffer update_clause = new StringBuffer("");
+    res = moca.executeCommand ( "list ossi primary key for table where table_name = @table_name", [table_name:table_name] );
+    while ( res.next() )
+    {
+        col = res.getString("column_name");
+        //
+        if ( !first )
+            update_clause.append ( " and " );
+        //
+        if ( col.toUpperCase() == "WH_ID_TMPL" )
+            stack_var = "wh_id";
+        else
+            stack_var = col;
+        //
+        if ( moca.getVariable ( stack_var ) == null )
+            my_value = "null";
+        else
+            my_value = "'" + moca.getVariable ( stack_var ).toString().replaceAll( "'", "''" ) + "'";
+        //
+        update_clause.append ( col + " = " + my_value );       
+        first = false;
+    }
+    [uc_where_clause:update_clause.toString()]
+    ]]
+}
+
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+Get expression that can be used in SQL or MOCA
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+<retcol name="uc_where_clause"></retcol>
+
+
+<exception value="eOK">The command completed successfully.</exception>
+
+<seealso cref="list ossi primary key for table"></seealso>
+</documentation>
+
+</command>

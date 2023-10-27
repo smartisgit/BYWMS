@@ -1,0 +1,10 @@
+LESDIR=..\..\..
+
+TARGET=usrOssiJobLog
+TARGETTYPE=.dll
+
+OFILES=MOCAinitialize.obj \
+MOCAlicense.obj \
+MOCAversion.obj 
+
+!include $(LESDIR)\makefiles\ntstd.mk

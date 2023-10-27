@@ -1,0 +1,239 @@
+<command>
+<name>get ossi documentation alg usage</name>
+<description>Generate HTML string that represents usage of a single algoirthm
+</description>
+<type>Local Syntax</type>
+
+<argument name="alg_grp_id" required="yes" datatype="string"></argument>
+<argument name="alg_id" required="yes" datatype="string"></argument>
+<argument name="url" required="yes" datatype="string"></argument>
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20191003 saad.ahmad - 10291 - Generate docymentaion
+ */
+publish data
+where inegration_folder = '../integration/'
+and pref_evt = 'osys_main_dcs_'
+and pref_iifd = 'iifd_main_'
+|
+if ( @url is null )
+    get server information
+|
+{
+    [
+    select *
+    from 
+    (
+        select 'Retrieve Method' typ, retr_mthd_id || '__' || retr_mthd_impl_genid pk, alg_id, null uc_link_typ, null ifd_id, null ifd_ver, null eo_id, null eo_ver, null alg_arg
+        from sl_retr_mthd_impl_def
+        union all
+        select 'Result IFD To System Map - Block' typ, ifd_id || '__' || ifd_ver || '__' || sys_id pk, blk_alg_id alg_id, 'ifd', ifd_id, ifd_ver, null, null, null
+        from sl_o_ifd_sys_map map
+        union all
+        select 'EO Segment - Block' typ, eo_id || '__' || eo_ver || '__' || eo_seg_id pk,  blk_alg_id alg_id,  'eo', null, null, eo_id, eo_ver, null
+        from sl_eo_seg
+        union all
+        select 'IFD Segment - Block' typ, ifd_id || '__' || ifd_ver || '__' || ifd_seg_id pk,  blk_alg_id alg_id,  'ifd' , ifd_id, ifd_ver, null, null, null
+        from sl_ifd_seg
+        union all
+        select 'IFD Segment - Pre'                typ, ifd_id || '__' || ifd_ver || '__' || ifd_seg_id pk,  pre_alg_id alg_id ,  'ifd' , ifd_id, ifd_ver, null, null, null
+        from sl_ifd_seg
+        union all
+        select 'IFD Segment - Process'            typ, ifd_id || '__' || ifd_ver || '__' || ifd_seg_id pk,  proc_alg_id alg_id ,  'ifd' , ifd_id, ifd_ver, null, null, null
+        from sl_ifd_seg
+        union all
+        select 'IFD Segment - Post'               typ, ifd_id || '__' || ifd_ver || '__' || ifd_seg_id pk,  post_alg_id alg_id ,  'ifd' , ifd_id, ifd_ver, null, null, null
+        from sl_ifd_seg
+        union all
+        select 'IFD - Pre'                        typ, ifd_id || '__' || ifd_ver pk,  pre_alg_id alg_id ,  'ifd' , ifd_id, ifd_ver, null, null, null
+        from sl_ifd_def
+        union all  
+        select 'IFD - Post'                       typ, ifd_id || '__' || ifd_ver pk,  post_alg_id alg_id ,  'ifd' , ifd_id, ifd_ver, null, null, null
+        from sl_ifd_def
+        union all
+        select 'IFD Field - Format'               typ, ifd_id || '__' || ifd_ver || '__' || ifd_seg_id || '__' || ifd_fld_id pk,  fld_alg_id alg_id ,  'ifd' , ifd_id, ifd_ver, null, null, fld_val
+        from sl_ifd_fld
+        union all
+        select 'Communication - Pre'              typ, comm_mthd_id pk,  pre_alg_id alg_id, 'comm', null, null, null, null, null
+        from sl_comm_mthd_def
+        union all
+        select 'Communication - Post'             typ, comm_mthd_id pk,  post_alg_id alg_id , 'comm', null, null, null, null, null
+        from sl_comm_mthd_def
+        union all
+        /*
+        select 'Communication Attribute'          typ, comm_mthd_id || '__' || comm_mthd_attr pk,  alg_id alg_id , 'comm', null, null, null, null , null
+        from sl_comm_mthd_attr
+        union all
+        */
+        select 'Communication Attribute Value (System)'  typ, comm_mthd_id || '__' || comm_mthd_attr || '__' || sys_id || '__' || comm_mode_cd pk,  alg_id alg_id , 'comm', null, null, null, null , null
+        from sl_sys_comm_val
+        union all
+        select 'Communication Attribute Value (IFD)'     typ, comm_mthd_id || '__' || comm_mthd_attr || '__' || sys_id || '__' || comm_mode_cd || '__' || ifd_id || '__' || ifd_ver pk,  alg_id alg_id , 'comm', null, null, null, null , null
+        from sl_sys_ifd_comm_val
+    ) alg_usage
+    where alg_usage.alg_id = @alg_id
+    ]
+    catch (-1403,510)
+    &
+    if ( @alg_grp_id = 'SL_MACRO' )
+    {
+        [
+        select distinct 
+              'Macro - EO Column' typ,
+               eo_id || '__' || eo_ver || '__' || eo_seg_id || '__' || eo_fld_id pk,
+               'eo' uc_link_typ,
+               eo_id, eo_ver
+        from sl_eo_col
+        where lower(sql_crsr_col) like '%^' || lower(@alg_id) || '%'
+        ]
+        catch (-1403,510)
+    }
+    |
+    {
+        if ( @uc_link_typ = 'ifd' )
+            [
+            select eo.eo_id, eo.eo_ver
+            from sl_ifd_def ifd
+                 join sl_eo_def eo on eo.eo_id = ifd.eo_id and eo.eo_ver = ifd.eo_ver
+            where ifd.ifd_id = @ifd_id
+            and ifd.ifd_ver = @ifd_ver
+            ]
+            catch (-1403,510)
+        |
+        if ( @ifd_id is not null )
+        {
+            [
+            select count(*) uc_cnt_ena
+            from sl_o_ifd_sys_map
+            where ifd_id = @ifd_id and ifd_ver = @ifd_ver
+            and ena_flg = 'T'
+            ]
+            |
+            if ( @uc_cnt_ena > 0 )
+                publish data
+                where uc_enabled = 1
+        }
+        else if ( @eo_id is not null )
+        {
+            [
+            select count(*) uc_cnt_ena
+            from sl_eo_def eo
+                 join sl_ifd_def ifd on ifd.eo_id = eo.eo_id and ifd.eo_ver = eo.eo_ver
+                 join sl_o_ifd_sys_map map on map.ifd_id = ifd.ifd_id and map.ifd_ver = ifd.ifd_ver
+                 join sl_sys_def sys on sys.sys_id = map.sys_id
+            where eo.eo_id = @eo_id and eo.eo_ver = @eo_ver
+            and map.ena_flg = 'T'
+            and sys.ena_flg = 'T'
+            ]
+            |
+            if ( @uc_cnt_ena > 0 )
+                publish data
+                where uc_enabled = 1
+        }
+        else
+            publish data
+            where uc_enabled = 1
+        |
+        if ( @uc_enabled = 1 )
+        {
+            if ( @evt_id is null )
+                [
+                select evt_id
+                from sl_eo_def
+                where eo_id = @eo_id
+                and eo_ver = @eo_ver
+                ]
+                catch (-1403,510)
+            |
+            if ( @evt_id is not null )
+            {
+                {
+                    [
+                    select distinct
+                           map.ifd_id i_ifd_id, map.ifd_ver i_ifd_ver,
+                           replace(lower(map.ifd_id), ' ', '_' ) h_i_ifd_id,
+                           replace(lower(map.ifd_ver),' ', '_' ) h_i_ifd_ver
+                    from sl_i_ifd_evt_map map
+                         join sl_sys_def sys on sys.sys_id = map.sys_id
+                    where map.evt_id = @evt_id
+                    and map.ena_flg = 'T'
+                    and sys.ena_flg = 'T'
+                    order by 1,2
+                    ]
+                    catch (-1403,510)
+                }
+                >> res_iifd
+            }
+            |
+            {
+                if ( rowcount(@res_iifd) > 0 )
+                {
+                    [[
+                    StringBuffer uc_link_data = new StringBuffer("" );
+                    while ( res_iifd.next() )
+                    {
+                        i_ifd_id  = res_iifd.getString ( "h_i_ifd_id" );
+                        i_ifd_ver = res_iifd.getString ( "h_i_ifd_ver" );
+                        this_link = "<a href=" + inegration_folder + pref_iifd + i_ifd_id + "__" + i_ifd_ver + ".html>" + i_ifd_id + "__" + i_ifd_ver + "</a>"
+                        uc_link_data.append ( " " );
+                        uc_link_data.append ( this_link );
+                    }
+                    [uc_link_data:uc_link_data.toString()]
+                    ]]
+                }
+                else
+                {
+                    noop >> res_iifd
+                    |
+                    publish data
+                    where uc_link_data = "<a href=" || @inegration_folder || @pref_evt || @evt_id || ".html>" || @evt_id || "</a>"
+                    and res_iifd = @res_iifd
+                    and link_event = 1
+                }
+            }
+            |
+            if ( @link_event = 1 or rowcount(@res_iifd) > 0 )
+                filter data 
+                where moca_filter_level = 8
+                and eo_id = @eo_id
+                and eo_ver = @eo_ver
+                and evt_id = @evt_id
+                and uc_link_data = @uc_link_data
+                and res_iifd = @res_iifd
+                and link_event = @link_event
+        } /* enabled */
+    } /* output of sql */
+} /* main */
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This returns a recordset that represents usage of a single algoirthm
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+<retcol name="@*" type="COMTYP_CHAR">See command</retcol>
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+<seealso cref="get ossi result by evaluating policy"></seealso>
+
+</documentation>
+
+
+
+</command>

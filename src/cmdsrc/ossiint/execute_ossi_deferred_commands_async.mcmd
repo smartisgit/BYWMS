@@ -1,0 +1,95 @@
+<command>
+<name>execute ossi deferred commands async</name>
+<description>Look at deferred execution commands and run them in async mode.  Each thread takes value of a certain filter</description>
+
+<argument name="exec_typ" datatype="string">Execution Type.</argument>
+<argument name="comflg" datatype="integer">Commit Flag.</argument>
+<argument name="delflg" datatype="integer">Delete Flag.</argument>
+
+<argument name="uc_thread_group_by_col" datatype="string">What column in deferred_exec to group by</argument>
+
+<argument name="uc_ossi_job_id" required="yes" datatype="string"></argument>
+
+<argument name="uc_num_concurrent_calls" required="yes" datatype="string"></argument>
+<argument name="uc_lock_deferred_exec" datatype="string">In process code, do we lock or not.  Default 0</argument>
+
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+publish data
+where comflg = nvl(@comflg, 0 )
+and delflg = nvl(@delflg,0)
+and uc_ossi_job_id = nvl(@uc_ossi_job_id, 'UC_G_DEFEXEC_' || @exec_typ )
+and uc_ossi_who = nvl(@uc_ossi_who, @wh_id || '-' || @@USR_ID )
+and uc_num_concurrent_calls = nvl(@uc_num_concurrent_calls, 10)
+and uc_lock_deferred_exec = nvl(@uc_lock_deferred_exec, 0)
+|
+{
+    execute ossi work using async execution
+    where uc_get_work_cmd = "list ossi deferred execution groups ready for execution"
+    and uc_do_work_cmd = 'process ossi one deferred execution group'
+    and uc_ossi_job_id = @uc_ossi_job_id
+    and uc_ossi_who = @uc_ossi_who
+    and uc_pk_col = 'uc_thread_group_by_val'
+    and uc_num_concurrent_calls = @uc_num_concurrent_calls
+    and comflg = @comflg
+    and uc_exec_status_col = 'uc_ossi_err_code'
+    and uc_exec_message_col = 'uc_ossi_err_descr'
+    and uc_data_col = 'uc_cnt_execs'
+}
+   
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This job will utilize async processing to execute deferred executions
+</p>
+]]>
+</remarks>
+
+<retrows>n</retrows>
+
+<retcol name="exec_id" type="string"></retcol>
+<retcol name="exec_typ" type="string"></retcol>
+<retcol name="exec_kv1" type="string"></retcol>
+<retcol name="exec_kv2" type="string"></retcol>
+<retcol name="exec_kv3" type="string"></retcol>
+<retcol name="my_savepoint" type="string"></retcol>
+<retcol name="comflg" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_ossi_job_seq" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_ossi_module_seq" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_ossi_action_seq" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_ossi_err_code" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_ossi_err_descr" type="COMTYP_CHAR"></retcol>
+
+
+
+
+
+<example>
+<![CDATA[
+<p>
+</p>
+]]>
+
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+<seealso cref="list ossi deferred execution groups ready for execution"></seealso>
+<seealso cref="process ossi one deferred execution group"></seealso>
+<seealso cref="execute ossi deferred commands async"></seealso>
+
+
+</documentation>
+
+
+</command>

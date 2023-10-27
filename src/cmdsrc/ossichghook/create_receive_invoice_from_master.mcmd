@@ -1,0 +1,45 @@
+<command>
+<name>create receive invoice from master</name>
+<description>Override core to pass in a flag that we are called from here so that rules can use it.  Flag 
+uc_called_from_create_rcvinv_from_master is set to 1</description>
+
+<argument name="@*" required="yes" datatype="string">Data from list command is assumed to be on stack</argument>
+<argument name="uc_inhibit_change_hook" required="yes" datatype="string">if we pass this as '1' then all change hook logic is bypassed
+useful in testing and assessing overhead</argument>
+
+
+<type>Local Syntax</type>
+
+<local-syntax>
+<![CDATA[
+
+
+^create receive invoice from master 
+where @*
+and uc_called_from_create_rcvinv_from_master = 1
+  
+]]>
+
+</local-syntax>
+
+<documentation>
+
+<remarks>
+<![CDATA[
+  <p>
+  This is called when we create rcvinv from master.  If rules need to detect this context, those rules can use
+  uc_called_from_create_rcvinv_from_master and test for 1
+  </p>
+]]>
+</remarks>
+
+<retcol name="@*" type="(varies according to field type)">All order columns</retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+
+
+<seealso cref="create receive invoice"></seealso>
+
+
+</documentation>
+</command>

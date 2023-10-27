@@ -1,0 +1,97 @@
+<command>
+<name>renumber ossi condition based rules expression</name>
+<description>renumber ossi condition based rules</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+list ossi conditional rules >> res 
+|
+[[
+    int interval = 10;
+    int srtseq = 10;
+    while (res.next())
+    {
+        // Help text starts at 0
+        if (srtseq == 10)
+        {
+            srtseq = 0;
+        }
+        srtseq = res.getInt("srtseq")+interval;
+        moca.executeInline(" change ossi rule based condition expression" +
+                           " where uc_rule_grp_id  = @uc_rule_grp_id" +
+                           " and uc_rule_subgrp_id = @uc_rule_subgrp_id" +
+                           " and uc_rule_id        = @uc_rule_id" +
+                           " and seqnum            = @seqnum" +
+                           " and srtseq            = @srtseq" +
+                           " and ena_flg           = @ena_flg" +
+                           " and uc_execute_cmd    =@uc_execute_cmd" +
+                           " and uc_condition_expr      = @uc_condition_expr",
+                           [uc_rule_grp_id:uc_rule_grp_id,
+                            uc_rule_subgrp_id:uc_rule_subgrp_id,
+                            uc_rule_id:res.getString("uc_rule_id"),
+                            seqnum:res.getString("seqnum"),
+                            srtseq:srtseq,
+                            ena_flg:res.getInt("ena_flg"),
+                            uc_condition_expr:res.getString("uc_condition_expr"),
+                            uc_execute_cmd:res.getString("uc_execute_cmd")]);
+        
+    }
+    ]]
+/*
+[select *
+     from usr_rule_engine_cond_expr
+    where uc_rule_grp_id = @uc_rule_grp_id
+      and uc_rule_subgrp_id = @uc_rule_subgrp_id
+      and uc_rule_id = @uc_rule_id
+  ]
+  >> res
+  |
+  {
+    publish data combination where res = @res
+    |
+    remove ossi rule based condition expression
+      where uc_rule_grp_id = @uc_rule_grp_id
+        and uc_rule_subgrp_id = @uc_rule_subgrp_id
+        and uc_rule_id = @uc_rule_id
+        and srtseq = @srtseq
+        and seqnum=@seqnum
+        and rtnum = @rtnum
+        and uc_condition_expr = @uc_condition_expr
+        and uc_execute_cmd = @uc_execute_cmd
+    ;
+    [[
+        int interval = 10;
+        while (res.next())
+        {
+          // Help text starts at 0
+          if (srtseq == 10 )
+          {
+            srtseq = 0;
+          }
+          srtseq = res.getInt("srtseq")+interval;
+          moca.executeInline("create ossi rule based condition expression" +
+            " where uc_rule_grp_id = '" + res.getString("uc_rule_grp_id") + "'" +
+            "   and uc_rule_subgrp_id = '" + res.getString("uc_rule_subgrp_id") + "'" +
+            "   and uc_rule_id = '" + res.getString("uc_rule_id") + "'" +
+            "   and seqnum = '" + res.getString("seqnum") + "'" +
+            "   and srtseq = " +srtseq +
+            "   and uc_condition_expr = \"" + res.getString("uc_condition_expr") + "\"" +
+            "   and uc_execute_cmd = \"" + res.getString("uc_execute_cmd") + "\"" +
+            "   and ena_flg = '" + res.getInt("ena_flg") + "'"); 
+        }
+      ]}
+*/ 
+]]>
+</local-syntax>
+
+<documentation>
+
+<remarks>
+This command may be used to renumber ossi condition based rules.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

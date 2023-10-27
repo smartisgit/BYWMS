@@ -1,0 +1,114 @@
+<command>
+<name>sl_get inb_files</name>
+<description>
+OVERRIDE: Allow additional sort options for this
+</description>
+
+<type>Local Syntax</type>
+<function>usrOssiTransposeResult</function>
+<argument name="uc_sort_split_file_name_on" required="no" datatype="string">What should we split the file name on</argument>
+<argument name="uc_sort_split_fld_num"      required="no" datatype="string">After splitting, which field number</argument>
+<argument name="uc_sort_split_dir"          required="no" datatype="string">a or d for sort direction</argument>
+
+<argument name="uc_get_exclusive_lock"      required="no" datatype="integer">Check for exclusive lock on each file</argument>
+
+
+<argument name="@*"    required="yes" datatype="string">Whatever standard needs</argument>
+
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+
+if ( @uc_sort_split_file_name_on is null )
+   ^sl_get inb_files
+else
+{
+   {
+      ^sl_get inb_files
+      |
+      {
+         sl_split filename
+         |
+         publish data
+         where uc_has_period = instr(@s_orig_filename, '.' )
+         |
+         /* from s_orig_filename, get the sort part */
+         [[
+         try
+         {
+            uc_sort_part = (s_orig_filename.split(uc_sort_split_file_name_on)[uc_sort_split_fld_num]);
+            if ( uc_has_period > 0 )
+               uc_sort_part = uc_sort_part.split("\\.")[0];
+         }
+         catch(ee)
+         {
+            uc_sort_part = s_orig_filename;
+         }
+         ]]
+         |
+         publish data
+         where full_file_name = @full_file_name
+         /* Put leading 0s in so that if data was 1 and 03, 1 sorts first */
+         and uc_sort_part     = sl_fmt__pad( @uc_sort_part, 'R', '0', 60)
+      }
+   }
+   >> res
+   |
+   sort result set where result_set = @res and sort_list = 'uc_sort_part ' || nvl(@uc_sort_split_dir, 'a')
+   |
+   publish data where full_file_name = @full_file_name
+}
+|
+if (@full_file_name is not null)
+{
+   if (@uc_get_exclusive_lock = 1)
+   {
+      if (ossi__file_exclusively_available(@full_file_name))
+      {
+         filter data where moca_filter_level = 4
+      }
+   }
+   else
+   {
+      filter data where moca_filter_level = 3
+   }
+}
+
+]]>
+</local-syntax>
+
+
+
+<documentation>
+
+
+<remarks>
+<![CDATA[
+This override may be used to get the inbound data sorted in a more specific way.  For example a system may
+have the files such that the file name has delimiters and they want to sort data by a certain part of the file name.
+
+For example if files are:
+a_b_2.xml
+x_y_1.xml
+
+A normal sort will return a_b file first but if significant field is the 2 or 1 we want to return data by that part.
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+<example>
+   sl_get inb_files
+   where path = 'C:\RedPrairie\WMSPROD2\LES\temp\*.txt'
+   and uc_sort_split_file_name_on = '_'
+   and uc_sort_split_fld_num = '2'
+   and uc_sort_split_dir = 'a'
+</example>
+
+<exception value="eOK">Normal successful completion</exception>
+</documentation>
+</command>

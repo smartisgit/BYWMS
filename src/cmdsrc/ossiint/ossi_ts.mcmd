@@ -1,0 +1,34 @@
+<command>
+<name>ossi ts</name>
+<description>
+Get current timestamp as milliseconds since midnight.  Used to see sub second time differnece
+</description>
+<type>C Function</type>
+<function>usrOssiGetTimestamp</function>
+
+<documentation>
+
+
+<remarks>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+
+This command may be used to see sub second time differnece
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+<example>
+??
+</example>
+
+<retcol name="uc_ossi_ts" type="float">Number of miliseconds since midnight</retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+</documentation>
+</command>

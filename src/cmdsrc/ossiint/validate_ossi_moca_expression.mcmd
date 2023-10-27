@@ -1,0 +1,125 @@
+<command>
+<name>validate ossi moca expression</name>
+<description>Validate the passed in moca expression</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="uc_syntax"></argument>
+<argument datatype="string" name="uc_only_when_in_braces"></argument>
+<argument datatype="string" name="uc_is_expression"></argument>
+<argument datatype="string" name="uc_raise_error_when_bad">If 1 (default) then if we have an error we raise error</argument>
+
+
+
+
+<local-syntax>
+<![CDATA[
+
+publish data
+where uc_only_when_in_braces = nvl(@uc_only_when_in_braces, 0 )
+and uc_is_expression = nvl(@uc_is_expression, 1 )
+and comflg = 0
+and uc_raise_error_when_bad= nvl(@uc_raise_error_when_bad, 1 )
+and uc_parse_error_code = ossi__e ( 'eUSR_ERROR_IN_MOCA_EXPRESSION' )
+|
+publish data
+where test_cmd = iif ( @uc_is_expression = 1, "publish data where xxx = iif ( " || @uc_syntax || ",1,0)", @uc_syntax)
+|
+if ( @uc_syntax is null )
+    publish data
+    where uc_tested_syntax = null
+    and uc_syntax = null
+    and uc_valid_expr = 1
+    and uc_reason = 'passed in null command'
+    and uc_error_code = 0
+    and uc_error_message = ''
+else if ( @uc_only_when_in_braces = 1 and @uc_synyax not like '{%}' )
+    publish data
+    where uc_tested_syntax = @test_cmd
+    and uc_valid_expr = 1
+    and uc_reason = 'not in braces'
+    and uc_error_code = 0
+    and uc_error_message = ''
+else
+{
+    try
+    {
+        execute server command 
+        where cmd = @test_cmd
+        catch(@?)
+        |
+        publish data
+        where uc_error_code = @?
+        and uc_error_message = @!
+    }
+    finally
+    {
+        rollback
+    }
+    |
+    publish data
+    where uc_valid_expr = iif ( @uc_error_code = 0 or @uc_error_code = -1403 or @uc_error_code = 510 or @uc_error_code = -1, 1, 0 )
+    |
+    if ( @uc_valid_expr != 1 and @uc_raise_error_when_bad = 1 )
+        set return status
+        where status = @uc_parse_error_code
+        and uc_tested_syntax = @test_cmd
+        and uc_error_code = @uc_error_code
+        and uc_error_message = @uc_error_message
+        and uc_syntax = @uc_syntax
+    else if ( @uc_valid_expr != 1 )
+    {
+        get ossi mls text with args
+        where mls_id = 'err' || @uc_parse_error_code
+        and uc_tested_syntax = @test_cmd
+        |       
+        publish data
+        where uc_parse_error_mls_text  = @mls_text
+        and uc_parse_error_mls_text_orig = @uc_mls_text_without_replace
+        and uc_parse_error_code = @uc_parse_error_code
+    }
+    |
+    publish data
+    where uc_tested_syntax = @test_cmd
+    and uc_syntax = @uc_syntax
+    and uc_valid_expr = @uc_valid_expr
+    and uc_reason = 'execute server command run test'
+    and uc_error_code = decode ( @uc_valid_expr, 0, @uc_error_code, 0 )
+    and uc_error_message =decode ( @uc_valid_expr, 0, @uc_error_message, '' )
+    and uc_parse_error_mls_text = @uc_parse_error_mls_text
+    and uc_parse_error_mls_text_orig = @uc_parse_error_mls_text_orig
+    and uc_parse_error_code = @uc_parse_error_code
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+This will be called from front-end screens where we allow the user to enter expressions.
+</remarks>
+
+<retrows>1</retrows>
+<retcol name="uc_syntax" type="COMTYP_CHAR">What expression was passed in</retcol>
+<retcol name="uc_tested_syntax" type="COMTYP_CHAR">What expression did we use for testing</retcol>
+<retcol name="uc_valid_expr" type="COMTYP_CHAR">1 or 0</retcol>
+<retcol name="uc_reason" type="COMTYP_CHAR">text describing how we tested</retcol>
+<retcol name="uc_error_code" type="COMTYP_CHAR">Error code</retcol>
+<retcol name="uc_error_message" type="COMTYP_CHAR">Error Message</retcol>
+
+<retcol name="uc_parse_error_mls_text" type="COMTYP_CHAR">An error text that can be displayed on the client if needed</retcol>
+<retcol name="uc_parse_error_mls_text_orig" type="COMTYP_CHAR">Informational only - mls text without tokens replaced</retcol>
+<retcol name="uc_parse_error_code" type="COMTYP_CHAR">Informational only - error code defined in the system for errors</retcol>
+
+
+
+
+
+
+<exception value="eOK">The command completed successfully.</exception>
+<exception value="eUSR_ERROR_IN_MOCA_EXPRESSION">Some parse error in syntax</exception>
+
+
+</documentation>
+
+
+</command>

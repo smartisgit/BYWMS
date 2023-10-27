@@ -1,0 +1,67 @@
+<command>
+<name>ossi get_rollout_install_dt</name>
+<description>Get date/time of when a rollout was installed</description>
+
+<argument name="moca_farg1" required="yes" datatype="string">Environment</argument>
+<argument name="moca_farg2" required="yes" datatype="string">Environment</argument>
+
+<type>Local Syntax</type>
+
+
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+publish data
+where uc_env_name = @moca_farg1
+and uc_rollout_name = @moca_farg2
+|
+if ( @uc_env_name is not null )
+{
+   execute ossi bugzilla select
+   where uc_select_stmt = "select uc_env_url from ossi_rollout_env where uc_env_name = @uc_env_name"
+   |
+   Remote ( @uc_env_url )
+   {
+      {
+         find file
+         where pathname = @@LESDIR || '/install/' || @uc_rollout_name || '-*'
+         |
+         get file info
+         |
+         publish data
+         where uc_rollout_pathname = @pathname
+         and uc_rollout_created = @created
+      }
+      >> res1
+      |
+      sort result set
+      where result_set = @res1
+      and  sort_list = 'uc_rollout_created d'
+      >> res2
+      |
+      publish top rows
+      where res = @res2
+      and rows = 1
+   }
+   |
+   if ( @uc_rollout_created is not null )
+      publish data
+      where uc_rollout_created = to_date(@uc_rollout_created, 'YYYY-MM-DD HH24:MI:SS' )
+}
+
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+Get date/time of when a rollout was installed
+</remarks>
+<retcol name="uc_rollout_created" type="String"></retcol>
+<exception value="eOK">Normal successful completion</exception>
+</documentation>
+</command>

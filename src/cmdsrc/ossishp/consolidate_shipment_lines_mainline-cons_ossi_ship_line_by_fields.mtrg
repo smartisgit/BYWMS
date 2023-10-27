@@ -1,0 +1,55 @@
+<trigger>
+<name>cons ossi ship line by fields</name>
+<on-command>consolidate shipment lines mainline</on-command>
+<fire-sequence>50</fire-sequence>
+
+<local-syntax>
+<![CDATA[
+
+if ( ossi__polval ( 'USR-OSSI-DATA-CHANGE-HOOK', 'CMD_CONSOLIDATE_SHIPMENT_LINES_MAINLINE_BY_RULES','ENABLED', '', 'rtnum1', nvl(@wh_id,@@WH_ID)) = 0 )
+{
+    consolidate ossi shipment lines with standard fields
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<remarks>
+This is created because we have standard trigger [cons_ship_line_by_fields] disabled.  For consolidation by rules we want to use the trigger
+[consolidate ossi shipment lines by rules].
+
+We have a policy to control the functionality.  The trigger [consolidate ossi shipment lines by rules] becomes a noop when policy is set to disabled.
+So in that case we want to run standard logic.
+
+So this trigger will kick in when the policy is 0 - and when 0 the logic here is a copy of standard logic, which has been copied into the custom command
+[consolidate ossi shipment lines with standard fields].
+
+srtseq of this trigger is also set to 50 because that is where the standard trigger was.  So idea is that if policy disables this, it should work same as standard.
+Only issue could be if [consolidate ossi shipment lines with standard fields] needs to be adjusted if the standard logic has changed.
+
+</remarks>
+<seealso cref="consolidate ossi shipment lines with standard fields">
+    Represents standard logic
+</seealso>
+
+<seealso cref="consolidate shipment lines mainline">
+    Standard command
+</seealso>
+
+<seealso cref="consolidate ossi shipment lines with standard fields">
+    Standard logic has been copied here and is called when rule based logic is disabled.
+</seealso>
+
+
+<policy
+    polcod="USR-OSSI-DATA-CHANGE-HOOK"
+    polvar="CMD_CONSOLIDATE_SHIPMENT_LINES_MAINLINE_BY_RULES"
+    polval="ENABLED"
+    rtnum1="set to 0 to disable this and 2 to enable"
+></policy>
+
+</documentation>
+
+</trigger>

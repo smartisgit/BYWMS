@@ -1,0 +1,57 @@
+#use $DCSDIR/include
+#include <dcsddl.h>
+#include <dcscolwid.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+#use $SALDIR/include
+
+#include <salcolwid.h>
+
+mset command on
+
+/*
+ * This view is called by les_cmd uc_ctxt_post_create_work_post_cmd to establish context during work manaegment but by invlod
+ */
+[drop view usr_wrkque_by_invlod_view] catch(@?)
+;
+[
+create view usr_wrkque_by_invlod_view
+as
+                        select invlod.lodnum,
+                               count(distinct invdtl.prt_client_id || '|' || invdtl.prtnum ) uc_cnt_prt,
+                               count(distinct invdtl.invsts) uc_cnt_invsts,
+                               count(distinct invdtl.prt_client_id || '|' || invdtl.prtnum || '|' || invdtl.lotnum) uc_cnt_lot,
+                               count(distinct invdtl.expire_dte) uc_cnt_expire_dte,
+                               count(distinct invdtl.mandte)     uc_cnt_mandte,
+                               min(invlod.stoloc) uc_cur_stoloc,
+                               min(locmst.arecod) uc_cur_arecod,
+                               min(invdtl.prt_client_id ) uc_min_prt_client_id,
+                               min(invdtl.prtnum) uc_min_prtnum,
+                               /*
+                                * Per amway rules taking min is ok for mixed.  min will be the oldest
+                                * Meeting with rick on 9/15/16
+                                */
+                               min(invdtl.lotnum) uc_min_lotnum,
+                               /*
+                                * Per amway ATL rules taking min is ok for mixed.  min will be the worst status.
+                                * e.g. if 4000 is good and 0204 is hold this will give 0204
+                                * Meeting with rick on 9/15/16
+                                */
+                               min(invdtl.invsts) uc_min_invsts,
+                               min(invdtl.expire_dte) uc_min_expire_dte,
+                               min(invdtl.mandte) uc_min_mandte,
+                               min(prtmst.age_pflnam ) uc_min_age_pflnam,
+                               sum(invdtl.untqty) uc_sum_untqty
+                        from invlod
+                             join invsub on invsub.lodnum = invlod.lodnum
+                             join invdtl on invdtl.subnum = invsub.subnum
+                             join prtmst_view prtmst
+                                on prtmst.prt_client_id = invdtl.prt_client_id
+                                and prtmst.prtnum = invdtl.prtnum
+                                and prtmst.wh_id = invlod.wh_id
+                             join locmst on locmst.wh_id = invlod.wh_id and locmst.stoloc = invlod.stoloc
+                        group by invlod.lodnum
+]
+RUN_DDL
+
+mset command on

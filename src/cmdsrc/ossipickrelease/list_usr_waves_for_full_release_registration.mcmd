@@ -1,0 +1,112 @@
+<command>
+<name>list usr waves for full release registration</name>
+<description>This command will list the shipments and waves that need to be marked for full release</description>
+ 
+<argument name="wh_id" required="yes" datatype="string"></argument>
+<argument name="ship_id" required="yes" datatype="string"></argument>
+<argument name="uc_show_all_data" required="yes" datatype="string"></argument>
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+if ( @ship_id is null ) hide stack variable where name = 'ship_id'
+|
+{
+    [
+    select 'register usr wave fully released' uc_oper,
+           ff.*
+    from
+    (
+        select bb.*,
+               case
+                   when bb.uc_reldte is not null and
+                        (
+                            bb.uc_cnt_non_rel_shp > 0 or
+                            bb.uc_cnt_rel_shp = 0
+                        )
+                   then 'U'
+                   when bb.uc_cnt_non_rel_shp = 0 and bb.uc_cnt_rel_shp > 0 and
+                        ( bb.uc_reldte is null or bb.uc_reldte < bb.uc_max_shp_reldte )
+                   then 'R'
+                   else 'NOOP'
+                   end uc_reg_oper_cd
+        from
+        (
+            select pckbat.wh_id,
+                   pckbat.schbat,
+                   pckbat.batsts,
+                   pckbat.uc_reldte,
+                   count ( distinct decode(shipment.uc_reldte, null, shipment_line.ship_id, null )) uc_cnt_non_rel_shp,
+                   count ( distinct decode(shipment.uc_reldte, null, null, shipment_line.ship_id )) uc_cnt_rel_shp,
+                   max(shipment.uc_reldte) uc_max_shp_reldte
+            from pckbat
+                 left outer join shipment_line 
+                     on shipment_line.schbat = pckbat.schbat 
+                     and shipment_line.linsts not in ( 'B' )
+                 left outer join shipment
+                     on shipment.ship_id = shipment_line.ship_id
+                     and shipment.shpsts not in ( 'C', 'B' )
+            where 1=1
+            and pckbat.wh_id = @wh_id
+            and pckbat.batsts != 'CMPL'
+            group by
+                   pckbat.wh_id,
+                   pckbat.schbat,
+                   pckbat.batsts,
+                   pckbat.uc_reldte
+        ) bb
+    ) ff
+    where 1=1
+    and ( @uc_show_all_data = 1 or ff.uc_reg_oper_cd != 'NOOP' )
+    order by 1,2,3
+    ]        
+    catch (-1403,510)
+}    
+   
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This lists all the data for waves that are for ready for full registration
+</p>
+]]>
+</remarks>
+
+<retrows>n</retrows>
+
+<retcol name="wh_id" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_oper" type="COMTYP_CHAR">Whether it is wave or shipment</retcol>
+<retcol name="uc_reg_oper_cd" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_reldte" type="COMTYP_CHAR">What was in the table when run</retcol>
+<retcol name="schbat" type="COMTYP_CHAR"></retcol>
+
+
+<retcol name="batsts" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_cnt_non_rel_shp" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_cnt_rel_shp" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_max_shp_reldte" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_reg_oper_cd" type="COMTYP_CHAR"></retcol>
+
+<example>
+<![CDATA[
+<p>
+</p>
+]]>
+
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+<seealso cref="list usr shipments for full release registration"></seealso>
+
+</documentation>
+
+
+</command>

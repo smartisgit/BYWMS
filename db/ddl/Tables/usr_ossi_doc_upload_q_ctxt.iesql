@@ -1,0 +1,51 @@
+#use $LESDIR/include
+#use $DCSDIR/include
+#use $MOCADIR/include
+#use $LESDIR/db/ddl/Indexes
+
+
+#include <dcsddl.h>
+#include <dcscolwid.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+
+mset command on
+[
+CREATE_TABLE(usr_ossi_doc_upload_q_ctxt)
+(
+    uc_doc_upload_q_id    STRING_TY(15) NOT NULL,
+    uc_doc_ctxt_parm_seq  INTEGER_TY    NOT NULL,
+    /**/
+    uc_doc_ctxt_parm_typ  STRING_TY(10) NOT NULL,
+    uc_doc_ctxt_parm_id   STRING_TY(200) NOT NULL,
+    uc_doc_ctxt_parm_val  STRING_TY(4000),
+    /**/
+    ins_dt             DATE_TY,
+    ins_user_id        STRING_TY(40),
+    last_upd_dt        DATE_TY,
+    last_upd_user_id   STRING_TY(40)
+                
+)
+] catch (ERR_TABLE_ALREADY_EXISTS)
+RUN_DDL
+
+#include <usr_ossi_doc_upload_q_ctxt_pk.iesql>
+
+mset command on
+create db documentation
+where table             = "usr_ossi_doc_upload_q_ctxt"
+and table_comment       = "This table stores the context information for a particular uploaded report.  The MOCA context is investigated to get the context"
+and uc_doc_upload_q_id  = "Primary Key of this table"
+and uc_doc_ctxt_parm_seq= "Ascending number to create uniqueness"
+and uc_doc_ctxt_parm_typ= "KEY implies that it will serve as a key for lookups.  One parameter id per upload.  DATA implies it is some data"
+and uc_doc_ctxt_parm_id = "Parameter Id"
+and uc_doc_ctxt_parm_val= "Parameter Value"
+/**/
+and ins_dt              = "Add Date/time"
+and last_upd_dt         = "Update Date/Time"
+and ins_user_id         = "Add User Id"
+and last_upd_user_id    = "Update user Id"
+
+
+RUN_DDL
+mset command off

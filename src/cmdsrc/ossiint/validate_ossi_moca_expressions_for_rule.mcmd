@@ -1,0 +1,164 @@
+<command>
+<name>validate ossi moca expressions for rule</name>
+<description>Validate the various moca expressions stored in the rule tables</description>
+<type>Local Syntax</type>
+
+<argument name="uc_rule_engine_table_name" required="yes" datatype="string">Pass in usr_rule_engine_expr or usr_rule_engine_cond_expr</argument>
+
+<argument name="uc_rule_grp_id" required="yes" datatype="string"></argument>
+<argument name="uc_rule_subgrp_id" required="yes" datatype="string"></argument>
+<argument name="uc_rule_id" required="yes" datatype="string"></argument>
+
+<argument datatype="string" name="uc_synyax"></argument>
+<argument datatype="string" name="uc_only_when_in_braces"></argument>
+<argument datatype="string" name="uc_is_expression"></argument>
+
+<local-syntax>
+<![CDATA[
+
+publish data
+where uc_rule_engine_table_name = nvl(@uc_rule_engine_table_name, 'usr_rule_engine_expr' )
+and uc_raise_error_when_bad = 0
+|
+if ( @uc_rule_id is null ) hide stack variable where name = 'uc_rule_id'
+|
+if ( @uc_rule_grp_id is null ) hide stack variable where name = 'uc_rule_grp_id'
+|
+if ( @uc_rule_subgrp_id is null ) hide stack variable where name = 'uc_rule_subgrp_id'
+|
+if ( @uc_rule_engine_table_name = 'usr_rule_engine_expr' )
+    publish data
+    where uc_order_by = 'uc_rule_grp_id, uc_rule_subgrp_id, srtseq, seqnum'
+else
+    publish data
+    where uc_order_by = 'uc_rule_grp_id, uc_rule_subgrp_id, uc_rule_id, srtseq, seqnum'
+|
+{
+    [
+    select rr.*
+    from @uc_rule_engine_table_name:raw rr
+    where @+rr.uc_rule_grp_id
+    and @+rr.uc_rule_subgrp_id
+    and @+rr.uc_rule_id
+    order by @uc_order_by:raw
+    ]
+    catch (-1403,510)
+    |
+    if ( @? = 0 )
+    {
+        if ( @uc_rule_engine_table_name = 'usr_rule_engine_expr' )
+        {
+            validate ossi moca expression
+            where uc_syntax = @uc_rule_expr 
+            |
+            publish data
+            where uc_rule_expr = @uc_rule_expr
+            and uc_rule_expr_valid = @uc_valid_expr
+            and uc_rule_expr_validation_error_code = @uc_error_code
+            and uc_rule_expr_validation_error_message = @uc_error_message
+            |
+            validate ossi moca expression
+            where uc_syntax = @uc_rule_value
+            and uc_only_when_in_braces = 1
+            and uc_is_expression = 0
+            |
+            publish data
+            where uc_rule_engine_table_name = @uc_rule_engine_table_name
+            and uc_rule_grp_id = @uc_rule_grp_id
+            and uc_rule_subgrp_id = @uc_rule_subgrp_id
+            and seqnum = @seqnum
+            and srtseq = @srtseq
+            and ena_flg = @ena_flg
+            and uc_cust_flg = @uc_cust_flg
+            and uc_rule_expr_valid = @uc_rule_expr_valid
+            and uc_rule_value_valid = @uc_valid_expr
+            and uc_rule_expr = @uc_rule_expr
+            and uc_rule_expr_validation_error_code = @uc_rule_expr_validation_error_code
+            and uc_rule_expr_validation_error_msg = @uc_rule_expr_validation_error_message
+            and uc_rule_value = @uc_rule_value
+            and uc_rule_value_validation_error_code = @uc_error_code
+            and uc_rule_value_validation_error_msg = @uc_error_message
+        }
+        else
+        {
+            validate ossi moca expression
+            where uc_syntax = @uc_condition_expr 
+            |
+            publish data
+            where uc_condition_expr = @uc_condition_expr
+            and uc_condition_expr_valid = @uc_valid_expr
+            and uc_condition_expr_validation_error_code = @uc_error_code
+            and uc_condition_expr_validation_error_msg = @uc_error_message
+            |
+            validate ossi moca expression
+            where uc_syntax = @uc_execute_cmd
+            and uc_only_when_in_braces = 0
+            and uc_is_expression = 0
+            |
+            publish data
+            where uc_rule_engine_table_name = @uc_rule_engine_table_name
+            and uc_rule_grp_id = @uc_rule_grp_id
+            and uc_rule_subgrp_id = @uc_rule_subgrp_id
+            and uc_rule_id = @uc_rule_id
+            and seqnum = @seqnum
+            and srtseq = @srtseq
+            and ena_flg = @ena_flg
+            and uc_cust_flg = @uc_cust_flg
+            and uc_execute_cmd_valid = @uc_valid_expr
+            and uc_condition_expr_valid = @uc_condition_expr_valid
+            and uc_condition_expr = @uc_condition_expr
+            and uc_condition_expr_validation_error_code = @uc_condition_expr_validation_error_code
+            and uc_condition_expr_validation_error_msg = @uc_condition_expr_validation_error_message
+            and uc_execute_cmd = @uc_execute_cmd
+            and uc_execute_cmd_validation_error_code = @uc_error_code
+            and uc_execute_cmd_validation_error_msg = @uc_error_message
+        }
+    }
+}
+
+
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+This will be called from front-end screens where we can validate all expressions
+</remarks>
+
+<retrows>n - based on rows returned from the table for group/subgroup/rule_id</retrows>
+<retcol name="uc_rule_engine_table_name" type="COMTYP_CHAR">Table name for which we are working</retcol>
+<retcol name="uc_rule_grp_id" type="COMTYP_CHAR">Group</retcol>
+<retcol name="uc_rule_subgrp_id" type="COMTYP_CHAR">Subgroup</retcol>
+<retcol name="seqnum" type="COMTYP_CHAR"></retcol>
+<retcol name="srtseq" type="COMTYP_CHAR"></retcol>
+<retcol name="ena_flg" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_cust_flg" type="COMTYP_CHAR"></retcol>
+
+<retcol name="uc_rule_expr_valid" type="COMTYP_CHAR">When table is usr_rule_engine_expr</retcol>
+<retcol name="uc_rule_expr_validation_error_code" type="COMTYP_CHAR">When table is usr_rule_engine_expr</retcol>
+<retcol name="uc_rule_expr_validation_error_msg" type="COMTYP_CHAR">When table is usr_rule_engine_expr</retcol>
+<retcol name="uc_rule_value" type="COMTYP_CHAR">When table is usr_rule_engine_expr</retcol>
+<retcol name="uc_rule_value_valid" type="COMTYP_CHAR">When table is usr_rule_engine_expr</retcol>
+<retcol name="uc_rule_value_validation_error_code" type="COMTYP_CHAR">When table is usr_rule_engine_expr</retcol>
+<retcol name="uc_rule_value_validation_error_msg" type="COMTYP_CHAR">When table is usr_rule_engine_expr</retcol>
+
+
+<retcol name="uc_rule_id" type="COMTYP_CHAR">When table is usr_rule_engine_cond_expr</retcol>
+<retcol name="uc_condition_expr" type="COMTYP_CHAR">When table is usr_rule_engine_cond_expr</retcol>
+<retcol name="uc_condition_expr_valid" type="COMTYP_CHAR">When table is usr_rule_engine_cond_expr</retcol>
+<retcol name="uc_condition_expr_validation_error_code" type="COMTYP_CHAR">When table is usr_rule_engine_cond_expr</retcol>
+<retcol name="uc_condition_expr_validation_error_msg" type="COMTYP_CHAR">When table is usr_rule_engine_cond_expr</retcol>
+<retcol name="uc_execute_cmd" type="COMTYP_CHAR">When table is usr_rule_engine_cond_expr</retcol>
+<retcol name="uc_execute_cmd_valid" type="COMTYP_CHAR">When table is usr_rule_engine_cond_expr</retcol>
+<retcol name="uc_execute_cmd_validation_error_code" type="COMTYP_CHAR">When table is usr_rule_engine_cond_expr</retcol>
+<retcol name="uc_execute_cmd_validation_error_msg" type="COMTYP_CHAR">When table is usr_rule_engine_cond_expr</retcol>
+
+
+
+<exception value="eOK">The command completed successfully.</exception>
+
+</documentation>
+
+
+</command>

@@ -1,0 +1,26 @@
+#use $DCSDIR/include
+#include <dcsddl.h>
+#include <dcscolwid.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+
+#use $SALDIR/include
+#include <salcolwid.h>
+
+mset command on
+[
+ALTER_TABLE_TABLE_INFO(bldg_mst)
+ALTER_TABLE_ADD_COLUMN_START(uc_unfinished_goods)
+     FLAG_TY
+ALTER_TABLE_ADD_COLUMN_END
+] catch (-2705,-1430 )
+RUN_DDL
+
+create db column comment 
+where table_name   = 'bldg_mst' 
+and column_name    = 'uc_unfinished_goods'
+and column_comment = 'if enabled, do not log UC_ORDER_COMMIT for the whole order'
+RUN_DDL
+
+mset command off
+

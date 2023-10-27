@@ -1,0 +1,7 @@
+<component-level>
+<name>ossiquery</name>
+<description>OSSI (Smart IS) Some basic commands for SQLs with rule engines</description>
+<sort-sequence>8090</sort-sequence>
+<library>OSSIint</library>
+<editable>true</editable>
+</component-level>

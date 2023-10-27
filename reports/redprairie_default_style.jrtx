@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE jasperTemplate PUBLIC "-//JasperReports//DTD Template//EN" "http://jasperreports.sourceforge.net/dtds/jaspertemplate.dtd">
+
+<jasperTemplate>
+	<style name="rpTitle" forecolor="#000000" hAlign="Center" vAlign="Middle" fontName="DejaVu Sans" fontSize="14" isBold="true"/>
+	<style name="rpGroupHead" hAlign="Right" vAlign="Middle" fontName="DejaVu Sans" fontSize="12" isBold="true"/>
+	<style name="rpGroupText" vAlign="Middle" fontName="DejaVu Sans" fontSize="12"/>
+	<style name="rpHeader" mode="Transparent" vAlign="Middle" fontName="DejaVu Sans" fontSize="11" isBold="true" isItalic="false" isUnderline="false" isStrikeThrough="false"/>
+	<style name="rpDetailText" vAlign="Middle" fontName="DejaVu Sans" fontSize="11"/>
+	<style name="rpDetailNumber" hAlign="Right" vAlign="Middle" fontName="DejaVu Sans" fontSize="11"/>
+	<style name="rpDetailStripe" forecolor="#F9F9F9" backcolor="#F9F9F9" hAlign="Right" vAlign="Middle" fontName="DejaVu Sans" fontSize="11"/>
+	<style name="NOSTYLE" fontName="DejaVu Sans"/>
+	<style name="rpDetail" vAlign="Middle" fontName="DejaVu Sans" fontSize="11"/>
+	<style name="rpHeaderRectangle" forecolor="#E8E8E8" backcolor="#E8E8E8" vAlign="Middle" fontName="DejaVu Sans" fontSize="11" isBold="true" isUnderline="false">
+		<box>
+			<pen lineWidth="0.0" lineStyle="Solid"/>
+			<topPen lineWidth="1.0" lineStyle="Solid" lineColor="#D8D8D8"/>
+			<leftPen lineWidth="1.0" lineStyle="Solid" lineColor="#D8D8D8"/>
+			<bottomPen lineWidth="0.0" lineStyle="Solid"/>
+			<rightPen lineWidth="1.0" lineStyle="Solid" lineColor="#D8D8D8"/>
+		</box>
+	</style>
+	<style name="rpDetailRectangle" forecolor="#E8E8E8" backcolor="#E8E8E8" vAlign="Middle" fontName="DejaVu Sans" fontSize="11" isBold="true" isUnderline="false">
+		<box>
+			<pen lineWidth="0.0" lineStyle="Solid"/>
+			<topPen lineWidth="1.0" lineStyle="Solid" lineColor="#D8D8D8"/>
+			<leftPen lineWidth="1.0" lineStyle="Solid" lineColor="#D8D8D8"/>
+			<bottomPen lineWidth="0.0" lineStyle="Solid"/>
+			<rightPen lineWidth="1.0" lineStyle="Solid" lineColor="#D8D8D8"/>
+		</box>
+	</style>
+	<style name="rpFooter" fontName="DejaVu Sans" fontSize="11"/>
+	<style name="rpSummary" backcolor="#F0F0F0" fontName="DejaVu Sans" fontSize="11" isBold="true"/>
+	<style name="rpBorder" forecolor="#D8D8D8"/>
+	<style name="rpFooterLine" forecolor="#000000">
+		<pen lineWidth="1.0"/>
+	</style>
+</jasperTemplate>

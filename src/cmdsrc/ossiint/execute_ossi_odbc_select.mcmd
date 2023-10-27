@@ -1,0 +1,74 @@
+<command>
+<name>execute ossi odbc select</name>
+<description>Execute a SQL Select against odbc database</description>
+
+<argument name="uc_select_stmt" required="yes" datatype="string"></argument>
+<argument name="uc_odbc_user_id" required="yes" datatype="string"></argument>
+<argument name="uc_odbc_password" required="yes" datatype="string"></argument>
+<argument name="uc_odbc_url" required="yes" datatype="string"></argument>
+
+<type>Local Syntax</type>
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+
+ossi expand vars in string
+where sl_string = @uc_select_stmt
+|
+{
+   [[
+   import java.sql.Connection;
+   import java.sql.DriverManager;
+   import java.sql.ResultSet;
+   import java.sql.Statement;
+   //
+   String userName = uc_odbc_user_id;
+   String password = uc_odbc_password;
+   String url = uc_odbc_url;
+   Connection con;
+   Statement ss;
+   ResultSet rs;
+   EditableResults ret_r;
+   //
+   try
+   {
+      con = DriverManager.getConnection(url, userName, password);
+      ss = con.createStatement();
+      rs = ss.executeQuery(sl_expanded);
+      ret_r = (EditableResults) (new SimpleResults());
+      int xx = com.redprairie.moca.util.MocaUtils.copySqlResults ( 
+                  (EditableResults) ret_r, 
+                  (ResultSet) rs );
+   }
+   finally
+   {
+      try {con.close()} catch(Exception ee) {;}
+   }
+   [res:ret_r]
+   ]]
+   |
+   publish data combination 
+   where res = @res
+}
+
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+Execute any SQL on any ODBC destination
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

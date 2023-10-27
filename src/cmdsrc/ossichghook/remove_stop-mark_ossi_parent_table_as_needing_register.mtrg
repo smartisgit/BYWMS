@@ -1,0 +1,26 @@
+<trigger>
+<name>mark ossi parent table as needing register</name>
+<on-command>remove stop</on-command>
+<fire-sequence>100000</fire-sequence>
+
+<local-syntax>
+<![CDATA[
+
+if ( @uc_old_stop_car_move_id is not null )
+{
+    mark ossi parent table as needing register
+    where table_name = 'CAR_MOVE'
+    and uc_reg_reacod = 'DD'
+    and uc_parent_update_clause = "car_move_id = " || qq(@uc_old_stop_car_move_id)
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<seealso cref="mark ossi parent table as needing register"></seealso>
+
+</documentation>
+
+</trigger>

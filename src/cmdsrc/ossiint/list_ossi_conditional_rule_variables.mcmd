@@ -1,0 +1,75 @@
+<command>
+<name>list ossi conditional rule variables</name>
+<description>List variables to be used for usr_rule_engine_cond_expr </description>
+
+<argument name="uc_rule_grp_id" required="yes" datatype="string"></argument>
+<argument name="uc_rule_subgrp_id" required="yes" datatype="string"></argument>
+<argument name="uc_rule_id" required="yes" datatype="string"></argument>
+<argument name="rtnum1" required="no" datatype="integer"></argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+parse ossi policy logic
+|
+publish data
+  where uc_rule_grp_id = nvl(@uc_rule_grp_id, @polcod)
+    and uc_rule_subgrp_id = nvl(@uc_rule_subgrp_id, @polvar)
+    and uc_rule_id = nvl(@uc_rule_id, @polval)
+|
+if (@seqnum is null)
+   hide stack variable
+     where name = 'seqnum'
+|
+if (@uc_rule_subgrp_id is null)
+   hide stack variable
+     where name = 'uc_rule_subgrp_id'
+|
+if (@uc_rule_id is null)
+   hide stack variable
+     where name = 'uc_rule_id'
+|
+{
+   {
+      [select uc_condition_expr
+         from usr_rule_engine_cond_expr
+        where @+uc_rule_grp_id
+          and @+uc_rule_subgrp_id
+          and @+uc_rule_id
+          and @+seqnum
+          and ena_flg = 1
+        union
+       select uc_execute_cmd
+         from usr_rule_engine_cond_expr
+        where @+uc_rule_grp_id
+          and @+uc_rule_subgrp_id
+          and @+uc_rule_id
+          and @+seqnum
+          and ena_flg = 1
+      ]
+      catch (-1403,510)
+   }
+   >> res
+   |
+   list ossi variables used
+     where colnam = 'uc_condition_expr'
+}
+]]>
+</local-syntax>
+
+
+<documentation>
+<remarks>
+This command is used to get conditional variables to be used for usr_rule_engine_cond_expr
+</remarks>
+
+<retcol name="var_nam" type="String">Variable Name</retcol>
+<retcol name="uc_var_nam" type="String">UC Variable Name</retcol>
+<retcol name="Value" type="String">Variable Value</retcol>
+
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

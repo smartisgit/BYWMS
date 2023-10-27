@@ -1,0 +1,75 @@
+<command>
+<name>ossi val_in_poldat</name>
+<description>Check that a value exists in poldat</description>
+<type>Local Syntax</type>
+
+
+<argument datatype="string" name="moca_farg1">Value to check</argument>
+<argument datatype="string" name="moca_farg2">Filter: Policy Code</argument>
+<argument datatype="string" name="moca_farg3">Filter: Policy Variable</argument>
+<argument datatype="string" name="moca_farg4">Filter: Policy Value</argument>
+<argument datatype="string" name="moca_farg5">Column Check: rtstr1</argument>
+<argument datatype="string" name="moca_farg6">Optional.  Warehouse id.  Default @wh_id or @@wh_id</argument>
+<argument datatype="string" name="moca_farg7">Optional.  rtnum1 filter</argument>
+
+
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+
+publish data
+where uc_val = @moca_farg1
+and   polcod = @moca_farg2
+and   polvar = @moca_farg3
+and   polval = @moca_farg4
+and   retcol = nvl(@moca_farg5,'rtstr1')
+and   wh_id  = nvl(nvl ( @moca_farg6, nvl(@wh_id, @@wh_id) ), '----')
+and   rtnum1 = @moca_farg7
+|
+{
+   if ( @uc_val is null )
+      publish data
+      where uc_found = '0'
+   else
+   {
+      list ossi policy data and cache
+      catch (-1403,510)
+      >> res_pol
+      |
+      {
+         [[
+         uc_found = "0";
+         while ( res_pol.next() )
+         {
+            uc_fetch_val = res_pol.getString ( retcol );
+            //
+            if ( uc_val.toLowerCase() == uc_fetch_val.toLowerCase() )
+            {
+               uc_found = "1";
+               break;
+            }
+         }
+         [uc_found:uc_found]
+         ]]
+      }
+   }
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+MOCA Function to find a value in a list
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

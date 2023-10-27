@@ -1,0 +1,92 @@
+<command>
+<name>compare ossi result set rows</name>
+<description>Compare two resultsets that have a single row to see if all contents are same</description>
+<type>Local Syntax</type>
+
+<argument name="rs1" required="yes" datatype="resultset"></argument>
+<argument name="rs2" required="yes" datatype="resultset"></argument>
+<argument name="uc_ignore_audit_columns" required="yes" datatype="integer">Default 1</argument>
+
+<local-syntax>
+<![CDATA[
+publish data
+where uc_ignore_audit_columns = nvl(@uc_ignore_audit_columns, 1 )
+|
+[[
+Integer data_same = 1;
+rs1_column_count = rs1.getColumnCount();
+rs2_column_count = rs2.getColumnCount();
+rs1_row_count = rs1.getRowCount();
+rs2_row_count = rs2.getRowCount();
+diff_at_column = "";
+//
+if ( rs1_column_count == rs2_column_count &&
+     rs1_row_count == rs2_row_count &&
+     rs1_row_count == 1 )
+{
+    rs1.next();
+    rs2.next();
+    //
+    for ( ii = 0; ii < rs1_column_count; ii++ )
+    {
+        if ( rs1.getColumnType(ii) == rs2.getColumnType(ii) && 
+             rs1.getColumnName(ii) == rs2.getColumnName(ii) )
+        {
+            if ( rs1.getColumnName(ii).toLowerCase() == "ins_dt" ||
+                 rs1.getColumnName(ii).toLowerCase() == "ins_user_id" ||
+                 rs1.getColumnName(ii).toLowerCase() == "last_upd_dt" ||
+                 rs1.getColumnName(ii).toLowerCase() == "last_upd_user_id" ||
+                 rs1.getColumnName(ii).toLowerCase() == "u_version" ||
+                 rs1.getColumnName(ii).toLowerCase() == "moddte" ||
+                 rs1.getColumnName(ii).toLowerCase() == "mod_usr_id" )
+                is_audit_column = true;
+            else
+                is_audit_column = false;
+            //
+            if ( !is_audit_column || uc_ignore_audit_columns == 0 )
+            {
+                if ( rs1.getValue(ii).toString() != rs2.getValue(ii).toString() )
+                {
+                    diff_at_column = rs1.getColumnName(ii).toLowerCase();
+                    data_same = 0;
+                    break;
+                }
+            }
+        }
+    }
+}
+[
+data_same:data_same,
+rs1_column_count:rs1_column_count,
+rs2_column_count:rs2_column_count,
+rs1_row_count:rs1_row_count,
+rs2_row_count:rs2_row_count,
+diff_at_column:diff_at_column
+]
+]]
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+This component will compare a row from two resultsets.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+<retrows>1</retrows>
+
+<retcol name="data_same" type="COMTYP_INT">1 if all values are same</retcol>
+<retcol name="rs1_column_count" type="COMTYP_INT"># columns in first result set</retcol>
+<retcol name="rs2_column_count" type="COMTYP_INT"># columns in second result set</retcol>
+<retcol name="rs1_row_count" type="COMTYP_INT"># rows in first result set</retcol>
+<retcol name="rs2_row_count" type="COMTYP_INT"># rows in second result set</retcol>
+<retcol name="diff_at_column" type="COMTYP_STRING">Found differnce at this column</retcol>
+
+
+
+</documentation>
+
+
+</command>

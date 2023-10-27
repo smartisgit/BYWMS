@@ -1,0 +1,149 @@
+<trigger>
+<name>execute ossi conditional commands</name>
+<on-command>move inventory</on-command>
+<fire-sequence>9700</fire-sequence>
+
+<argument name="uc_inhibit_move_inventory_rules" required="yes" datatype="integer">For testing perofrmance or any other exceptions</argument>
+<argument name="uc_res_move_inv_attr" required="yes" datatype="results">Published from move inventory</argument>
+
+
+<local-syntax>
+<![CDATA[
+
+/*
+ * Revision Log
+ * 2021-11-30 saad.ahmad 12608 - Initial
+ */
+
+if ( @uc_inhibit_change_hook != '1' and @uc_inhibit_move_inventory_rules != 1 and
+     @wh_id is not null and
+     @uc_res_move_inv_attr is not null
+   )
+{
+    if ( ossi__polval('USR-OSSI-DATA-CHANGE-HOOK', 'CMD_MOVE_INVENTORY_POST', 'ENABLED', '', 'rtnum1', nvl(@wh_id,@@WH_ID) ) != 0 )
+    {
+        publish data
+        where uc_continue_if_action_error = 0
+        |
+        {
+            publish data combination
+            where res = @uc_res_move_inv_attr
+            |
+            publish data
+            where uc_src_remqty = ossi__location_qty ( @srcloc, @wh_id )
+            and uc_use_lodnum = nvl(@dstlod, nvl(@srclod, @lodnum))
+            and uc_use_subnum = nvl(@dstsub, nvl(@srcsub, @subnum))
+            and uc_use_dtlnum = nvl(@srcdtl, @dtlnum)
+            and uc_full_load_picked_flg = iif((@uc_use_lodnum is not null and @uc_use_subnum is null and @uc_use_dtlnum is null and @uc_src_remqty = 0), 1, 0)      
+            |
+            if ( @uc_use_subnum is null ) hide stack variable where name = 'uc_use_subnum'
+            |
+            if ( @uc_use_dtlnum is null ) hide stack variable where name = 'uc_use_dtlnum'
+            | 
+            {
+                /*
+                 * A client id is important.  Yes it is possible that one load could potentially have multiple client ids but that is rare
+                 * So lets publish one so that we can utlize it for rules
+                 * The summary stats of the load may come in handy for the rules.
+                 */
+                [
+                select min(invdtl.prt_client_id)      prt_client_id,
+                       min(invdtl.prtnum)             prtnum,
+                       min(invdtl.lotnum)             lotnum,
+                       min(prtmst.prtfam)             prtfam,
+                       count(distinct invdtl.prtnum)  uc_cnt_prtnum,
+                       count(distinct invdtl.prtnum || '|' || invdtl.lotnum) uc_cnt_lotnum,
+                       count(distinct prtmst.prtfam)  uc_cnt_prtfam
+                from invlod
+                     join invsub on invsub.lodnum = invlod.lodnum
+                     join invdtl on invdtl.subnum = invsub.subnum
+                     join prtmst_view prtmst
+                         on prtmst.prt_client_id = invdtl.prt_client_id
+                         and prtmst.prtnum = invdtl.prtnum
+                         and prtmst.wh_id = invlod.wh_id
+                where invlod.lodnum = @uc_use_lodnum
+                and @+invsub.subnum^uc_use_subnum
+                and @+invdtl.dtlnum^uc_use_dtlnum
+                ]
+                |
+                execute ossi all conditional rules
+                where uc_rule_grp_id = 'OSSI-MOVE-INVENTORY'
+                and uc_rule_subgrp_id = 'GLOBAL-MAP'
+                and uc_cache_key = null
+                catch (-1403,510)
+                ;
+                if ( ossi__polval('USR-OSSI-DATA-CHANGE-HOOK', 'CMD_MOVE_INVENTORY_POST', 'ENABLED', '', 'rtnum2', nvl(@wh_id,@@WH_ID) ) != 0 )
+                {
+                    /*
+                     * Since we will be querying all invdtls and that can be expensive for large locations
+                     * and at this time we dont have any use cases for it - first look ahead to see if we have any rules
+                     * Only if we do we do it
+                     */
+                    execute ossi all conditional rules
+                    where uc_rule_grp_id = 'OSSI-MOVE-INVENTORY-DTL'
+                    and uc_rule_subgrp_id = 'GLOBAL-MAP'
+                    and uc_mode_get_action_cmds = 1
+                    and uc_cache_key = null
+                    catch (-1403,510)
+                    |
+                    if ( @? = 0 and @uc_res_action_cmds is not null and rowcount(@uc_res_action_cmds) > 0 )
+                    {
+                        /*
+                         * Also execute the rule that will process all details
+                         */
+                        publish data
+                        where dstlod = nvl(@dstlod, @lodnum)
+                        |
+                        [
+                        select prtmst.prtfam,
+                               invdtl.*
+                        from invlod
+                             join invsub on invsub.lodnum = invlod.lodnum
+                             join invdtl on invdtl.subnum = invsub.subnum
+                             join prtmst_view prtmst on prtmst.prt_client_id = invdtl.prt_client_id and prtmst.prtnum = invdtl.prtnum and prtmst.wh_id = invlod.wh_id
+                        where 1=1
+                        and invlod.lodnum = @dstlod
+                        order by invdtl.dtlnum
+                        ]
+                        catch (-1403,510)
+                        |
+                        if ( @? = 0 )
+                        {
+                            execute ossi all conditional rules
+                            where uc_rule_grp_id = 'OSSI-MOVE-INVENTORY-DTL'
+                            and uc_rule_subgrp_id = 'GLOBAL-MAP'
+                            and uc_mode_get_action_cmds = 0
+                            and uc_cache_key = null
+                            catch (-1403,510)
+                        }
+                    } /* we have any detail actions */
+                } /* detaol is enabled */
+            } /* hidden variables for queries */
+        } /* in scope set uc_continue_if_action_error = 0 */
+    } /* check policy for enabled */
+} /* input says we should continue */
+    
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+When create inventory has completed, then we can call conditional rules per row returned.
+- les_cmd uc_ctxt_post_action_cmd_create_inventory can be extended to enrich the context
+- Rules from OSSI-CREATE-INVENTORY are executed
+</remarks>
+
+<seealso cref="execute ossi all conditional rules"></seealso>
+<seealso cref="execute ossi les_cmd"></seealso>
+
+<policy
+    polcod="USR-OSSI-DATA-CHANGE-HOOK"
+    polvar="CMD_MOVE_INVENTORY_POST"
+    polval="ENABLED"
+    rtnum1="0 disables create inventory triggers.  Set to 2 for enabled"
+    rtnum2="0 disables the DTL rules from here.  1 will enable"
+></policy>
+
+</documentation>
+
+</trigger>

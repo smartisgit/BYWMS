@@ -1,0 +1,76 @@
+<command>
+<name>clear ossi cache for table update</name>
+<description>Given a table name, see the associated caches and clear them automatically</description>
+<type>Local Syntax</type>
+
+<argument name="table_name" required="yes" datatype="string"></argument>
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 11919 - Bring the core Oracular components
+ */
+publish data
+where table_name = upper(@table_name)
+|
+{
+    /*
+     * This policy lookup has to be without cached lookup since we are looking up what to clear
+     */
+    [
+    select rtstr1 uc_cache_grp
+    from poldat_view
+    where polcod = 'USR-OSSI'
+    and polvar = 'CACHE-CONTROL'
+    and polval = @table_name || '-AUTO-CLEAR'
+    and rtnum1 = 1
+    and wh_id = '----'
+    order by srtseq
+    ]
+    catch (-1403,510)
+    |
+    if ( @? = 0 )
+    {
+        clear ossi moca cache
+        where uc_cache_grp = @uc_cache_grp
+        catch(@?) /* cactching error since this is a very low level API and dont want CRUDs to fail over these */
+        |
+        publish data
+        where table_name = @table_name
+        and uc_cache_grp = @uc_cache_grp
+        and uc_clear_cache_sts = @?
+        and uc_clear_cache_msg = @!
+    }
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+Given a table, see what caches we need to clear
+</remarks>
+
+<retrows>n</retrows>
+<retcol name="table_name" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_cache_grp" type="COMTYP_CHAR">The cache that is cleared</retcol>
+<retcol name="uc_clear_cache_sts" type="COMTYP_CHAR">Status for clearing cache</retcol>
+<retcol name="uc_clear_cache_msg" type="COMTYP_CHAR">Message for clearing cache</retcol>
+
+
+<policy
+    polcod="USR-OSSI"
+    polvar="CACHE-CONTROL"
+    polval="tablename-AUTO-CLEAR"
+    rtnum1="1 to enable a record"
+    rtstr1="name of cache"
+></policy>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

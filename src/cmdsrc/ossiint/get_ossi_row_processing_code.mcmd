@@ -1,0 +1,197 @@
+<command>
+<name>get ossi row processing code</name>
+<description>Given a row on stack, analyze rules to assign a code to it</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="polcod">This is the main policy where polval is the code to return</argument>
+<argument datatype="string" name="polvar">This is the main policy where polval is the code to return</argument>
+<argument datatype="string" name="uc_polval_ok_to_process">This contains the rule that tells if it is ok to process row</argument>
+<argument datatype="string" name="uc_polval_eval_result_list">
+    Under this polval, rtstr1 is the other polvals within the polcod/polvar that define the various rules.
+    Then rtnum1 is to sort that polval, rtstr2 is to dertmine the uc_sort_order when that polval is determined.  rtnum2 is 1 to mean that this applies when generally
+    this row is ok to process.
+</argument>
+
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+publish data
+where wh_id = nvl(@wh_id, @@WH_ID)
+|
+{
+    publish data
+    where uc_ok_to_process_cond = ossi__polval_cat ( @polcod, @polvar, @uc_polval_ok_to_process, '', 'rtstr1', 'rtnum1=1', ' ', @wh_id )
+    |
+    {
+        if ( @uc_ok_to_process_cond is not null )
+        {
+            execute server command 
+            where cmd = "publish data where uc_ok_to_process = iif ( " || @uc_ok_to_process_cond || ",1,0)"
+            and inline = 1
+        }
+        |
+        /* Now get all other rules */
+        execute ossi moca and cache
+        where uc_cache_grp = 'OSSI_ROW_RULES'
+        and uc_cache_key = @polcod || '__' || @polvar
+        and uc_inline = 1
+        and uc_moca_cmd = 
+            "[select distinct poldat.polval, poldat_rule.rtnum1 uc_main_sort_order, poldat_rule.rtnum2 uc_ok_rule, poldat_rule.rtstr2 uc_sort_order_value "
+         || " from poldat "
+         || "      left outer join poldat poldat_rule" 
+         || "          on poldat_rule.polcod = poldat.polcod"
+         || "          and poldat_rule.polvar = poldat.polvar"
+         || "          and poldat_rule.wh_id_tmpl = poldat.wh_id_tmpl"
+         || "          and poldat_rule.polval = @uc_polval_eval_result_list"
+         || "          and poldat_rule.rtstr1 = poldat.polval"
+         || " where poldat.polcod = @polcod "
+         || " and poldat.polvar = @polvar "
+         || " and poldat.polval not in ( @uc_polval_ok_to_process, @uc_polval_eval_result_list) "
+         || " and poldat.rtnum1 = 1"
+         || " and poldat.wh_id_tmpl = '----'"
+         || " order by 3 desc, 2] "
+         || " catch (-1403,510)"
+         || " |"
+         || " if ( @? = 0 )"
+         || " {"
+         || "     publish data"
+         || "     where uc_prc_typ_cd_value = @polval"
+         || "     and uc_prc_typ_cd_rule = ossi__polval_cat ( @polcod, @polvar, @polval, '', 'rtstr1', 'rtnum1=1', ' ', @wh_id )"
+         || "     and uc_main_sort_order = @uc_main_sort_order"
+         || "     and uc_ok_rule = @uc_ok_rule"
+         || "     and uc_sort_order_value = @uc_sort_order_value"
+         || " }"
+        >> res_rule
+        |
+        {
+            [[
+            String ret_uc_prc_typ_cd_value;
+            String ret_uc_prc_typ_cd_rule;
+            String ret_uc_sort_order_value;
+            //
+            while ( res_rule.next() )
+            {
+                uc_prc_typ_cd_value = res_rule.getString ( "uc_prc_typ_cd_value" );
+                uc_prc_typ_cd_rule  = res_rule.getString ( "uc_prc_typ_cd_rule" );
+                uc_ok_rule          = res_rule.getInt    ( "uc_ok_rule" );
+                uc_sort_order_value = res_rule.getString ( "uc_sort_order_value" );
+                //
+                // If this is an ok rule then only evaluate if this row was ok to process otherwise skip it
+                //
+                if ( (uc_ok_rule == 1 && uc_ok_to_process == 1) ||
+                     (uc_ok_rule == 0 && uc_ok_to_process == 0)
+                   )
+                {
+                    myres = moca.executeInline ( "publish data where eval_res = iif ( " + uc_prc_typ_cd_rule + ",1,0)" );
+                    if ( myres.next() )
+                    {
+                        if ( myres.getInt ( "eval_res" ) == 1 )
+                        {
+                            ret_uc_prc_typ_cd_value = uc_prc_typ_cd_value;
+                            ret_uc_prc_typ_cd_rule = uc_prc_typ_cd_rule;
+                            ret_uc_sort_order_value = uc_sort_order_value;
+                            break;
+                        }
+                    }
+                }
+            }
+            [ret_uc_prc_typ_cd_value:ret_uc_prc_typ_cd_value,
+             ret_uc_prc_typ_cd_rule:ret_uc_prc_typ_cd_rule,
+             ret_uc_sort_order_value:ret_uc_sort_order_value]
+            ]]
+            |
+            publish data
+            where uc_sort_order = @ret_uc_sort_order_value
+            and uc_table_prc_cd = @ret_uc_prc_typ_cd_value
+            and uc_ok_to_process = @uc_ok_to_process
+            and uc_table_prc_cd_rule = @ret_uc_prc_typ_cd_rule
+            /**/
+            and uc_display_rule_polcod = @polcod
+            and uc_display_rule_polvar = @polvar
+            and uc_display_rule_eval_list_polval = @uc_polval_eval_result_list
+            and uc_display_rule_ok_to_process_polval = @uc_polval_ok_to_process
+        }
+   
+    } /* have ok to process rule */
+} /* main scope */
+
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+This is to provide a user controllable framework where we have a resultset (grid) and each grid row needs to be assigned a certain processing code. This may be used for two functionalities
+<ul>
+    <li>Generally determining if the data on the row is to be processed</li>
+    <li>Somehow mark the row, e.g. return a code so that it can be used for color coding</li>
+    <li>Return a code for each row which could then be used for sorting</li>
+</ul>
+
+This command should be called for each row of the recordset.  it will return the listed output columns.  The final resultset is then expected to carry following columns
+<ul>
+    <li>uc_sort_order .. This will be used eventually to sort the whole resultset via sort result set command</li>
+    <li>uc_table_prc_cd .. The recordset can return it so that it gets added to grid and from there it could be used as display rule to color code</li>
+    <li>uc_ok_to_process .. generally used to somehow indicate that data from this row can be processed or not.  Most likely the client tool will somehow need to respect this</li>
+</ul>
+
+Some of the uc_table_prc_cd values may be defined to act only when the row is ok to be processed (uc_ok_to_process=1)
+</remarks>
+
+<retrows>1</retrows>
+
+<retcol name="uc_sort_order " type="COMTYP_CHAR">per rule a value determined to sort the final result set</retcol>
+<retcol name="uc_table_prc_cd " type="COMTYP_CHAR">per rule how to process this row</retcol>
+<retcol name="uc_ok_to_process " type="COMTYP_CHAR">per rule, should this row be processed in general</retcol>
+<retcol name="uc_table_prc_cd_rule " type="COMTYP_CHAR">text of the rule that the row passed</retcol>
+<retcol name="uc_display_rule_polcod " type="COMTYP_CHAR">polcod of the rule</retcol>
+<retcol name="uc_display_rule_polvar " type="COMTYP_CHAR">polvar of the rule</retcol>
+<retcol name="uc_display_rule_eval_list_polval " type="COMTYP_CHAR">within polcod/polvar what was the polval that had the list of various polvals</retcol>
+<retcol name="uc_display_rule_ok_to_process_polval " type="COMTYP_CHAR">within polcod/polvar what was the polval that described ok to process condition</retcol>
+
+
+<seealso cref="list usr inventory for pack tables"></seealso>
+<seealso cref="sort result set"></seealso>
+
+
+<policy 
+   polcod="ANYTHING that can be passed in" 
+   polvar="ANYTHING that can be passed in" 
+   polval="special value passed in as uc_polval_ok_to_process here" 
+   rtstr1="expression that evaluates to true.  Multiple rows may be added which are concatenated.  In this case sorted by srtseq">
+   rtnum1="1 to enable it"
+</policy>
+
+<policy 
+   polcod="ANYTHING that can be passed in" 
+   polvar="ANYTHING that can be passed in" 
+   polval="special value passed in as uc_polval_eval_result_list here" 
+   rtstr1="OTHER polval values that are eventually determined as the value for a row">
+   rtstr2="For that other polval (mentioned in rtstr1), what is the uc_sort_order that will be assigend to row that meets the criteria">
+   rtnum1="When evaluating the rules specified under this, how to sort it.  Note that we stop when first rule is met">
+   rtnum2="If 1 then we evaluate this rule only if generally row is considered ok to process">
+</policy>
+
+<policy 
+   polcod="ANYTHING that can be passed in" 
+   polvar="ANYTHING that can be passed in" 
+   polval="Value that will be assigned to the row if consition is met" 
+   rtstr1="This is the condition that is evaluated.  Multiple rows may be created (sorted by srtseq and rtnum1=1) to create a long condition.">
+   rtnum1="1 to enable a row"
+</policy>
+
+
+
+<exception value="eOK">The command completed successfully.</exception>
+
+</documentation>
+
+
+</command>

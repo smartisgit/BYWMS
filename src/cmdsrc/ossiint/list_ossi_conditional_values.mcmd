@@ -1,0 +1,71 @@
+<command>
+<name>list ossi conditional values</name>
+<description>Get conditional values</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+publish data
+  where uc_rule_subgrp_id = nvl(@uc_rule_subgrp_id, @poldcod)
+    and uc_rule_subgrp_id = nvl(@uc_rule_subgrp_id, @polvar)
+    and uc_rule_value = nvl(@uc_rule_value, @polval)
+    and ena_flg = nvl(@ena_flg, @rtnum1)
+|
+if (@ena_flg is null)
+   hide stack variable
+     where name = 'ena_flg'
+|
+if (@uc_rule_value is null)
+   hide stack variable
+     where name = 'uc_rule_value'
+|
+parse ossi policy logic
+|
+{
+   [select *
+      from usr_rule_engine_cond_expr
+     where uc_rule_grp_id = @uc_rule_grp_id
+       and uc_rule_subgrp_id = @uc_rule_subgrp_id
+       and @+uc_rule_value
+       and @+ena_flg
+     order by srtseq
+   ]
+}
+]]>
+</local-syntax>
+<argument name="uc_policy_logic" required="yes" datatype="string"></argument>
+<argument name="polcod" required="no" datatype="string"></argument>
+<argument name="polvar" required="no" datatype="string"></argument>
+<argument name="rtnum1" required="no" datatype="integer"></argument>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This command is used to get conditional values
+</p>
+]]>
+</remarks>
+
+<retrows>n</retrows>
+
+<retcol name="uc_rule_grp_id" type="String">Rule Group Id</retcol>
+<retcol name="uc_rule_subgrp_id" type="String">Rule Subgroup ID</retcol>
+<retcol name="uc_rule_id" type="String">Rule ID</retcol>
+<retcol name="seqnum" type="String">Sequence Number</retcol>
+<retcol name="srtseq" type="String">SRT Sequence</retcol>
+<retcol name="ena_flg" type="flag">Enabled</retcol>
+<retcol name="uc_condition_expr" type="String">Conditional Expression</retcol>
+<retcol name="uc_execute_expr" type="String">Execute Command</retcol>
+<retcol name="uc_rule_catg_cd" type="String">Rule Category</retcol>
+<retcol name="uc_rule_comment" type="String">Rule Comment</retcol>
+<retcol name="uc_cust_flg" type="flag">Cust Flag</retcol>
+<retcol name="ins_dt" type="String"></retcol>
+<retcol name="ins_user_id" type="String"></retcol>
+<retcol name="last_upd_dt" type="date">Last Update Date</retcol>
+<retcol name="last_upd_user_id" type="String">Last Update User ID</retcol>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+</documentation>
+</command>

@@ -1,0 +1,9 @@
+LESDIR=..\..\..
+
+TARGET=USRint
+TARGETTYPE=.dll
+
+OFILES=MOCAversion.obj \
+       usrTestUsrCommand.obj
+
+!include $(LESDIR)\makefiles\ntstd.mk

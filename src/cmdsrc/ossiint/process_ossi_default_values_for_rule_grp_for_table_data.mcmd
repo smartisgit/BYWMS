@@ -1,0 +1,88 @@
+<command>
+<name>process ossi default values for rule grp for table data</name>
+<description>Using the underlying command update the tables for the key that is available</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="uc_rule_grp_id"></argument>
+<argument datatype="string" name="uc_table_name">This is the table we are working with</argument>
+<argument datatype="string" name="uc_table_rule_typ">This is the main prefix to indicate operation.  e.g. SET.  From shipment planning we call it with PLN</argument>
+<argument datatype="string" name="uc_get_ctxt_cmd">An override get context command.  If not passed in we go by les_cmd</argument>
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+*/
+publish data
+where uc_table_name = upper(@uc_table_name)
+and uc_table_rule_typ = nvl(@uc_table_rule_typ, 'SET')
+|
+{
+    {
+        get ossi clause for primary key from stack
+        where table_name = @uc_table_name
+        |
+        publish data
+        where uc_main_table_where_clause = @uc_where_clause
+    }
+    |
+    publish ossi default values for rule grp for table data
+    where uc_rule_grp_id = @uc_rule_grp_id
+    and uc_rule_subgrp_id_prefix = @uc_table_rule_typ || '-' || @uc_table_name
+    and uc_return_column_delim = ','
+    |
+    {
+        if ( @uc_set_table_name is not null and @uc_set_table_data_clause is not null )
+        {
+            [
+            update @uc_set_table_name:raw
+            set @uc_set_table_data_clause:raw
+            where @uc_main_table_where_clause:raw
+            ]
+            catch (-1403,510)
+            |
+            publish data
+            where uc_rule_grp_id = @uc_rule_grp_id
+            and uc_table_name = @uc_table_name
+            and uc_table_rule_typ = @uc_table_rule_typ
+            and uc_main_table_where_clause = @uc_main_table_where_clause
+            and uc_set_table_name = @uc_set_table_name
+            and uc_set_table_data_clause = @uc_set_table_data_clause
+            and uc_update_status = @?
+            and uc_update_message = @!
+        }
+    }
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+This command will process the data for defaulting purposes.  So for example if we need to set ord and ord_line data this will get the values and then
+call update on the tables.
+</remarks>
+
+<retrows>n</retrows>
+<retcol name="uc_rule_grp_id" type="COMTYP_CHAR">passed in value</retcol>
+<retcol name="uc_table_name" type="COMTYP_CHAR">passed in value upper case</retcol>
+<retcol name="uc_table_rule_typ" type="COMTYP_CHAR">passed in value. May be defaulted</retcol>
+
+<retcol name="uc_main_table_where_clause" type="COMTYP_CHAR">Clause representing the PK of the main table</retcol>
+<retcol name="uc_set_table_name" type="COMTYP_CHAR">As returned from [publish ossi default values for rule grp for table data]</retcol>
+<retcol name="uc_set_table_data_clause" type="COMTYP_CHAR">Clause that can be used in update statement</retcol>
+<retcol name="uc_update_status" type="COMTYP_CHAR">Status of update</retcol>
+<retcol name="uc_update_message" type="COMTYP_CHAR">Message retuend from update</retcol>
+
+
+<exception value="eOK">Normal successful completion</exception>
+
+
+<seealso cref="publish ossi default values for rule grp for table data"></seealso>
+</documentation>
+
+
+</command>

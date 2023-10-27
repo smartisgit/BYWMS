@@ -1,0 +1,167 @@
+<command>
+<name>put ossi ftp</name>
+<description>put a file via ftp.</description>
+<type>Local Syntax</type>
+<argument name="host" required="yes" datatype="string"></argument>
+<argument name="port" default-value="21" datatype="string"></argument>
+<argument name="user" datatype="string"></argument>
+<argument name="pass" datatype="string"></argument>
+<argument name="destdir" datatype="string"></argument>
+<argument name="destfile" datatype="string"></argument>
+<argument name="srcdir" datatype="string"></argument>
+<argument name="srcfile" datatype="string"></argument>
+<argument name="mode" datatype="string"></argument>
+<argument name="use_sftp" default-value="0" datatype="integer"></argument>
+
+<argument name="use_rename" default-value="0" datatype="integer">If 1 we will put with an extension first and then rename to final.  Default 1</argument>
+<argument name="rename_ext" default-value="0" datatype="string">Extension to use for temp file.  Default .tmp</argument>
+
+
+<local-syntax>
+<![CDATA[
+
+publish data
+where use_sftp = nvl(@use_sftp,'1')
+|
+publish data
+where use_rename = nvl(@use_rename, 0 )
+and rename_ext = nvl(@rename_ext, '.tmp' )
+and port = int(@port)
+and use_sftp = int(@use_sftp)
+|
+publish data
+where tmp_destfile = @destfile || @rename_ext
+|
+{
+    [[
+    import java.io.File;
+    import com.jscape.inet.ftp.Ftp;
+    import com.jscape.inet.sftp.Sftp;
+    import com.jscape.inet.ssh.util.SshParameters;
+    //
+    String error = null;
+    if (use_sftp == 0)
+    {
+        Ftp ftp = new Ftp(host, user, pass, port);
+        try 
+        {
+            ftp.connect();
+            if (mode.equals("B")) 
+            {
+                ftp.setBinary();
+            }
+            else 
+            {
+                ftp.setAscii();
+            }
+            ftp.setLocalDir(new File(srcdir));
+            ftp.setDir(destDir);
+            //
+            if ( use_rename == 1 )
+            {
+                ftp.upload(srcfile, tmp_destfile);
+                ftp.renameFile(tmp_destfile, destfile);
+            }
+            else
+            {
+                ftp.upload(srcfile, destfile);
+            }
+            ftp.disconnect();
+        }
+        catch (Exception e) 
+        {
+            error = e.getMessage();
+        }
+    }
+    else
+    {
+        if (port == 21) 
+        {
+            port = 22;
+        }
+        SshParameters params = new SshParameters(host, port, user, pass)
+        Sftp ftp = new Sftp(params);
+        try 
+        {
+            ftp.connect();
+            if (mode.equals("B"))
+            {
+                ftp.setBinary();
+            }
+            else 
+            {
+                ftp.setAscii();
+            }
+            ftp.setLocalDir(new File(srcdir));
+            ftp.setDir(destDir);
+            //
+            if ( use_rename == 1 )
+            {
+                ftp.upload(srcfile, tmp_destfile);
+                ftp.renameFile(tmp_destfile, destfile);
+            }
+            else
+            {
+                ftp.upload(srcfile, destfile);
+            }
+            ftp.disconnect();
+        } 
+        catch (Exception e) 
+        {
+            error = e.getMessage();
+        }
+    }
+    [error:error]
+    ]]
+    |
+    if (@error != null)
+    {
+        set return status 
+        where status = 97050
+        and action = 'put'
+        and err_msg = @error
+    }
+    else
+        publish data
+        where host = @host
+        and user = @user
+        and destdir = @destdir
+        and destfile = @destfile
+        and srcdir = @srcdir
+        and srcfile = @srcfile
+        and use_sftp = @use_sftp
+        and use_rename = @use_rename
+        and rename_ext = @rename_ext
+        and tmp_destfile = @tmp_destfile
+}
+
+]]>
+</local-syntax>
+<documentation>
+<remarks>
+<![CDATA[
+ This command put a file to another host via ftp or sftp.
+]]>
+</remarks>
+<retrows>1</retrows>
+
+<retcol name="host" type="string"></retcol>
+<retcol name="user" type="string"></retcol>
+<retcol name="destdir" type="string"></retcol>
+<retcol name="destfile" type="string"></retcol>
+<retcol name="srcdir" type="string"></retcol>
+<retcol name="srcfile" type="string"></retcol>
+<retcol name="use_sftp" type="string"></retcol>
+<retcol name="use_rename" type="string"></retcol>
+<retcol name="rename_ext" type="string"></retcol>
+<retcol name="use_rename" type="string"></retcol>
+<retcol name="tmp_destfile" type="string"></retcol>
+
+
+<exception value="eOK">The command completed successfully.</exception>
+<exception value="97050">An FTP communication failure occurred.</exception>
+
+<seealso cref="get ossi ftp"></seealso>
+<seealso cref="remove ossi ftp"></seealso>
+</documentation>
+</command>

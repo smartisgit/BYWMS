@@ -1,0 +1,78 @@
+<command>
+<name>list ossi variables used</name>
+<description>Return the variables used </description>
+
+<argument name="res" required="yes" datatype="resultset"></argument>
+<argument name="colnam" required="no" datatype="string"></argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+publish data 
+  where colnam = nvl(@colnam, 'rtstr1')
+      and uc_rule_grp_id = nvl(@uc_rule_grp_id, @polcod)
+      and uc_rule_subgrp_id = nvl(@uc_rule_subgrp_id, @polvar)
+|
+[[
+  import java.util.regex.*;
+  Pattern ptn = Pattern.compile("@(\\w+)");
+  Set<String> set = new TreeSet<String>();
+  while (res.next())
+  {
+    String value = res.getString(colnam);
+    if (value != null) {
+      Matcher mth = ptn.matcher(value);
+      while (mth.find())
+      {
+        set.add(mth.group(1).toLowerCase());
+      }
+    }
+  }
+  SimpleResults s = new SimpleResults();
+  s.addColumn("var_nam", MocaType.STRING);
+  for (String var : set)
+  {
+    s.addRow();
+    s.setStringValue("var_nam", var);
+  }
+[s:s]
+]]
+|
+{
+   publish data combination
+     where s = @s
+   &
+   [select distinct polval var_nam
+      from poldat
+     where polcod = 'USR-CTXT-' || @uc_rule_grp_id
+       and polvar = @uc_rule_subgrp_id
+       and rtnum1 = 2
+   ]
+   catch (-1403)
+}
+|
+filter data
+  where var_nam = @var_nam
+    and uc_var_nam = ossi__get_field_help ( @var_nam)
+    and value = null
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<remarks>
+This command is used to get variable used.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

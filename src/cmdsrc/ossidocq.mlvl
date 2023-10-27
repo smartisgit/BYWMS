@@ -1,0 +1,8 @@
+<component-level>
+<name>ossidocq</name>
+<description>Smart IS Document Upliad Queue</description>
+<sort-sequence>8004</sort-sequence>
+<editable>true</editable>
+<library>ossiint</library>
+</component-level>
+

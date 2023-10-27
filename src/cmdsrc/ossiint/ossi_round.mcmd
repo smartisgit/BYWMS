@@ -1,0 +1,65 @@
+<command>
+<name>ossi round</name>
+<description>
+Round a value to appropriate decimal
+</description>
+<type>Local Syntax</type>
+
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+publish data
+where val          = @moca_farg1
+and   round_at     = @moca_farg2
+and   uc_sign      = iif ( float(@moca_farg1) < 0, -1, 1 )
+|
+if ( @round_at >= 0 )
+{
+   [[
+   BigInteger pwrval = Math.pow(10, round_at);
+   BigDecimal addval = (BigDecimal)0.5 / (BigDecimal)pwrval;
+   BigInteger temp   = (BigInteger) (( ((BigDecimal) val + addval) * ((BigDecimal) pwrval)) );
+   BigDecimal ret = ((BigDecimal)temp)/pwrval;
+   [pwrval:pwrval, temp:temp, ret:ret,val:val,addval:addval]
+   ]]
+   |
+   publish data
+   where ret = @ret
+}
+else
+   publish data where ret = @val
+|
+filter data
+where ret = @ret * @uc_sign
+
+
+
+
+]]>
+
+</local-syntax>
+
+<documentation>
+
+
+<remarks>
+<![CDATA[
+Round a value
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+<example>
+??
+</example>
+
+<retcol name="ret" type="float">Rounded value</retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+</documentation>
+</command>

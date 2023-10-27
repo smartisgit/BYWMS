@@ -1,0 +1,44 @@
+<command>
+<name>get ossi conditional rule expression command</name>
+<description></description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20200513 Haseeb Ahmed- 11118 - Bring the core Oracular components
+ */
+[[
+   if (uc_condition_expr.startsWith("["))
+   {
+      uc_condition_expr = uc_condition_expr.trim(); // trim whitespace so it ends with a bracket
+      // expr will be "[expr]", so strip off the leading and trailing bracket
+      cmd = "[select 1 result from dual where " + uc_condition_expr.substring(1,uc_condition_expr.length()-1) + "]catch(-1403,510)";
+   }
+   else if ( uc_condition_expr.startsWith("{"))
+   {
+      cmd = uc_condition_expr;
+   }
+   else
+   {
+      cmd = "publish data where result = iif(" + uc_condition_expr + ",1,0)";
+   }
+[cmd:cmd]
+]]
+
+
+]]>
+</local-syntax>
+<argument name="uc_condition_expr" required="yes" datatype="string"></argument>
+<documentation>
+
+<remarks>
+This command is used to get conditional rule expression command.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

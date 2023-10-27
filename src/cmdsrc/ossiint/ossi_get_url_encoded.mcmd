@@ -1,0 +1,24 @@
+<command>
+<name>ossi get_url_encoded</name>
+<description>Encode the URL</description>
+
+<type>C Function</type>
+<function>ossiURLEncode</function>
+<argument name="moca_farg1" required="yes" datatype="string">URL to encode</argument>
+
+<documentation>
+<remarks>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+]]>
+</remarks>
+<retcol name="uc_url_encoded" type="COMTYP_CHAR">Ftpcod to return</retcol>
+<retrows>1</retrows>
+</documentation>
+</command>

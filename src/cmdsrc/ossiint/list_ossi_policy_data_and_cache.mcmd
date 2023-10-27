@@ -1,0 +1,81 @@
+<command>
+<name>list ossi policy data and cache</name>
+<description>get policy data and cache the results</description>
+<type>Local Syntax</type>
+
+
+<argument datatype="string" name="polcod"></argument>
+<argument datatype="string" name="polvar"></argument>
+<argument datatype="string" name="polval"></argument>
+<argument datatype="string" name="wh_id"></argument>
+<argument datatype="string" name="rtstr1"></argument>
+<argument datatype="string" name="rtstr2"></argument>
+<argument datatype="string" name="rtnum1"></argument>
+<argument datatype="string" name="rtnum2"></argument>
+<argument datatype="string" name="rtflt1"></argument>
+<argument datatype="string" name="rtflt2"></argument>
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+publish data
+where wh_id = nvl(nvl(@wh_id, @@WH_ID),'----')
+|
+publish data
+where uc_cache_key =         @polcod
+                  || '__' || @polvar 
+                  || '__' || @polval 
+                  || '__' || @rtstr1 
+                  || '__' || @rtstr2 
+                  || '__' || @rtnum1 
+                  || '__' || @rtnum2 
+                  || '__' || @rtflt1 
+                  || '__' || @rtflt2 
+                  || '__' || @wh_id
+|
+{
+   if ( @polcod is null ) hide stack variable where name = 'polcod'
+   |
+   if ( @polvar is null ) hide stack variable where name = 'polvar'
+   |
+   if ( @polval is null ) hide stack variable where name = 'polval'
+   |
+   if ( @rtstr1 is null ) hide stack variable where name = 'rtstr1'
+   |
+   if ( @rtstr2 is null ) hide stack variable where name = 'rtstr2'
+   |
+   if ( @rtnum1 is null ) hide stack variable where name = 'rtnum1'
+   |
+   if ( @rtnum2 is null ) hide stack variable where name = 'rtnum2'
+   |
+   if ( @rtflt1 is null ) hide stack variable where name = 'rtflt1'
+   |
+   if ( @rtflt2 is null ) hide stack variable where name = 'rtflt2'
+   |
+   execute ossi moca and cache
+   where uc_cache_grp = 'OSSI__POLVAL'
+   and uc_moca_cmd = "[select * from poldat_view where @+polcod and @+polvar and @+polval and @+rtstr1 and @+rtstr2 and @+rtnum1 and @+rtnum2 and @+rtflt1 and @+rtflt2 and @+wh_id order by srtseq]"
+   and uc_inline = 1
+   and uc_force_ossi_cache1 = '1'
+}
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+Get policy data and cache results
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

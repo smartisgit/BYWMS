@@ -1,0 +1,53 @@
+<command>
+<name>replace ossi id mapping</name>
+<description></description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="actcod">Activity Code, Default: 'UC_ID_MAP'</argument>
+<argument datatype="string" name="var_nam">ID name, 'pck_zone_id', 'pck_mthd_id', etc.</argument>
+<argument datatype="string" name="to_value">Local WH</argument>
+<argument datatype="string" name="fr_value">From WH</argument>
+<argument datatype="int" name="inv_attr_int1">Local ID</argument>
+<argument datatype="int" name="inv_attr_int2">From ID</argument>
+
+
+<local-syntax>
+<![CDATA[
+
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - JWC-2804
+*/
+
+
+    [delete dlytrn
+      where wh_id = '----'
+        and actcod = nvl(@actcod, 'UC_ID_MAP')
+        and var_nam = @var_nam
+        and fr_value = @fr_value
+        and to_value = @to_value
+        and inv_attr_int1 = @inv_attr_int1
+    ] catch(-1403)
+    |
+    write daily transaction
+      where wh_id = '----'
+        and oprcod = ''
+        and actcod = nvl(@actcod, 'UC_ID_MAP')
+        and var_nam = @var_nam
+        and fr_value = @fr_value
+        and to_value = @to_value
+        and inv_attr_int1 = @inv_attr_int1
+        and inv_attr_int2 = @inv_attr_int2
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+</documentation>
+
+</command>
+

@@ -1,0 +1,87 @@
+<command>
+<name>list ossi smart rule domain sub groups</name>
+<description>this commands will list rule sub groups for a rule group</description>
+
+<argument name="uc_rule_grp_id" required="yes" datatype="string">The rule group we want to see</argument>
+<argument name="uc_filter_usage_context" required="yes" datatype="string">Optionally pass in filter context.  For example we can pass in label for OUTPUT-SET-LABEL-INV-CONTAINER rule.  It will then only list those that are used in the label</argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+
+publish data
+where uc_rule_grp_id =  @uc_rule_grp_id
+and uc_filter_usage_context_list = ''
+|
+{
+    if ( @uc_filter_usage_context is not null )
+    {
+        list ossi label fields
+        where uc_fetch_typ = 'FLDS'
+        and label_name = @uc_filter_usage_context
+        and uc_inhibit_ossi_cache = '1'
+        >> res_usage_context
+        |
+        if ( @res_usage_context is not null and rowcount(@res_usage_context) > 0 )
+        {
+            convert column results to string 
+            where res = @res_usage_context 
+            and colnam = 'uc_label_field' 
+            and separator = ','
+            |
+            publish data
+            where uc_filter_usage_context_list = ',' || lower(@result_string) || ','
+        }
+    }
+    |
+    [
+    select distinct uc_rule_subgrp_id uc_rule_subgrp_id
+    from usr_rule_engine_expr
+    where uc_rule_grp_id = @uc_rule_grp_id
+    order by 1
+    ]
+    |
+    if ( @uc_filter_usage_context_list is null )
+        filter data
+        where moca_filter_level = 1
+    else
+    {
+        /* for now it is handling just the label stuff */
+        if ( ossi__instr ( @uc_rule_subgrp_id, '-', -1)  > 0 )
+            publish data
+            where uc_lookup_fld = substr(@uc_rule_subgrp_id,  ossi__instr ( @uc_rule_subgrp_id, '-', -1)+1 )
+        else
+            publish data
+            where uc_lookup_fld = @uc_rule_subgrp_id
+        |
+        if ( instr(@uc_filter_usage_context_list, ','||lower(@uc_lookup_fld)||',') > 0 ) 
+            filter data
+            where moca_filter_level = 3
+    }
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+List the uc_rule_subgrp_id values from the usr_rule_engine_expr table for a given uc_rule_grp_id.  This is called by the fornt-end screen to populate the dropdown
+</p>
+]]>
+</remarks>
+
+<retrows>n</retrows>
+<retcol name="uc_rule_subgrp_id" type="string">Name of the subgroup</retcol>
+
+
+<exception value="eOK">The command completed successfully.</exception>
+
+<seealso cref="list ossi conditional rules"></seealso>
+
+</documentation>
+
+
+</command>

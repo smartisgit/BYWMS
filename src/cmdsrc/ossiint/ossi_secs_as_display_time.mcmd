@@ -1,0 +1,49 @@
+<command>
+<name>ossi secs_as_display_time</name>
+<description>Get display time</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="moca_farg1">secs</argument>
+
+
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+publish data
+where secs = float(@moca_farg1)
+|
+{
+   /* format the time so can be displayed as 123:23:34 format */
+   publish data
+   where hours = int(@secs/3600)
+   and hour_secs = int(@secs/3600) * 3600
+   |
+   publish data
+   where mins = int((@secs - (@hours * 3600)) / 60)
+   and min_secs = int((@secs - (@hours * 3600))/60) * 60
+   |
+   publish data
+   where secs = int(@secs - (@hour_secs + @min_secs))
+   |
+   publish data
+   where ret = to_char(@hours,'0009')||':'||to_char(@mins,'09')||':'|| to_char(@secs,'09')
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+MOCA Function to convert seconds to a string like hh:mm:ss
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

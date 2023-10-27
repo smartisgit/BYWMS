@@ -1,0 +1,57 @@
+<command>
+<name>change ossi rule based condition expression</name>
+<description>change data in usr_rule_engine_cond_expr table</description>
+
+<argument name="uc_rule_grp_id" required="yes" datatype="string"></argument>
+<argument name="uc_rule_subgrp_id" required="yes" datatype="string"></argument>
+<argument name="uc_rule_id" required="yes" datatype="string"></argument>
+<argument name="seqnum" required="yes" datatype="string">This user does not see.  Ever ascending value based on max and add 1</argument>
+
+<argument name="srtseq" required="yes" datatype="string">This is what user sees during sorting</argument>
+<argument name="uc_condition_expr" required="yes" datatype="string"></argument>
+<argument name="uc_execute_cmd" required="yes" datatype="string"></argument>
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+capture ossi table data for history logging
+where uc_log_table_name = 'usr_rule_engine_cond_expr'
+|
+change record
+where table = 'usr_rule_engine_cond_expr'
+and uc_cust_flg = decode ( ossi__is_dev_env(), 1, null, 1 )
+|
+filter data 
+where moca_filter_level = 1
+and old_uc_captured_table_data = @uc_captured_table_data
+   
+]]>
+
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+Change data in this table
+</p>
+]]>
+</remarks>
+
+<retrows>0</retrows>
+
+
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+
+<seealso cref="get ossi commands for condition"></seealso>
+
+</documentation>
+
+
+</command>

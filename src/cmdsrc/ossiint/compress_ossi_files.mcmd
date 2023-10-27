@@ -1,0 +1,270 @@
+<command>
+<name>compress ossi files</name>
+<description>Given a list of files passed in as recordset, compress them into a new archive</description>
+
+<argument datatype="string" name="uc_res_files">A recordset of filenames.</argument>
+<argument datatype="string" name="uc_zip_filename">Full file path to the zip</argument>
+<argument datatype="string" name="uc_zip_buffer_size">If not passed in assume 1024</argument>
+<argument datatype="string" name="uc_filename_colnam">This is the column name from within uc_res_files </argument>
+<argument datatype="string" name="uc_zip_file_remove_first">If not passed in assume 1024</argument>
+
+<argument datatype="string" name="l_processed_dir">We will move the files to this folder if passed in</argument>
+<argument datatype="string" name="uc_new_name_expr">if this is passed in, we rename the files to this first</argument>
+
+<argument datatype="string" name="uc_compress_tmp_folder">Move file here first</argument>
+<argument datatype="string" name="uc_log_each_compress">Show in usr_ossi_job_log each compress action</argument>
+<argument datatype="string" name="uc_ossi_job_seq">job Sequence if we are logging it</argument>
+<argument datatype="string" name="uc_ossi_module_seq">module Sequence if we are logging it</argument>
+<argument datatype="string" name="uc_ossi_who"></argument>
+
+<argument datatype="string" name="uc_remove_temp_file_for_compress">Default is 1.  0 is for debugging only</argument>
+
+<type>Local Syntax</type>
+
+<local-syntax>
+<![CDATA[
+
+publish data
+where uc_zip_buffer_size = nvl(@uc_zip_buffer_size, 1024)
+and uc_filename_colnam = nvl(@uc_filename_colnam,'')
+and uc_new_name_expr = nvl(@uc_new_name_expr, '')
+and uc_ossi_job_seq = nvl(@uc_ossi_job_seq, 0 )
+and uc_log_each_compress = nvl(@uc_log_each_compress, '0' )
+and uc_ossi_module_seq = nvl(@uc_ossi_module_seq, 0)
+and uc_ossi_who = nvl(@uc_ossi_who, '' )
+and uc_remove_temp_file_for_compress = nvl(@uc_remove_temp_file_for_compress,'1')
+|
+publish data
+where uc_ossi_job_seq = int(@uc_ossi_job_seq)
+|
+if ( @uc_zip_filename is null or @uc_filename_colnam is null )
+    set return status
+    where status = 507
+    and verb = "compress ossi"
+    and noun = "files"
+    and argname = "uc_zip_filename and uc_filename_colnam"
+else if ( @uc_res_files is null )
+    set return status
+    where status = 507
+    and verb = "compress ossi"
+    and noun = "files"
+    and argname = "uc_res_files"
+else if ( rowcount(@uc_res_files) > 0 )
+{
+    if ( @uc_zip_file_remove_first = 1 )
+    {
+        remove file
+        where filnam = @uc_zip_file_remove_first
+        catch(@?)
+    }
+    ;
+    [[
+    import java.io.File;
+    import java.io.FileInputStream;
+    import java.io.FileOutputStream;
+    import java.io.IOException;
+    import java.util.zip.ZipEntry;
+    import java.util.zip.ZipOutputStream;
+    //
+    SimpleResults res = new SimpleResults();
+    Integer file_cnt = 0;
+    Integer one_file_size = 0;
+    Integer my_action = 0;
+    byte[] buffer = new byte[uc_zip_buffer_size];
+    FileOutputStream fos = new FileOutputStream(uc_zip_filename);
+    ZipOutputStream zos = new ZipOutputStream(fos);
+    //
+    res.addColumn ( "uc_src_pathname",       MocaType.STRING );
+    res.addColumn ( "uc_src_filename",       MocaType.STRING );
+    res.addColumn ( "uc_src_tmp_pathname",   MocaType.STRING );
+    res.addColumn ( "uc_src_new_filename",   MocaType.STRING );
+    res.addColumn ( "uc_src_use_pathname",   MocaType.STRING );
+    res.addColumn ( "uc_src_filesize",       MocaType.INTEGER );
+    res.addColumn ( "uc_src_file_dir",       MocaType.STRING);
+    res.addColumn ( "uc_src_file_ext",       MocaType.STRING );
+    res.addColumn ( "uc_src_file_no_ext",    MocaType.STRING );
+    //
+    while ( uc_res_files.next() )
+    {
+        my_src_pathname = uc_res_files.getString(uc_filename_colnam); 
+        //
+        if ( uc_log_each_compress == '1' &&  uc_ossi_job_seq > 0 )
+        {
+            res_act = moca.executeInline ( " publish data" +
+                                           " where aa = ossi__register_action ( @uc_ossi_job_seq, @uc_ossi_module_seq, 'ZIP1',"+
+                                           " substr(@uc_src_pathname,1,200), @uc_ossi_who ) catch(@?)", 
+                                           [uc_src_pathname:my_src_pathname] );
+            if ( res_act.next() )
+                my_action = res_act.getInt ( "aa" );
+        }
+        //
+        res_split = moca.executeCommand ( "sl_split filename where full_file_name = @full_file_name",
+                                          [full_file_name:my_src_pathname] );
+        if ( res_split.next() )
+        {
+            my_src_filename             = res_split.getString ( "s_orig_filename" );
+            my_src_filename_dir         = res_split.getString ( "s_dir" );
+            my_src_filename_ext         = res_split.getString ( "s_ext" );
+            my_src_filename_without_ext = res_split.getString ( "s_filename" );
+        }
+        my_tmp_pathname = uc_compress_tmp_folder + "/" + my_src_filename;
+        //
+        // First copy the original file as-is to temp location.  We are removing the dest first
+        // just in case it exist already.
+        //
+        moca.executeCommand ( "remove file where filnam = @dest catch(@?); copy file where src = @src and dest = @dest",
+                              [src:my_src_pathname, dest:my_tmp_pathname] );
+        use_src_pathname= my_tmp_pathname;  // default to this file path
+        //
+        // We may be renaming the files e.g. from lbl to dat.  If so do that now
+        // so that zip has it with proper name
+        //
+        my_new_filename = my_src_filename;
+        if ( uc_new_name_expr.length() > 0 )
+        {
+            try
+            {
+                res_nn = moca.executeCommand ( " publish data " +
+                                               " where dest_file     = @dest_file" +
+                                               " and   dest_file_dir = @dest_file_dir" +
+                                               " and   dest_file_ext = @dest_file_ext" +
+                                               " and   dest_file_without_ext = @dest_file_without_ext" +
+                                               " | " +
+                                               " publish data where uc_new_dest = " + uc_new_name_expr,
+                                               [dest_file:my_src_filename,
+                                                dest_file_dir:my_src_filename_dir,
+                                                dest_file_ext:my_src_filename_ext,
+                                                dest_file_without_ext:my_src_filename_without_ext] );
+                res_nn.next();
+                my_new_filename  = res_nn.getString ( "uc_new_dest" );
+                use_src_pathname = uc_compress_tmp_folder + "/" + my_new_filename;
+                //
+                // Now also rename the file to this new name
+                //
+                res_rn = moca.executeCommand ( "move file where from = @from and to = @to",
+                                               [from:my_tmp_pathname, to:use_src_pathname] );
+            } 
+            catch ( Exception ee )
+            {
+                ;
+            }
+        } // else - have rename expression
+        //
+        File srcFile = new File( use_src_pathname );
+        FileInputStream fis = new FileInputStream(srcFile);
+        // begin writing a new ZIP entry, positions the stream to the start of the entry data
+        zos.putNextEntry(new ZipEntry(srcFile.getName()));
+        int length;
+        one_file_size = 0;
+        while ((length = fis.read(buffer)) > 0) 
+        {
+            zos.write(buffer, 0, length);
+            one_file_size += length;
+        }
+        zos.closeEntry();
+        // close the InputStream
+        fis.close();
+        //
+        // We are done with the renmaed tmp file.  Get rid of it
+        //
+        if ( uc_remove_temp_file_for_compress == '1' )
+        {
+            moca.executeCommand ( "remove file where filnam = @filnam catch(@?)",
+                                  [filnam:use_src_pathname] );
+        }
+        //
+        // Add to output res
+        res.addRow();
+        res.setValue ( 0, my_src_pathname );
+        res.setValue ( 1, my_src_filename );
+        res.setValue ( 2, my_tmp_pathname );
+        res.setValue ( 3, my_new_filename );
+        res.setValue ( 4, use_src_pathname );
+        res.setValue ( 5, one_file_size );
+        res.setValue ( 6, my_src_filename_dir );
+        res.setValue ( 7, my_src_filename_ext );
+        res.setValue ( 8, my_src_filename_without_ext );
+        //
+        if ( uc_log_each_compress == '1' &&  uc_ossi_job_seq > 0 && my_action > 0)
+        {
+            moca.executeInline ( "complete ossi job log where uc_ossi_action_seq = @uc_ossi_action_seq catch(@?)",
+                                 [uc_ossi_action_seq:my_action] );
+        }
+        file_cnt++;
+    } // wend
+    // close the ZipOutputStream
+    zos.close();
+    [uc_compress_res:res]
+    ]]
+    |
+    {
+        /*
+         * If l_processed_dir is passed in, then we move the files to that folder
+         */
+        if ( @l_processed_dir is not null )
+        {
+            publish data combination
+            where res = @uc_compress_res
+            |
+            {
+                publish data
+                where to = @l_processed_dir || '/' || @uc_src_filename
+                |
+                {
+                    remove file
+                    where filnam = @to
+                    catch(@?)
+                    ;
+                    move file
+                    where from = @uc_src_pathname
+                    and to = @to
+                    ;
+                    publish data
+                    where uc_src_pathname = @uc_src_pathname
+                    and uc_src_filename = @uc_src_filename
+                    and uc_src_tmp_pathname = @uc_src_tmp_pathname
+                    and uc_src_new_filename = @uc_src_new_filename
+                    and uc_src_use_pathname = @uc_src_use_pathname
+                    and uc_src_filesize = @uc_src_filesize
+                    and uc_moved_pathname = @to
+                    and uc_src_file_dir = @uc_src_file_dir
+                    and uc_src_file_ext = @uc_src_file_ext
+                    and uc_src_file_no_ext = @uc_src_file_no_ext
+                }
+            } /* all files */ 
+        } /* have l_processeed dir passed in */
+        else
+            publish data combination
+            where res = @uc_compress_res
+    } /* scope of all output */
+} /* main */
+
+]]>
+</local-syntax>
+<documentation>
+<remarks>
+List of files are passed in as a recordset where first field in recordset is the 
+</remarks>
+
+<retrows>n.  For each source file</retrows>
+
+<retcol name="uc_src_pathname" type="String">File name that we processed per original recordset</retcol>
+<retcol name="uc_src_filename" type="String">Filename portion from that file path</retcol>
+<retcol name="uc_src_tmp_pathname" type="String">We copy file temporarily to a different location so that we can
+renmae and zip it from there</retcol>
+<retcol name="uc_src_new_filename" type="String">If an expression is passed in to get a new file name, it is that new
+file name.  If no expression passed it is same as uc_src_filename</retcol>
+<retcol name="uc_src_use_pathname" type="String">It is the full source file path.  if a rename expression passed in
+then it is used by concatenating original folder name with new file name.  Otherwise it is same as uc_src_pathname</retcol>
+<retcol name="uc_src_filesize" type="Integer">Size of source file</retcol>
+
+<retcol name="uc_moved_pathname" type="String">this is published only when l_processed_dir is passed in to move 
+the source files some place else.  if it is then this is the moved file name </retcol>
+
+<retcol name="uc_src_file_dir" type="String">Directory portion of source file</retcol>
+<retcol name="uc_src_file_ext" type="String">Extension portion of source file</retcol>
+<retcol name="uc_src_file_no_ext" type="String">File Without extension portion of source file</retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+</documentation>
+</command>

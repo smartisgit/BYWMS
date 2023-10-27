@@ -1,0 +1,28 @@
+<command>
+<name>remove usr issue</name>
+<description>Remove Issues</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ */
+sl_remove gen_maint where table_name = 'usr_ossi_issue_assign'
+
+]]>
+</local-syntax>
+
+<argument name="uc_ossi_issue_assign_seq" required="yes">Issue Assignment Sequence</argument>
+<argument name="uc_ossi_issue_id" required="yes">Issue ID</argument>
+<documentation>
+
+<remarks>
+This command can be used to remove issues.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

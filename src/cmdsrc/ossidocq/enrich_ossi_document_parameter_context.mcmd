@@ -1,0 +1,256 @@
+<command>
+<name>enrich ossi document parameter context</name>
+<description>For the context that is passed in to us, add more to that to enrich it</description>
+<type>Local Syntax</type>
+
+<argument name="uc_list_sess_var" datatype="string">Session variable that contains the names of variables already set</argument>
+<argument name="uc_ctxt_res" datatype="recordset">What we have so far</argument>
+
+<local-syntax>
+<![CDATA[
+
+/*
+ * Policies are being looked up by ---- because that is the only supported use case.
+ * and for performance we are using poldat and not poldat_view
+ */
+
+publish data
+where uc_list_sess_var = nvl(@uc_list_sess_var, 'uc_doc_ctxt_parm_list' )
+|
+publish data
+where uc_ctxt_parm_list = ossi__sess_var ( @uc_list_sess_var, ',', 'Y' )
+|
+if ( @uc_ctxt_parm_list != ',' and @uc_ctxt_parm_list != '' and @uc_ctxt_res is not null and rowcount(@uc_ctxt_res) > 0 )
+{
+    /*
+     * Everything in our context so far becomes a single row
+     */
+    transpose ossi resultset
+    where colnam = 'uc_doc_ctxt_parm_id'
+    and attr_expr = 'uc_doc_ctxt_parm_val'
+    and res = @uc_ctxt_res
+    |
+    {
+        {
+            [
+            select distinct polvar
+            from poldat 
+            where polcod = 'USR-OSSI-DOC-UPLOAD-Q'
+            and polvar like 'CHILD-CONTEXT-GROUP-%'
+            and rtnum1 = 1
+            and wh_id_tmpl = '----'
+            order by 1
+            ]
+            catch (-1403,510)
+            |
+            if ( @? = 0 )
+            {
+                [[
+                boolean found_child_ctxt = false;
+                SimpleResults ret = new SimpleResults();
+                ret.addColumn ( "uc_doc_ctxt_parm_typ", MocaType.STRING);
+                ret.addColumn ( "uc_doc_ctxt_parm_catg", MocaType.STRING);
+                ret.addColumn ( "uc_doc_ctxt_parm_id", MocaType.STRING );
+                ret.addColumn ( "uc_doc_ctxt_parm_val", MocaType.STRING );
+                //
+                // main policy for all the groups
+                //
+                res_pol = moca.executeInline ( "[select distinct polvar" +
+                                               " from poldat" +
+                                               " where polcod = 'USR-OSSI-DOC-UPLOAD-Q'" +
+                                               " and polvar like 'CHILD-CONTEXT-GROUP-%'" +
+                                               " and rtnum1 = 1" +
+                                               " and wh_id_tmpl = '----'" +
+                                               " order by 1] catch (-1403,510)" );
+                while ( res_pol.next() )
+                {                                       
+                    res_child_ctxt = moca.executeInline ( "[select lower(ctxt_hdr.polval) uc_column_name, ctxt_dtl.rtstr2 uc_cmd_get_ctxt, ctxt_dtl.rtstr1 uc_vals_set" +
+                                                          " from poldat ctxt_hdr" +
+                                                          "      join poldat ctxt_dtl" +
+                                                          "          on ctxt_dtl.polcod = ctxt_hdr.polcod" +
+                                                          "          and ctxt_dtl.polval = ctxt_hdr.polval" +
+                                                          "          and ctxt_dtl.wh_id_tmpl = ctxt_hdr.wh_id_tmpl" +
+                                                          "          /*#nobind*/ " +
+                                                          "          and ctxt_dtl.polvar = 'CHILD-CONTEXT'" +
+                                                          "          and ctxt_dtl.rtnum1 = 1" +
+                                                          "          /*#bind*/" +
+                                                          " where ctxt_hdr.polcod = 'USR-OSSI-DOC-UPLOAD-Q'" +
+                                                          " and ctxt_hdr.polvar = @polvar" +
+                                                          " and ctxt_hdr.rtnum1 = 1" +
+                                                          " and ctxt_hdr.wh_id_tmpl = '----'" +
+                                                          " order by ctxt_hdr.srtseq] catch (-1403,510)",
+                                                          [polvar:res_pol.getString("polvar")]
+                                                         );
+                    while ( res_child_ctxt.next() )
+                    {
+                        /*
+                         * The les command is expected to return 3 columns
+                         * seq - that we ignore
+                         * uc_doc_ctxt_parm_id - parm id
+                         * uc_doc_ctxt_parm_val - value
+                         */
+                        res_les_cmd = moca.executeInline ( " execute ossi les_cmd" +
+                                                           " where les_cmd_id = @uc_cmd_get_ctxt" +
+                                                           " and uc_les_cmd_inline = 1" +
+                                                           " and uc_inhibit_return_extra_columns = 1" +
+                                                           " catch(@?)",
+                                                           [uc_cmd_get_ctxt:res_child_ctxt.getString("uc_cmd_get_ctxt")] );
+                        while ( res_les_cmd.next() )
+                        {
+                            found_child_ctxt = true;
+                            //
+                            // Dont add the values if they are already in our context
+                            //
+                            if ( uc_ctxt_parm_list.indexOf ( "," + res_les_cmd.getString ( "uc_doc_ctxt_parm_id" ) + "," ) < 0 )
+                            {
+                                if ( res_les_cmd.getString ( "uc_doc_ctxt_parm_val" ) != null &&
+                                     res_les_cmd.getString ( "uc_doc_ctxt_parm_val" ) != "" )
+                                {
+                                    ret.addRow();
+                                    ret.setValue ( "uc_doc_ctxt_parm_typ",  "KEY" );
+                                    ret.setValue ( "uc_doc_ctxt_parm_catg", "CHILD" );
+                                    ret.setValue ( "uc_doc_ctxt_parm_id",   res_les_cmd.getString ( "uc_doc_ctxt_parm_id" ) );
+                                    ret.setValue ( "uc_doc_ctxt_parm_val",  res_les_cmd.getString ( "uc_doc_ctxt_parm_val" ) );
+                                }
+                            }
+                        }
+                        //
+                        // If we found child context we are done.  we dont need to lookup more
+                        //
+                        if ( found_child_ctxt )
+                            break;
+                        
+                    } // wend res_child_ctxt
+                }//wend pol
+                [uc_enriched_res:ret]
+                ]]
+            }
+        } /* this is first pass which went thround child results */
+        |
+        {
+            {
+                publish data combination where res = @uc_ctxt_res
+                &
+                publish data combination where res = @uc_enriched_res
+            }
+            >> res_total_ctxt
+            |
+            {
+                [[
+                SimpleResults ret = new SimpleResults();
+                StringBuffer value_list = new StringBuffer( "||" );
+                ret.addColumn ( "uc_doc_ctxt_parm_typ", MocaType.STRING);
+                ret.addColumn ( "uc_doc_ctxt_parm_catg", MocaType.STRING);
+                ret.addColumn ( "uc_doc_ctxt_parm_id", MocaType.STRING );
+                ret.addColumn ( "uc_doc_ctxt_parm_val", MocaType.STRING );
+                //
+                // loop through total ctxt first and record our values
+                //
+                while ( res_total_ctxt.next() )
+                {
+                    value_list.append ( res_total_ctxt.getString ( "uc_doc_ctxt_parm_id").toLowerCase() + "=" + res_total_ctxt.getString ( "uc_doc_ctxt_parm_val") + "||" );
+                }
+                //
+                res_total_ctxt.reset();
+                while ( res_total_ctxt.next() )
+                {
+                    this_var = res_total_ctxt.getString ( "uc_doc_ctxt_parm_id").toUpperCase();
+                    this_var_value = res_total_ctxt.getString ( "uc_doc_ctxt_parm_val");
+                    //
+                    res_ctxt = moca.executeInline ( " publish data" +
+                                                    " where ctxt_les_cmd = ossi__polval ( 'USR-OSSI-DOC-UPLOAD-Q', 'MORE-CONTEXT', @this_var, '', 'rtstr1', '----', 1 )" +
+                                                    " |" +
+                                                    " if ( @ctxt_les_cmd is not null )" +
+                                                    " {" +
+                                                    "     publish data where " + this_var + " = @this_var_value" +
+                                                    "     |" +
+                                                    "     execute ossi les_cmd where les_cmd_id = @ctxt_les_cmd and uc_les_cmd_inline = 1 and uc_inhibit_return_extra_columns = 1 " +
+                                                    "     catch(@?)" +
+                                                    "     >> myres" +
+                                                    "     |" +
+                                                    "     if ( @? = 0 and @myres is not null and rowcount(@myres) > 0 )" +
+                                                    "     {" +
+                                                    "         convert ossi columns to rows" +
+                                                    "         where res = @myres" +
+                                                    "         and col_column_name = 'column_name'" +
+                                                    "         and val_column_name = 'column_value'" +
+                                                    "     }" +
+                                                    " }",
+                                                    [this_var:this_var, this_var_value:this_var_value] );
+                    while ( res_ctxt.next() )
+                    {
+                        this_ctxt_value = res_ctxt.getString ( "column_value" );
+                        if ( this_ctxt_value != null && this_ctxt_value != "" )
+                        {
+                            this_ctxt_val_str = res_ctxt.getString ( "column_name" ).toLowerCase() + "=" + this_ctxt_value;
+                            if ( value_list.indexOf( "||" + this_ctxt_val_str + "||" ) < 0 )
+                            {
+                                value_list.append ( this_ctxt_val_str + "||" );
+                                //
+                                ret.addRow();
+                                ret.setValue ( "uc_doc_ctxt_parm_typ",  "KEY" );
+                                ret.setValue ( "uc_doc_ctxt_parm_catg", "MORE" );
+                                ret.setValue ( "uc_doc_ctxt_parm_id",   res_ctxt.getString ( "column_name" ).toLowerCase() );
+                                ret.setValue ( "uc_doc_ctxt_parm_val",  this_ctxt_value );
+                            } // dont have this already
+                        } // we have a value
+                    } // wend ctxt
+                }
+                [uc_more_res:ret]
+                ]]
+            }
+            |
+            publish data
+            where uc_enriched_res = @uc_enriched_res
+            and uc_more_res = @uc_more_res
+        } /* scope */
+    } /* transposed resultset from caller */
+}
+|
+publish data
+where uc_enriched_res = @uc_enriched_res
+and uc_more_res = @uc_more_res
+
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This will upload anything to document queue locally for eventual upload
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+<retcol name="uc_enriched_res" type="COMTYP_RES">The enriched resultset.  it has following columns
+uc_doc_ctxt_parm_typ .. set to KEY
+uc_doc_ctxt_parm_catg .. set to CHILD
+uc_doc_ctxt_parm_id
+uc_doc_ctxt_parm_val
+</retcol>
+<retcol name="uc_more_res" type="COMTYP_RES">More data as needed resultset.  it has following columns
+uc_doc_ctxt_parm_typ .. set to KEY
+uc_doc_ctxt_parm_catg .. set to MORE
+uc_doc_ctxt_parm_id
+uc_doc_ctxt_parm_val
+</retcol>
+
+
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+<seealso cref="transpose ossi resultset"></seealso>
+<seealso cref="get ossi document context key parameters"></seealso>
+
+
+</documentation>
+
+
+
+</command>

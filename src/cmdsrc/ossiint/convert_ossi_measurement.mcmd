@@ -1,0 +1,78 @@
+<command>
+<name>convert ossi measurement</name>
+<description>Convert the measurement data</description>
+
+<transaction>new</transaction> <type>Local Syntax</type>
+
+<argument name="uc_mu_cat" required="no" datatype="String">DIM or MASS</argument>
+<argument name="uc_src_sys_id" required="no" datatype="String"></argument>
+<argument name="uc_dest_sys_id" required="no" datatype="String"></argument>
+<argument name="uc_value" required="no" datatype="String"></argument>
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161208 saad.ahmad - 7154 - Hub base
+ */
+publish data
+where 
+    uc_src_mu      = ossi__polval ( 'USR-INT-MU', @uc_mu_cat, @uc_src_sys_id, '', 'rtstr1', '----' )
+and uc_mu_def      = ossi__polval ( 'USR-INT-MU', @uc_mu_cat, 'DEFAULT',      '', 'rtstr1', '----' )
+and uc_dest_mu     = ossi__polval ( 'USR-INT-MU', @uc_mu_cat, @uc_dest_sys_id,'', 'rtstr1', '----' )
+and uc_sys_my      = ossi__polval ( 'SYS-MU',     @uc_mu_cat, 'DEFAULT',      '', 'rtstr1', '----' )
+|
+publish data
+where use_src_mu = nvl(@uc_src_mu, @uc_mu_def )
+and use_dest_mu  = nvl(@uc_dest_mu,@uc_mu_def )
+|
+{
+   execute ossi moca and cache
+   where uc_cache_grp = 'OSSI_MEASUREMENT_'
+   and   uc_inline = '1'
+   and   uc_cache_key = @use_src_mu
+   and   uc_moca_cmd = "[select cf_numerator, cf_denominator"
+                    || " from mu_mst"
+                    || " where mu = @use_src_mu]"
+   |
+   publish data
+   where uc_value_to_sys = @uc_value * (@cf_numerator / @cf_denominator )
+   |
+   execute ossi moca and cache
+   where uc_cache_grp = 'OSSI_MEASUREMENT_'
+   and   uc_inline = '1'
+   and   uc_cache_key = @use_dest_mu
+   and   uc_moca_cmd = "[select cf_numerator, cf_denominator"
+                    || " from mu_mst"
+                    || " where mu = @use_dest_mu]"
+   |
+   publish data
+   where uc_value_to_dest_mu = @uc_value_to_sys * (@cf_denominator / @cf_numerator )
+}
+
+
+]]>
+</local-syntax>
+
+<documentation>
+
+
+<remarks>
+<![CDATA[
+This command is to convert measurement data
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+<example>
+??
+</example>
+
+<exception value="eOK">Normal successful completion</exception>
+</documentation>
+
+
+
+</command>

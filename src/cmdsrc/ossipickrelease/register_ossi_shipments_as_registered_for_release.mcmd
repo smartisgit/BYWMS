@@ -1,0 +1,89 @@
+<command>
+<name>register ossi shipments as registered for release</name>
+<description>This command will serve as an alternate way to mark shipments are registered for release (i.e. first phase of release that marks shipment.alcdte)</description>
+ 
+<argument name="wh_id" required="yes" datatype="string"></argument>
+<argument name="pcksts" datatype="string"></argument>
+<argument name="ship_id" datatype="string"></argument>
+<argument name="schbat" required="yes" datatype="string"></argument>
+<argument name="comflg" required="yes" datatype="string"></argument>
+<argument name="uc_show_all_data" required="yes" datatype="string"></argument>
+<argument name="uc_ossi_job_id" required="yes" datatype="string"></argument>
+<argument name="skip_rpl_chk" datatype="integer"></argument>
+<argument name="pcksts" datatype="string">It can be passed in but typically not</argument>
+
+
+
+<argument name="uc_num_concurrent_calls" required="yes" datatype="string"></argument>
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+publish data
+where comflg = nvl(@comflg, 0 )
+and uc_ossi_job_id = nvl(@uc_ossi_job_id, 'UC_W_' || @wh_id || '_SHPREGREL' )
+and uc_ossi_who = nvl(@uc_ossi_who, @wh_id || '-' || @@USR_ID )
+and uc_num_concurrent_calls = nvl(@uc_num_concurrent_calls, 10)
+|
+{
+    execute ossi work using async execution
+    where uc_get_work_cmd = "list ossi shipments for release registration"
+    and uc_do_work_cmd = 'register ossi one shipment for release registration'
+    and uc_ossi_job_id = @uc_ossi_job_id
+    and uc_ossi_who = @uc_ossi_who
+    and uc_pk_col = 'ship_id'
+    and uc_num_concurrent_calls = @uc_num_concurrent_calls
+    and comflg = @comflg
+    and uc_exec_status_col = 'uc_ossi_err_code'
+    and uc_exec_message_col = 'uc_ossi_err_descr'
+    and uc_data_col = 'ship_id'
+}
+   
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This job will utilize async processing to register the waves as fuly released as needed
+</p>
+]]>
+</remarks>
+
+<retrows>n</retrows>
+
+<retcol name="wh_id" type="COMTYP_CHAR"></retcol>
+<retcol name="ship_id" type="COMTYP_CHAR"></retcol>
+<retcol name="comflg" type="COMTYP_INT">This is echoed</retcol>
+<retcol name="skip_rpl_chk" type="COMTYP_INT">This is echoed</retcol>
+
+<retcol name="uc_ossi_job_id" type="COMTYP_CHAR">Job Id</retcol>
+<retcol name="uc_ossi_job_seq" type="COMTYP_INT">Job Sequence</retcol>
+<retcol name="uc_ossi_module_seq" type="COMTYP_INT">Job Module Sequence</retcol>
+
+
+
+<example>
+<![CDATA[
+<p>
+</p>
+]]>
+
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+<seealso cref="process pick release registration"></seealso>
+<seealso cref="list usr waves for full release registration"></seealso>
+<seealso cref="register ossi one shipment for release registration"></seealso>
+
+
+</documentation>
+
+
+</command>

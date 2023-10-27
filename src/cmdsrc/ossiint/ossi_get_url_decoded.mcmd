@@ -1,0 +1,26 @@
+<command>
+<name>ossi get_url_decoded</name>
+<description>Decode the URL</description>
+
+<type>C Function</type>
+<function>ossiURLDecode</function>
+<argument name="moca_farg1" required="yes" datatype="string">URL to decode</argument>
+<argument name="moca_farg2" required="no" datatype="string">Do cleanup for unprintable 1/0 1 is default</argument>
+<argument name="moca_farg3" required="no" datatype="string">Replace non printable with this character.  space is default</argument>
+
+<documentation>
+<remarks>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+]]>
+</remarks>
+<retcol name="uc_url_decoded" type="COMTYP_CHAR">Ftpcod to return</retcol>
+<retrows>1</retrows>
+</documentation>
+</command>

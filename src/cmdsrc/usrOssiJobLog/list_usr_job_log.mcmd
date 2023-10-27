@@ -1,0 +1,84 @@
+<command>
+<name>list usr job log</name>
+<description>list the job log</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+if ( nvl(@uc_ossi_show_latest_flg,'0') = '1' )
+   [
+   select max(uc_ossi_job_seq) uc_ossi_job_seq
+   from   usr_ossi_job_log
+   where  @*
+   ]
+|
+[
+select uc_ossi_job_seq,
+       uc_ossi_job_id,
+       uc_ossi_module_seq,
+       uc_ossi_module_id,
+       uc_ossi_action_seq,
+       uc_ossi_action_id,
+       uc_ossi_data,
+       uc_ossi_who,
+       uc_ossi_start_dt,
+       uc_ossi_end_dt,
+       ((uc_ossi_end_ts - uc_ossi_start_ts)/1000) uc_ossi_dur,
+       uc_ossi_err_code
+from   usr_ossi_job_log
+where  @+uc_ossi_job_seq
+and    @*
+order by
+       uc_ossi_job_seq desc,
+       uc_ossi_module_seq asc,
+       uc_ossi_action_seq asc
+]
+
+]]>
+</local-syntax>
+
+<argument name="uc_ossi_show_latest_flg" required="no" datatype="String">If 0 show all, if 1 show latest.  Default 0</argument>
+<argument name="@*" required="yes" datatype="string">Columns in var_job_log table</argument>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This command will list the data from var_job_log.  The data will be ordered to show the most current 
+job first.
+</p>
+]]>
+</remarks>
+
+<retrows>n</retrows>
+
+<retcol name="uc_ossi_job_seq" type="COMTYP_INT"></retcol>
+<retcol name="uc_ossi_who" type="COMTYP_STRING">Who was doing the work</retcol>
+<retcol name="uc_ossi_job_id" type="COMTYP_STRING"></retcol>
+<retcol name="uc_ossi_module_id" type="COMTYP_STRING"></retcol>
+<retcol name="uc_ossi_action_id" type="COMTYP_STRING"></retcol>
+<retcol name="uc_ossi_data" type="COMTYP_STRING">Data for the event</retcol>
+<retcol name="uc_ossi_dur" type="COMTYP_FLOAT">Duration in seconds</retcol>
+<retcol name="uc_ossi_err_code" type="COMTYP_INT">Error Code, 0 means success </retcol>
+
+
+<exception value="eOK">The command completed successfully.</exception>
+<exception value="510">If variable was not passed and no default was passed.</exception>
+
+<seealso cref="create usr job log"></seealso>
+<seealso cref="change usr job log"></seealso>
+<seealso cref="complete usr job"></seealso>
+<seealso cref="complete usr job log"></seealso>
+<seealso cref="usr register_action"></seealso>
+<seealso cref="usr register_module"></seealso>
+<seealso cref="usr register_job"></seealso>
+<seealso cref="list usr job log"></seealso>
+
+</documentation>
+
+</command>

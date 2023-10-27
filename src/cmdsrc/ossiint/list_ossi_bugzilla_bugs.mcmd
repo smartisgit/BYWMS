@@ -1,0 +1,108 @@
+<command>
+<name>list ossi bugzilla bugs</name>
+<description>List the buggs in bugzilla</description>
+
+<argument name="uc_env_name" required="yes" datatype="string">Environment</argument>
+<argument name="uc_bug_id" required="yes" datatype="string">Environment</argument>
+<argument name="uc_rollout_name" required="yes" datatype="string">Environment</argument>
+<argument name="uc_product_name" required="yes" datatype="string">Environment</argument>
+<argument name="uc_component_name" required="yes" datatype="string">Environment</argument>
+<argument name="uc_filter" required="yes" datatype="string">Environment</argument>
+
+<type>Local Syntax</type>
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+publish data
+where uc_filter = nvl(@uc_filter,'1=1')
+|
+if ( nvl(@uc_bug_id,0) = 0 )
+   publish data
+   where uc_bug_id_clause = " and 1=1"
+else
+   publish data
+   where uc_bug_id_clause = " and bugs.bug_id = @uc_bug_id"
+|
+if ( @uc_product_name is null )
+   publish data
+   where uc_product_name_clause = " and 1=1"
+else
+   publish data
+   where uc_product_name_clause = " and products.name = '" || @uc_product_name || "'"
+|
+if ( @uc_component_name is null )
+   publish data
+   where uc_component_name_clause = " and 1=1"
+else
+   publish data
+   where uc_component_name_clause = " and components.name = '" || @uc_component_name || "'"
+|
+{
+   publish data
+   where uc_select = " select bugs.bug_id       uc_bug_id,"
+                  || "        products.name     uc_product_name,"
+                  || "        components.name   uc_component_name,"
+                  || "        bugs.short_desc   uc_bug_synopsis,"
+                  || "        bugs.bug_status   uc_bug_status,"
+                  || "        bugs.resolution   uc_bug_resolution,"
+                  || "        bugs.bug_severity uc_bug_severity,"
+                  || "        bugs.priority     uc_bug_priority,"
+                  || "        rj.uc_last_rollout_id,"
+                  || "        ossi_rollout.rollout_name uc_last_rollout_name"
+                  || " from bugs"
+                  || "      join products on products.id = bugs.product_id"
+                  || "      join components on components.id = bugs.component_id"
+                  || "      left outer join ("
+                  || "              select ossi_bugs_in_rollout.bug_id, max(ossi_rollout.id) uc_last_rollout_id "
+                  || "              from ossi_bugs_in_rollout"
+                  || "                   join ossi_rollout on ossi_rollout.rollout_name = ossi_bugs_in_rollout.rollout_name"
+                  || "              group by ossi_bugs_in_rollout.bug_id"
+                  || "           ) rj on rj.bug_id = bugs.bug_id"
+                  || "       left outer join ossi_rollout on ossi_rollout.id = rj.uc_last_rollout_id"
+                  || " where 1=1"
+                  || @uc_bug_id_clause
+                  || @uc_product_name_clause
+                  || @uc_component_name_clause
+                  || " order by 1,2"
+   |
+   execute ossi bugzilla select
+   where uc_select_stmt = @uc_select
+   |
+   execute server command 
+   where cmd = "publish data where uc_result = iif (" || @uc_filter || ",'1','0')"
+   and inline = 1
+   |
+   if ( @uc_result = '1' )
+      filter data where moca_filter_level = '2'
+}
+
+
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+Get all bugzilla bugs and rollouts
+</remarks>
+
+<retcol name="uc_rollout_name" type="String"></retcol>
+<retcol name="uc_rollout_descr" type="String"></retcol>
+<retcol name="uc_major_rev" type="String"></retcol>
+<retcol name="uc_minor_rev" type="String"></retcol>
+<retcol name="uc_bug_id" type="String"></retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

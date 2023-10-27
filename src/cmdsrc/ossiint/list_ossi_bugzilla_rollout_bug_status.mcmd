@@ -1,0 +1,40 @@
+<command>
+<name>list ossi bugzilla rollout bug status</name>
+<description>List the bugzilla statuses</description>
+
+<argument name="uc_env_name" required="yes" datatype="string">Environment</argument>
+
+<type>Local Syntax</type>
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+{
+   execute ossi bugzilla select
+   where uc_select_stmt = "select value uc_rollout_bug_status from bug_status order by 1"
+}
+
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+Get all rollout bug status
+</remarks>
+
+<retcol name="uc_rollout_bug_status" type="String"></retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

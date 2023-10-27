@@ -1,0 +1,379 @@
+<command>
+<name>log ossi event for move inventory</name>
+<description>This command will log event on inventory movement</description>
+
+<argument name="wh_id" required="yes" datatype="string">wh_id</argument>
+<argument name="client_id" required="yes" datatype="string">client</argument>
+<argument name="usr_id" required="yes" datatype="string">user.  if not passed in use @@USR_ID</argument>
+<argument name="devcod" required="yes" datatype="string">device.  if not passed in use @@DEVCOD</argument>
+<argument name="uc_called_from" required="yes" datatype="string">if not passed in, use this component name</argument>
+
+<argument name="uc_rule_grp_id_hststs" required="yes" datatype="string">
+This is the rule group id used for transforming status.  if not passed in use USR-INTEGRATION-&lt;&lt;CLIENT_GRP&gt;&gt;
+</argument>
+<argument name="uc_rule_subgrp_id_hststs" required="yes" datatype="string">
+This is the rule sub-group id used for transforming status.  If not pased in use HSTSTS
+</argument>
+
+<argument name="uc_rule_grp_id_hstloc" required="yes" datatype="string">
+This is the rule group id used for transforming status.  if not passed in use USR-INTEGRATION-&lt;&lt;CLIENT_GRP&gt;&gt;
+</argument>
+<argument name="uc_rule_subgrp_id_hstloc" required="yes" datatype="string">
+This is the rule sub-group id used for transforming status.  If not pased in use HSTLOC
+</argument>
+
+
+<argument name="uc_evt_typ" required="yes" datatype="string">
+<![CDATA[
+    <ul>
+        <li>INV-ADJ: means it is an adjustment style transaction.  A negative from source and positive to new</li>
+        <li>INV-STS: means it is an status style transaction.  Variables published like FR_ and TO_</li>
+    </ul>
+]]>
+</argument>
+<argument name="evt_id" required="yes" datatype="string">Actual event id to log.  if not passed use uc_evt_typ</argument>
+<argument name="uc_evt_reacod" required="yes" datatype="string">This is the reason code that will be used for event reacod arg</argument>
+<argument name="uc_evt_adj_ref1" required="yes" datatype="string">This is the adj ref1 that will be used for event reacod arg</argument>
+<argument name="uc_join_invhld" required="yes" datatype="string">1 or 0.  Default 1.  This indicates if we should join to invhld.  One invdtl 
+can have multiple holds so it is an option</argument>
+
+<argument name="uc_use_lodnum" required="yes" datatype="string">Returned from move inventory trigger</argument>
+<argument name="uc_use_subnum" required="yes" datatype="string">Returned from move inventory trigger</argument>
+<argument name="uc_use_dtlnum" required="yes" datatype="string">Returned from move inventory trigger</argument>
+
+<argument name="srcloc" required="yes" datatype="string">move inventory output:</argument>
+<argument name="dstloc" required="yes" datatype="string">move inventory output:</argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+/*
+ * Revision Log
+ * 2021-11-30 saad.ahmad 12608 - Initial
+ */
+
+publish data
+where uc_join_invhld           = nvl(@uc_join_invhld, 1 )
+and   evt_id                   = nvl(@evt_id, @uc_evt_typ )
+and   wh_id                    = nvl(@wh_id, @@WH_ID)
+and   usr_id                   = nvl(@usr_id, @@USR_ID)
+and   devcod                   = nvl(@devcod, @@DEVCOD)
+and   uc_called_from           = nvl(@uc_called_from, 'log ossi event for move inventory' )
+and   uc_rule_grp_id_hststs    = nvl(@uc_rule_grp_id_hststs, 'USR-INTEGRATION-<<CLIENT_GRP>>' )
+and   uc_rule_subgrp_id_hststs = nvl(@uc_rule_subgrp_id_hststs, 'HSTSTS' )
+and   uc_rule_grp_id_hstloc    = nvl(@uc_rule_grp_id_hstloc, 'USR-INTEGRATION-<<CLIENT_GRP>>' )
+and   uc_rule_subgrp_id_hstloc = nvl(@uc_rule_subgrp_id_hstloc, 'HSTLOC' )
+and   uc_transformed_invsts    = 1
+and   uc_evt_reacod            = nvl(@uc_evt_reacod, 'n/a')
+|
+if ( @uc_join_invhld = 1 )
+    publish data
+    where uc_invhld_join = "left outer join invhld on invhld.dtlnum = invdtl.dtlnum"
+    and   uc_invhld_sel  = "invhld.hldpfx, invhld.hldnum"
+else
+    publish data
+    where uc_invhld_join = ""
+    and   uc_invhld_sel  = "'' hldpfx, '' hldnum"
+|
+get integrator system id 
+where wh_id = @wh_id
+and systyp = 'WMD'
+|
+{
+    if ( @uc_use_subnum is null ) hide stack variable where name = 'uc_use_subnum'
+    |
+    if ( @uc_use_dtlnum is null ) hide stack variable where name = 'uc_use_dtlnum'
+    |
+    [
+    select invdtl.*,
+           @uc_invhld_sel:raw,
+           invlod.lodnum,
+           invlod.wh_id,
+           invlod.stoloc,
+           invlod.lodtag,
+           wh.trans_wh_id
+    from invlod
+         join invsub on invsub.lodnum = invlod.lodnum
+         join invdtl on invdtl.subnum = invsub.subnum
+         join prtmst_view prtmst
+             on prtmst.prt_client_id = invdtl.prt_client_id
+             and prtmst.prtnum = invdtl.prtnum
+             and prtmst.wh_id = invlod.wh_id
+         join wh on wh.wh_id = invlod.wh_id
+         @uc_invhld_join:raw
+    where 1=1
+    and invlod.lodnum = @uc_use_lodnum
+    and @+invsub.subnum^uc_use_subnum
+    and @+invdtl.dtlnum^uc_use_dtlnum
+    order by invdtl.dtlnum
+    ]
+    catch (-1403,510)
+    |
+    if ( @? = 0 )
+    {
+        /*
+         * We have two concepts.  
+         * a. host_invsts.  e.g. in SAP we have 3 buckets for goods by status e.g. availablock, blocked etc.
+         * b. host_stoloc.  e.g. in SAP we have 7000, 8000, 9000 etc.
+         * The value is determined based on rules engine and that is based on invsts and location.  So we push from location data to get from values
+         * and to location data to get to values.
+         * for host status we have a default that it will be WMS status but for host location there is no default concept.  So if none
+         * then it will be null
+         */
+        {
+            list ossi typical location data
+            where wh_id = @wh_id
+            and stoloc = @srcloc
+            and uc_out_prefix = ''
+            |
+            {
+                {
+                    get ossi mapped value by logic
+                    where uc_rule_grp_id = @uc_rule_grp_id_hststs
+                    and uc_rule_subgrp_id = @uc_rule_subgrp_id_hststs
+                    |
+                    publish data
+                    where uc_fr_host_invsts = nvl(@uc_ret, @invsts)
+                }
+                |
+                {
+                    get ossi mapped value by logic
+                    where uc_rule_grp_id = @uc_rule_grp_id_hstloc
+                    and uc_rule_subgrp_id = @uc_rule_subgrp_id_hstloc
+                    |
+                    publish data
+                    where uc_fr_host_stoloc = @uc_ret
+                }
+                |
+                publish data
+                where uc_fr_host_invsts = @uc_fr_host_invsts
+                and uc_fr_host_stoloc = @uc_fr_host_stoloc
+            }
+        }
+        |
+        {
+            list ossi typical location data
+            where wh_id = @wh_id
+            and stoloc = @dstloc
+            and uc_out_prefix = ''
+            |
+            {
+                {
+                    get ossi mapped value by logic
+                    where uc_rule_grp_id = @uc_rule_grp_id_hststs
+                    and uc_rule_subgrp_id = @uc_rule_subgrp_id_hststs
+                    |
+                    publish data
+                    where uc_to_host_invsts = nvl(@uc_ret, @invsts)
+                }
+                |
+                {
+                    get ossi mapped value by logic
+                    where uc_rule_grp_id = @uc_rule_grp_id_hstloc
+                    and uc_rule_subgrp_id = @uc_rule_subgrp_id_hstloc
+                    |
+                    publish data
+                    where uc_to_host_stoloc = @uc_ret
+                }
+                |
+                publish data
+                where uc_to_host_invsts = @uc_to_host_invsts
+                and uc_to_host_stoloc = @uc_to_host_stoloc
+            }
+        }
+        |            
+        if ( @uc_evt_typ = 'INV-STS' )
+        {
+            publish data
+            where arecod               = @dstare
+            and   trnqty               = @untqty
+            and   reacod               = @uc_evt_reacod
+            and   fr_cstms_bond_flg    = @cstms_bond_flg
+            and   fr_cstms_cnsgnmnt_id = @cstms_cnsgnmnt_id
+            and   fr_dty_stmp_flg      = @dty_stmp_flg
+            and   fr_expire_dte        = @expire_dte
+            and   fr_invsts            = @invsts
+            and   fr_inv_attr_dte1     = @inv_attr_dte1
+            and   fr_inv_attr_dte2     = @inv_attr_dte2
+            and   fr_inv_attr_flt1     = @inv_attr_flt1 
+            and   fr_inv_attr_flt2     = @inv_attr_flt2
+            and   fr_inv_attr_flt3     = @inv_attr_flt3
+            and   fr_inv_attr_int1     = @inv_attr_int1
+            and   fr_inv_attr_int2     = @inv_attr_int2
+            and   fr_inv_attr_int3     = @inv_attr_int3
+            and   fr_inv_attr_int4     = @inv_attr_int4
+            and   fr_inv_attr_int5     = @inv_attr_int5
+            and   fr_inv_attr_str1     = @inv_attr_str1
+            and   fr_inv_attr_str2     = @inv_attr_str2
+            and   fr_inv_attr_str3     = @inv_attr_str3
+            and   fr_inv_attr_str4     = @inv_attr_str4
+            and   fr_inv_attr_str5     = @inv_attr_str5
+            and   fr_inv_attr_str6     = @inv_attr_str6
+            and   fr_inv_attr_str7     = @inv_attr_str7
+            and   fr_inv_attr_str8     = @inv_attr_str8
+            and   fr_inv_attr_str9     = @inv_attr_str9
+            and   fr_inv_attr_str10    = @inv_attr_str10
+            and   fr_inv_attr_str11    = @inv_attr_str11
+            and   fr_inv_attr_str12    = @inv_attr_str12
+            and   fr_inv_attr_str13    = @inv_attr_str13
+            and   fr_inv_attr_str14    = @inv_attr_str14
+            and   fr_inv_attr_str15    = @inv_attr_str15
+            and   fr_inv_attr_str16    = @inv_attr_str16
+            and   fr_inv_attr_str17    = @inv_attr_str17
+            and   fr_inv_attr_str18    = @inv_attr_str18
+            and   fr_lotnum            = @lotnum
+            and   fr_mandte            = @mandte
+            and   fr_orgcod            = @orgcod
+            and   fr_revlvl            = @revlvl
+            and   fr_rttn_id           = @rttn_id
+            and   fr_sup_lotnum        = @sup_lotnum
+            and   fr_hld_flg           = @hld_flg
+            and   fr_hld_qty           = decode ( @hld_flg, 1, @untqty, 0 )
+            and   to_cstms_bond_flg    = @cstms_bond_flg
+            and   to_cstms_cnsgnmnt_id = @cstms_cnsgnmnt_id
+            and   to_dty_stmp_flg      = @dty_stmp_flg
+            and   to_expire_dte        = @expire_dte
+            and   to_invsts            = @invsts
+            and   to_inv_attr_dte1     = @inv_attr_dte1
+            and   to_inv_attr_dte2     = @inv_attr_dte2
+            and   to_inv_attr_flt1     = @inv_attr_flt1 
+            and   to_inv_attr_flt2     = @inv_attr_flt2
+            and   to_inv_attr_flt3     = @inv_attr_flt3
+            and   to_inv_attr_int1     = @inv_attr_int1
+            and   to_inv_attr_int2     = @inv_attr_int2
+            and   to_inv_attr_int3     = @inv_attr_int3
+            and   to_inv_attr_int4     = @inv_attr_int4
+            and   to_inv_attr_int5     = @inv_attr_int5
+            and   to_inv_attr_str1     = @inv_attr_str1
+            and   to_inv_attr_str2     = @inv_attr_str2
+            and   to_inv_attr_str3     = @inv_attr_str3
+            and   to_inv_attr_str4     = @inv_attr_str4
+            and   to_inv_attr_str5     = @inv_attr_str5
+            and   to_inv_attr_str6     = @inv_attr_str6
+            and   to_inv_attr_str7     = @inv_attr_str7
+            and   to_inv_attr_str8     = @inv_attr_str8
+            and   to_inv_attr_str9     = @inv_attr_str9
+            and   to_inv_attr_str10    = @inv_attr_str10
+            and   to_inv_attr_str11    = @inv_attr_str11
+            and   to_inv_attr_str12    = @inv_attr_str12
+            and   to_inv_attr_str13    = @inv_attr_str13
+            and   to_inv_attr_str14    = @inv_attr_str14
+            and   to_inv_attr_str15    = @inv_attr_str15
+            and   to_inv_attr_str16    = @inv_attr_str16
+            and   to_inv_attr_str17    = @inv_attr_str17
+            and   to_inv_attr_str18    = @inv_attr_str18
+            and   to_lotnum            = @lotnum
+            and   to_mandte            = @mandte
+            and   to_orgcod            = @orgcod
+            and   to_revlvl            = @revlvl
+            and   to_rttn_id           = @rttn_id
+            and   to_sup_lotnum        = @sup_lotnum
+            and   to_hld_flg           = @hld_flg
+            and   to_hld_qty           = decode ( @hld_flg, 1, @untqty, 0 )
+            and   hstdst               = @dstloc
+            and   hstsrc               = @srcloc
+            |
+            sl_log event
+            where ifd_data_ptr = null
+        }
+        else if ( @uc_evt_typ = 'INV-ADJ' )
+        {
+            /*
+             * In this style there are two records.  a negative from from and positive for to
+             */
+            do loop where count = 2
+            |
+            {
+                publish data
+                where adj_ref1          = @uc_evt_adj_ref1
+                and   adj_ref2          = @uc_evt_adj_ref2
+                and   reacod            = @uc_evt_reacod
+                and   uc_host_invsts    = decode ( @i, 0, @uc_fr_host_invsts, @uc_to_host_invsts)
+                and   untqty            = decode ( @i, 0, -1 * @untqty, @untqty)
+                and   stoloc            = decode ( @i, 0, @srcloc, @dstloc)
+                and   hstacc            = decode ( @i, 0, @srcloc, @dstloc)
+                and   uc_host_stoloc    = decode ( @i, 0, @uc_fr_host_stoloc, @uc_to_host_stoloc)
+                |
+                sl_log event
+                where ifd_data_ptr = null
+            } /* 2 records */    
+        } /* Inv adj style */
+        else if ( @uc_evt_typ = 'INV-MOV' )
+        {
+            sl_log event
+            where ifd_data_ptr = null
+        }
+        |
+        publish data
+        where evt_data_seq = @evt_data_seq
+        and evt_id = @evt_id
+        and sys_id = @sys_id
+        and srcloc = @srcloc
+        and dstloc = @dstloc
+        and uc_fr_host_invsts = @uc_fr_host_invsts
+        and uc_to_host_invsts = @uc_to_host_invsts
+        and uc_fr_host_stoloc = @uc_fr_host_stoloc
+        and uc_to_host_stoloc = @uc_to_host_stoloc
+        and wh_id = @wh_id
+        and lodnum = @lodnum
+        and subnum = @subnum
+        and dtlnum = @dtlnum
+        and invsts = @invsts
+        and prt_client_id = @prt_client_id
+        and prtnum = @prtnum
+        and lotnum = @lotnum
+        and untqty = @untqty
+    }
+}
+
+
+]]>
+</local-syntax>
+<documentation>
+<remarks>
+<![CDATA[
+    <p>
+    Sometimes on inventory movement we have a need to log inventory events like INV-ADJ, INV-STS, INV-MOV.
+    We cannot simply put these in HOST-TRANS policy since we have to have specific event arguments.  So typically as a result we need
+    to duplicate logic of result IFD to a new event.
+    This event can be used in conditional rules to log the event keeping in mind how the standard events are.  based on template it can 
+    log the movement as INV-STS (so single event with from and to), INV-ADJ (two events with first as negative and second as positive) or INV-MOV
+    </p>
+]]>
+</remarks>
+
+
+<retrows>1</retrows>
+<retcol name="evt_data_seq" type="integer">Event that is logged</retcol>
+<retcol name="evt_id" type="string">Event Id logged</retcol>
+<retcol name="sys_id" type="string">Integrator source system id</retcol>
+<retcol name="srcloc" type="string">Source location from move inventory</retcol>
+<retcol name="dstloc" type="string">Destination location from move inventory</retcol>
+<retcol name="uc_fr_host_invsts" type="string">Per rules engine what was the from host status</retcol>
+<retcol name="uc_to_host_invsts" type="string">Per rules engine what was the to host status</retcol>
+<retcol name="uc_fr_host_stoloc" type="string">Per rules engine what was the from host location</retcol>
+<retcol name="uc_to_host_stoloc" type="string">Per rules engine what was the to host location</retcol>
+<retcol name="wh_id" type="string">Warehouse</retcol>
+<retcol name="lodnum" type="string">Load#</retcol>
+<retcol name="subnum" type="string"></retcol>
+<retcol name="dtlnum" type="string"></retcol>
+<retcol name="invsts" type="string">Status</retcol>
+<retcol name="prt_client_id" type="string">Client</retcol>
+<retcol name="prtnum" type="string">Item</retcol>
+<retcol name="lotnum" type="string">Lot</retcol>
+<retcol name="untqty" type="integer">Quantity</retcol>
+
+<example>
+</example>
+
+<exception value="eOK">Normal successful completion</exception>
+
+<seealso cref="move inventory"></seealso>
+<seealso cref="list ossi typical location data"></seealso>
+
+
+
+</documentation>
+</command>

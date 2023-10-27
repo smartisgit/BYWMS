@@ -1,0 +1,44 @@
+<command>
+<name>execute ossi moca and cache core using c</name>
+<description>
+Execute the MOCA but if it is the same as a previous run, just return those results
+</description>
+
+<argument name="uc_cache_grp" required="yes" datatype="string"></argument>
+<argument name="uc_moca_cmd" required="no" datatype="string"></argument>
+<argument name="uc_inline" required="no" datatype="Integer"></argument>
+<argument name="uc_cache_key" required="no" datatype="string"></argument>
+
+
+<type>C Function</type>
+<function>ossiExecuteMOCAAndCache</function>
+
+<documentation>
+
+
+<remarks>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+
+This runs the command and caches the results
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+<example>
+execute ossi moca and cache
+where uc_cache_grp = "XXX"
+and uc_moca_cmd = "publish data where a=1"
+
+</example>
+
+<retcol name="@*" type="string">Variable</retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+</documentation>
+</command>

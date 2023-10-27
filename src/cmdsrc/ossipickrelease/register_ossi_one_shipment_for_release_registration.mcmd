@@ -1,0 +1,86 @@
+<command>
+<name>register ossi one shipment for release registration</name>
+<description>This command is responsible for marking a single shipment as registered for release.</description>
+ 
+<argument name="ship_id"></argument>
+<argument name="wh_id"></argument>
+<argument name="comflg" datatype="integer"></argument>
+<argument name="skip_rpl_chk" datatype="integer"></argument>
+
+<argument name="uc_ossi_job_id" datatype="string"></argument>
+<argument name="uc_ossi_job_seq" datatype="integer"></argument>
+<argument name="uc_ossi_module_seq" datatype="integer"></argument>
+
+
+
+<type>Local Syntax</type>
+
+<local-syntax>
+<![CDATA[
+
+
+if ( @ship_id is not null )
+{
+    [
+    select alcdte uc_my_alcdte
+    from shipment
+    where ship_id = @ship_id
+    for update of alcdte
+    ]
+    catch (-1403,510)
+    |
+    if ( @? = 0 and @uc_my_alcdte is null )
+    {
+        process pick release registration
+        where ship_id = @ship_id
+        and wh_id = @wh_id
+        catch (-1403,510)
+        ;
+        publish data
+        where wh_id = @wh_id
+        and ship_id = @ship_id
+        and comflg = @comflg
+        and skip_rpl_chk = @skip_rpl_chk
+        and uc_ossi_job_id = @uc_ossi_job_id
+        and uc_ossi_job_seq = @uc_ossi_job_seq
+        and uc_ossi_module_seq = @uc_ossi_module_seq
+    }
+}
+  
+]]>
+
+</local-syntax>
+
+<documentation>
+
+<remarks>
+<![CDATA[
+  <p>
+  This command is responsble for marking a single shipment as registered.  It is called as the first phase of pick release
+
+  </p>
+]]>
+</remarks>
+
+
+<retrows>1</retrows>
+
+<retcol name="wh_id" type="string"></retcol>
+<retcol name="ship_id" type="string"></retcol>
+<retcol name="comflg" type="integer"></retcol>
+<retcol name="skip_rpl_chk" type="integer"></retcol>
+<retcol name="uc_ossi_job_id" type="string"></retcol>
+<retcol name="uc_ossi_job_seq" type="integer"></retcol>
+<retcol name="uc_ossi_module_seq" type="integer"></retcol>
+
+
+<exception value="eOK">Normal successful completion</exception>
+
+
+<seealso cref="process pick release registration"></seealso>
+<seealso cref="register ossi shipments as registered for release"></seealso>
+
+
+
+</documentation>
+</command>

@@ -1,0 +1,28 @@
+#use $DCSDIR/include
+#include <dcsddl.h>
+#include <dcscolwid.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+#use $SALDIR/include
+#include <salcolwid.h>
+
+mset command on
+
+[
+DROP_VIEW(UCDM_PCKLST_00420_PCKLSTGRPCRI)
+] catch (ERR_CANNOT_DROP_TABLE_NOT_FOUND)
+RUN_DDL
+
+mset command off
+
+CREATE_VIEW(UCDM_PCKLST_00420_PCKLSTGRPCRI)
+select pcklst_grp_cri.*,
+       pcklst_rule.pcklst_rule_name,
+       pcklst_rule.pcklst_rule_name || '-' || ltrim(to_char(pcklst_grp_cri.seqnum)) pcklst_grp_cri_pk,
+       pcklst_rule.wh_id
+from pcklst_grp_cri
+     join pcklst_rule on pcklst_rule.pcklst_rule_id = pcklst_grp_cri.pcklst_rule_id
+
+RUN_DDL
+
+mset command on

@@ -1,0 +1,51 @@
+<command>
+<name>sl_remove gen_maint</name>
+<description>Pre-trigger to handle overridden table names</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+ignore ossi this object for data management 
+|
+if (@uc_do_issue_logging = '1')
+{
+  publish data 
+    where table_name = upper(nvl(@table_name, @table)) 
+  |
+  if (ossi__override_table_name(@table_name) = 1)
+  {
+    [select uc_ossi_issue_assign_seq 
+       from usr_ossi_issue_assign 
+      where uc_ossi_user_id = @@USR_ID 
+        and uc_ossi_stat_cd = 'A' 
+    ] catch (-1403) 
+    |
+    if (@? = 0)
+    {
+      process usr issue 
+        where uc_table_name = @table_name 
+          and uc_action = 'REMOVE' 
+      ;
+      override ossi pk data for issue assignment 
+      ;
+      publish data
+        where uc_do_issue_logging = 0
+    }
+  }
+}
+|
+^sl_remove gen_maint
+  where @*
+
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This component is pre-trigger to handle overridden table names
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

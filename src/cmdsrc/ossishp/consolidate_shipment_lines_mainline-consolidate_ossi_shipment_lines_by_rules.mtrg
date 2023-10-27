@@ -1,0 +1,42 @@
+<trigger>
+<name>consolidate ossi shipment lines by rules</name>
+<on-command>consolidate shipment lines mainline</on-command>
+<fire-sequence>9000</fire-sequence>
+
+<local-syntax>
+<![CDATA[
+
+{
+    if ( ossi__polval ( 'USR-OSSI-DATA-CHANGE-HOOK', 'CMD_CONSOLIDATE_SHIPMENT_LINES_MAINLINE_BY_RULES','ENABLED', '', 'rtnum1', nvl(@wh_id,@@WH_ID)) != 0 )
+    {
+        execute ossi all conditional rules
+        where uc_rule_grp_id = 'OSSI-CONSOLIDATE-SHIPMENT-LINES'
+        and uc_rule_subgrp_id = 'GLOBAL-MAP'
+        and uc_cache_key= null
+        catch (-1403,510)
+    }
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<seealso cref="consolidate ossi shipment lines with standard fields">
+    Represents standard logic
+</seealso>
+
+<seealso cref="consolidate shipment lines mainline">
+    Standard command
+</seealso>
+
+<policy
+    polcod="USR-OSSI-DATA-CHANGE-HOOK"
+    polvar="CMD_CONSOLIDATE_SHIPMENT_LINES_MAINLINE_BY_RULES"
+    polval="ENABLED"
+    rtnum1="set to 0 to disable this and 2 to enable"
+></policy>
+
+</documentation>
+
+</trigger>

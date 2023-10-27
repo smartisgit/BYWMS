@@ -1,0 +1,140 @@
+<command>
+<name>list ossi documents from store</name>
+<description>This is the main moca command to query the blob store for documents that have been uploaded there
+</description>
+<type>Local Syntax</type>
+
+<argument name="@*" required="yes" datatype="string">Nothing specific here but [get ossi document context key parameters] is called</argument>
+
+<argument name="wh_id" required="yes" datatype="string"></argument>
+
+
+
+<local-syntax>
+<![CDATA[
+
+if (@wh_id is null and @uc_upload_id is null)
+{
+    [select '' wh_id,
+            '' uc_doc_pgm_id,
+            '' uc_doc_upload_q_id,
+            '' usr_id,
+            '' uc_doc_pgm_cd,
+            '' locale_id,
+            sysdate f_uc_creation_time,
+            sysdate t_uc_creation_time,
+            '' carcod,
+            '' srvlvl,
+            '' trlr_id,
+            '' car_move_id,
+            '' stop_id,
+            '' ship_id,
+            '' ordnum,
+            '' ordtyp,
+            '' stcust,
+            '' rtcust,
+            '' btcust,
+            '' uc_bt_host_ext_id,
+            '' uc_st_host_ext_id,
+            '' uc_rt_adrnam,
+            '' uc_st_adrnam,
+            '' stoloc
+       from dual
+      where 1=2
+    ]
+}
+else
+{
+    [
+    select rtstr1
+    from poldat_view
+    where polcod = 'USR-OSSI-DOC-UPLOAD-Q'
+    and polvar = 'CONTEXT'
+    and polval = 'MAIN-COLUMN-LIST'
+    and wh_id = '----'
+    and rtnum1 = 1
+    order by srtseq
+    ]
+    catch (-1403,510)
+    >> res_vars
+    |
+    {
+        [[
+        StringBuffer filter_clause = new StringBuffer("");
+        Integer clause_cnt = 0;
+        MocaContext currentContext = MocaUtils.currentContext();
+        while ( res_vars.next() )
+        {
+            this_variable = res_vars.getString("rtstr1");
+            if ( currentContext.isVariableAvailable ( this_variable ) )
+            {
+                this_value = currentContext.getVariable(this_variable);
+                if ( this_value != null )
+                {
+                    this_value = this_value.toString().trim();
+                    if ( this_value != "" )
+                    {
+                        this_clause = "metadata." + this_variable + "=='" + this_value + "'";
+                        //
+                        if ( clause_cnt > 0 )
+                            filter_clause.append ( " && " );
+                        filter_clause.append ( this_clause );
+                        clause_cnt++;
+                    } // and not empty
+                } // not null
+            } // have variable in context
+        } // wend
+        [uc_filter_clause_base:filter_clause.toString(), uc_filter_clause_base_cnt:clause_cnt]
+        ]]
+        |
+        execute ossi blob service
+        where uc_az_service = 'blob list'
+        and uc_list_filter = @uc_filter_clause_base
+        catch(@?)
+        |
+        if ( @? = 0 and @cmd_result is not null )
+        {
+            parse ossi document queue json to res
+            where uc_doc_q_json = @cmd_result
+            catch(@?)
+            |
+            if ( @? = 0 )
+                filter data
+                where moca_filter_level = 1
+            else
+                [select 1 from dual where 1=2]
+        }
+        else
+            [select 1 from dual where 1=2]
+    }
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+   This command is used by front-end to query the document store and retrn data to caller for displaying per BY toolset
+</p>
+]]>
+</remarks>
+
+<retrows>n</retrows>
+<retcol name="parse ossi document queue json to res/*" type="COMTYP_CHAR">All output columns from here</retcol>
+
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+<seealso cref="get ossi document context key parameters"></seealso>
+
+
+</documentation>
+
+
+
+</command>

@@ -1,0 +1,2 @@
+polcod,polvar,polval,wh_id_tmpl,srtseq,rtstr1,rtstr2,rtnum1,rtnum2,rtflt1,rtflt2,grp_nam
+USR-OSSI-APP-MONITOR,_HELP,_HELP,----,1,"polvar = name of monitor. polval=COMMANDS rtstr1=detect command rtstr2=fix command, rtnum1=1 to enable, rtnum2=1 to raise ems on failure","fix command can raise error but no rows (use noop), detect command returns multiple rows for fix cmd",0,0,,,OSSISVN_10731

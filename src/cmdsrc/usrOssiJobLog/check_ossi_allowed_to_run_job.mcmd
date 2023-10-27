@@ -1,0 +1,285 @@
+<command>
+<name>check ossi allowed to run job</name>
+<description>Look at various parameters like time of day and time of job since last run to see if this job should run now</description>
+<type>Local Syntax</type>
+
+<argument name="wh_id" datatype="string">Warehouse Id</argument>
+<argument name="uc_now_dt" datatype="string">Pass in now date/time.  If not passed system time is taken</argument>
+<argument name="uc_sch_active_tim_start" datatype="string">Start time while job is active</argument>
+<argument name="uc_sch_active_tim_end" datatype="string">End time while job is active</argument>
+<argument name="uc_sch_inactive_tim_start" datatype="string">Start time while job is not allowed</argument>
+<argument name="uc_sch_inactive_tim_end" datatype="string">End time while job is not allowed</argument>
+<argument name="uc_sch_active_dow_list" datatype="string">List of days of week when job is not allowed to run</argument>
+<argument name="uc_sch_active_dom_list" datatype="string">List of days of month when job is allowed to run.  L means last day of month</argument>
+<argument name="uc_sch_inactive_dom_list" datatype="string">List of days of month when job is not allowed to run.  L means last day of month</argument>
+<argument name="uc_sch_tim_local_flg" datatype="string">If 1 then all times are local.  and uc_now_dt will be converted to local time as well.  Local to warehouse</argument>
+
+<argument name="uc_sch_interval" datatype="string">Interval in seconds since last run</argument>
+<argument name="uc_interval_chk_module_id" datatype="string">When doing interval check the module id to check</argument>
+<argument name="uc_interval_chk_job_id" datatype="string">When doing interval check the job id to check</argument>
+
+<local-syntax>
+<![CDATA[
+
+publish data
+where uc_now_dt = date(nvl(@uc_now_dt, sysdate ))
+and uc_sch_tim_local_flg = nvl(@uc_sch_tim_local_flg, 1 )
+and wh_id = nvl(@wh_id, @@WH_ID )
+and uc_sch_active_tim_start_cond_passed   = 1
+and uc_sch_active_tim_end_cond_passed     = 1
+and uc_sch_inactive_tim_start_cond_passed = 0
+and uc_sch_inactive_tim_end_cond_passed   = 0
+and uc_sch_active_dow_list_cond_passed    = 1
+and uc_sch_active_dom_list_cond_passed    = 1
+and uc_sch_inactive_dom_list_cond_passed  = 0
+|
+if ( @uc_sch_tim_local_flg = 1 and nvl(@wh_id,'----') != '----' )
+    publish data
+    where use_uc_now_dt = date(ossi__get_wh_local_time(@wh_id,'yyyyMMddHHmmss', @uc_now_dt))
+else
+    publish data
+    where use_uc_now_dt = @uc_now_dt
+|
+/*
+ * using java, we will find the last day of month for this date and also the day of week as a number.
+ * We have advertised that Monday is 1 so we are passing US locale
+ */
+[[
+//
+df = new java.text.SimpleDateFormat ( "u", new Locale("us", "EN") );
+Calendar cal = Calendar.getInstance();
+cal.setTime ( use_uc_now_dt );
+last_day_of_month = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
+day_of_week = df.format(use_uc_now_dt);
+]]
+|
+publish data
+where uc_now_dom = to_char(@use_uc_now_dt, 'DD')
+|
+/*
+ * We need to parse this now to get day of week day of month etc.
+ */
+publish data
+where uc_now_dom = @uc_now_dom
+and uc_now_time = to_char(@use_uc_now_dt, 'HH24:MI:SS' )
+and uc_now_dow = @day_of_week
+and uc_now_dom_last = @last_day_of_month
+and uc_now_dom_ind = iif ( @uc_now_dom = @uc_now_dom_last, 'L', '' )
+|
+{
+    if ( @uc_sch_active_tim_start is not null )
+        publish data
+        where uc_sch_active_tim_start_cond_passed = iif ( @uc_now_time >= @uc_sch_active_tim_start, 1, 0 )
+    |
+    if ( @uc_sch_active_tim_end is not null )
+        publish data
+        where uc_sch_active_tim_end_cond_passed = iif ( @uc_now_time <= @uc_sch_active_tim_end, 1, 0 )
+    |
+    if ( @uc_sch_inactive_tim_start is not null )
+        publish data
+        where uc_sch_inactive_tim_start_cond_passed = iif ( @uc_now_time >= @uc_sch_inactive_tim_start, 1, 0 )
+    |
+    if ( @uc_sch_inactive_tim_end is not null )
+        publish data
+        where uc_sch_inactive_tim_end_cond_passed = iif ( @uc_now_time <= @uc_sch_inactive_tim_end, 1, 0 )
+    |
+    if ( @uc_sch_active_dow_list is not null )
+        publish data
+        where uc_sch_active_dow_list_cond_passed = iif ( instr( ','||@uc_sch_active_dow_list||',' , ','||@uc_now_dow||',') > 0, 1, 0 )
+    |
+    if ( @uc_sch_active_dom_list is not null )
+    {
+        publish data
+        where uc_sch_active_dom_list_cond_passed = iif ( instr(','||@uc_sch_active_dom_list||',' , ','||@uc_now_dom||',') > 0, 1, 0 )
+        |
+        if ( @uc_sch_active_dom_list_cond_passed = 0 )
+            publish data
+            where uc_sch_active_dom_list_cond_passed = iif ( instr(','||@uc_sch_active_dom_list||',' , ','||@uc_now_dom_ind||',') > 0, 1, 0 )
+        else
+            publish data
+            where uc_sch_active_dom_list_cond_passed = @uc_sch_active_dom_list_cond_passed
+    }
+    |
+    if ( @uc_sch_inactive_dom_list is not null )
+    {
+        publish data
+        where uc_sch_inactive_dom_list_cond_passed = iif ( instr(','||@uc_sch_inactive_dom_list||',' , ','||@uc_now_dom||',') > 0, 1, 0 )
+        |
+        if ( @uc_sch_inactive_dom_list_cond_passed = 0 )
+            publish data
+            where uc_sch_inactive_dom_list_cond_passed = iif ( instr(','||@uc_sch_inactive_dom_list||',' , ','||@uc_now_dom_ind||',') > 0, 1, 0 )
+        else
+            publish data
+            where uc_sch_inactive_dom_list_cond_passed = @uc_sch_inactive_dom_list_cond_passed
+    }
+    |
+    if ( 
+           @uc_sch_active_tim_start_cond_passed = 1 and @uc_sch_active_tim_end_cond_passed = 1         /* must start within range */
+           and @uc_sch_inactive_tim_start_cond_passed = 0 and @uc_sch_inactive_tim_end_cond_passed = 0 /* must not be inactive range */
+           and @uc_sch_active_dow_list_cond_passed = 1                                                 /* must be on active day of week */
+           and @uc_sch_active_dom_list_cond_passed = 1                                                 /* must be on active day of month */
+           and @uc_sch_inactive_dom_list_cond_passed = 0                                               /* must not be on inactive day of month */
+       )
+        publish data
+        where uc_allowed_per_sch = 1
+    else       
+        publish data
+        where uc_allowed_per_sch = 0
+    |
+    /*
+     * If allowed per schedule and we have interval then find that per it
+     */
+    if ( @uc_sch_interval > 0 and @uc_allowed_per_sch = 1 and
+         (@uc_interval_chk_job_id is not null or @uc_interval_chk_module_id is not null)
+       )
+    {
+        if ( @uc_interval_chk_job_id is null ) hide stack variable where name = 'uc_interval_chk_job_id'
+        |
+        if ( @uc_interval_chk_module_id is null )
+            publish data
+            where uc_interval_chk_module_id = '%'
+        |
+        [
+        select x.*
+        from
+        (
+            select uc_ossi_job_seq  last_uc_ossi_job_seq,
+                   uc_ossi_start_dt last_uc_ossi_start_dt,
+                   uc_ossi_end_dt   last_uc_ossi_end_dt
+            from usr_ossi_job_log
+            where @+uc_ossi_job_id^uc_interval_chk_job_id
+            and @+uc_ossi_module_id^uc_interval_chk_module_id
+            and uc_ossi_action_id = '%'
+            and uc_ossi_end_dt is not null
+            and uc_ossi_start_dt is not null
+            and nvl(uc_ossi_err_code,0) = 0
+            and rownum < 999999
+            order by uc_ossi_job_seq desc, uc_ossi_module_id desc
+        ) x
+        where rownum < 2
+        ]
+        catch (-1403,510)
+        |
+        if ( @? != 0 )
+            publish data
+            where uc_allowed_to_run = 1
+        else
+        {
+            publish data
+            where uc_elapsed_since_last_run = (@uc_now_dt - @last_uc_ossi_end_dt)*24*3600
+            |
+            if ( @uc_elapsed_since_last_run > @uc_sch_interval )
+                publish data
+                where uc_allowed_to_run = 1
+                and uc_elapsed_since_last_run = @uc_elapsed_since_last_run
+                and last_uc_ossi_job_seq = @last_uc_ossi_job_seq
+                and last_uc_ossi_start_dt = @last_uc_ossi_start_dt
+                and last_uc_ossi_end_dt = @last_uc_ossi_end_dt
+            else
+                publish data
+                where uc_allowed_to_run = 0
+                and uc_elapsed_since_last_run = @uc_elapsed_since_last_run
+                and last_uc_ossi_job_seq = @last_uc_ossi_job_seq
+                and last_uc_ossi_start_dt = @last_uc_ossi_start_dt
+                and last_uc_ossi_end_dt = @last_uc_ossi_end_dt
+        }
+    }
+    else if ( @uc_allowed_per_sch = 1 )
+        publish data
+        where uc_allowed_to_run = 1
+    else
+        publish data
+        where uc_allowed_to_run = 0
+    |
+    publish data
+    where uc_allowed_to_run = @uc_allowed_to_run
+    and uc_allowed_per_sch = @uc_allowed_per_sch
+    and uc_now_dt = @uc_now_dt
+    and use_uc_now_dt = @use_uc_now_dt
+    and uc_now_dom = @uc_now_dom
+    and uc_now_time = @uc_now_time
+    and uc_now_dow = @uc_now_dow
+    and uc_now_dom_last = @uc_now_dom_last
+    and uc_now_dom_ind = @uc_now_dom_ind
+    and uc_sch_active_tim_start_cond_passed = @uc_sch_active_tim_start_cond_passed
+    and uc_sch_active_tim_end_cond_passed = @uc_sch_active_tim_end_cond_passed
+    and uc_sch_inactive_tim_start_cond_passed = @uc_sch_inactive_tim_start_cond_passed
+    and uc_sch_inactive_tim_end_cond_passed = @uc_sch_inactive_tim_end_cond_passed
+    and uc_sch_active_dow_list_cond_passed = @uc_sch_active_dow_list_cond_passed
+    and uc_sch_active_dom_list_cond_passed = @uc_sch_active_dom_list_cond_passed
+    and uc_sch_inactive_dom_list_cond_passed = @uc_sch_inactive_dom_list_cond_passed
+    and uc_elapsed_since_last_run = @uc_elapsed_since_last_run
+    and last_uc_ossi_job_seq = @last_uc_ossi_job_seq
+    and last_uc_ossi_start_dt = @last_uc_ossi_start_dt
+    and last_uc_ossi_end_dt = @last_uc_ossi_end_dt
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<remarks>
+<![CDATA[
+<p>
+We can schedule certain jobs such that they are scheduled per job scheduleer to run more frequently but they have their own constraints to define when they should run.  Specifically 
+we use this for auto wave jobs.  The constraints are more complex as they can be seen in usr_auto_wave_rule_hdr table.
+
+So idea is that:
+<ul>
+    <li>The job will run more frequently, e.g. every minute</li>
+    <li>The job is expected to push its run information to usr_ossi_job_log table.  The job id or module id is set predictabally</li>
+    <li>Every time the job runs, it will see if it should do any work based on various constraints that are defined in input and also in table usr_auto_wave_rule_hdr</li>
+    <li>The caller will utilize the return field uc_allowed_to_run.  if 1 then the work should be done</li>
+</ul>
+
+The logic is 
+<ul>
+    <li>Per uc_sch_tim_local_flg, we will utilze warehouse local time.  Default is 1</li>
+    <li>uc_sch_active_tim_start and uc_sch_active_tim_end optionally define a time range.  Time should be withn that (if passed in) for the job to run.</li>
+    <li>uc_sch_inactive_tim_start and uc_sch_inactive_tim_end define a range when job should not run.  So if time is within this range we will not run the job</li>
+    <li>uc_sch_active_dow_list, if passed in, is a coma-sepated list of days of week when job is run.  Not passing in means it can run on any day.  Monday is 1</li>
+    <li>uc_sch_active_dom_list, if passed in, is a coma-separated list of days of month when job is run.  Not pass in means it can run on any day.  L here means last day of month</li>
+    <li>uc_sch_inactive_dom_list, if passed in, is a coma-separated list of days of month when job is not run.  Not pass in means it can run on any day.  L here means last day of month</li>
+    <li>
+        uc_sch_interval is interval in seconds since last successful run of this job.  We will look at usr_ossi_job_log by using uc_ossi_job_id as uc_interval_chk_job_id or uc_interval_chk_module_id.
+        Then we will see if this much time has passed since that run.  If interval has passed then job will run.
+    </li>
+</ul>
+
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+<retcol name="uc_allowed_to_run" type="COMTYP_CHAR">Caller should see this value.  If 1 then job should run</retcol>
+<retcol name="uc_allowed_per_sch" type="COMTYP_CHAR">If 1 then means it was allowed per schedule only (disregading last run information)</retcol>
+<retcol name="uc_now_dt" type="COMTYP_CHAR">the system date/time used to make the decision</retcol>
+<retcol name="use_uc_now_dt" type="COMTYP_CHAR">This is the date/time used to make calculations.  It may be different from uc_now_dt if using warehouse local time</retcol>
+<retcol name="uc_now_dom" type="COMTYP_CHAR">Day of month</retcol>
+<retcol name="uc_now_time" type="COMTYP_CHAR">Time portion as HH:MI:SS.  Hour in 24 hour format</retcol>
+<retcol name="uc_now_dow" type="COMTYP_CHAR">Day of week.  Monday is 1</retcol>
+<retcol name="uc_now_dom_last" type="COMTYP_CHAR">What is last day of month based on date passed in</retcol>
+<retcol name="uc_now_dom_ind" type="COMTYP_CHAR">If now is last day of month this will be L otherwise null</retcol>
+<retcol name="uc_sch_active_tim_start_cond_passed" type="COMTYP_CHAR">1 if uc_sch_active_tim_start condition passed 0 otherwise</retcol>
+<retcol name="uc_sch_active_tim_end_cond_passed" type="COMTYP_CHAR">1 if uc_sch_active_tim_end condition passed 0 otherwise</retcol>
+<retcol name="uc_sch_inactive_tim_start_cond_passed" type="COMTYP_CHAR">1 if uc_sch_inactive_tim_start condition passed 0 otherwise</retcol>
+<retcol name="uc_sch_inactive_tim_end_cond_passed" type="COMTYP_CHAR">1 if uc_sch_inactive_tim_end condition passed 0 otherwise</retcol>
+<retcol name="uc_sch_active_dow_list_cond_passed" type="COMTYP_CHAR">1 if now day of week is in the list or list is null.  0 otherwise</retcol>
+<retcol name="uc_sch_active_dom_list_cond_passed" type="COMTYP_CHAR">1 if now day of month is in the uc_sch_active_dom_list list or list is null.  0 otherwise</retcol>
+<retcol name="uc_sch_inactive_dom_list_cond_passed" type="COMTYP_CHAR">1 if now day of month is in the uc_sch_inactive_dom_list list or list is null.  0 otherwise</retcol>
+<retcol name="last_uc_ossi_job_seq" type="COMTYP_CHAR">Per input uc_interval_chk_job_id or uc_interval_chk_module_id, what was the last execution of job for calculating interval</retcol>
+<retcol name="last_uc_ossi_start_dt" type="COMTYP_CHAR">The start time of that job</retcol>
+<retcol name="last_uc_ossi_end_dt" type="COMTYP_CHAR">The end time of that job</retcol>
+<retcol name="uc_elapsed_since_last_run" type="COMTYP_CHAR">Seconds since last run of this job</retcol>
+
+
+
+<exception value="eOK">Normal successful completion</exception>
+
+<seealso cref="register ossi job or module"></seealso>
+
+
+</documentation>
+</command>

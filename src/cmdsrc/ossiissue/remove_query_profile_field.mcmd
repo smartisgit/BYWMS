@@ -1,0 +1,30 @@
+<command>
+<name>remove query profile field</name>
+<description>Removes all, so must be a pre-trigger</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ */
+process usr issue
+  where uc_table_name = 'PROFILE_FLDS'
+    and uc_action = 'REMOVE'
+;
+^remove query profile field
+  where @*
+
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This command removes all query profile fields.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

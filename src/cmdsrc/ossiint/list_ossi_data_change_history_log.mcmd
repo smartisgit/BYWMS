@@ -1,0 +1,101 @@
+<command>
+<name>list ossi data change history log</name>
+<description>List the data change history log</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="uc_data_change_hist_id"></argument>
+<argument datatype="string" name="dlytrn_id"></argument>
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+publish data
+where uc_data_change_hist_id = null
+and uc_data_table_name = null
+|
+if ( @dlytrn_id is not null )
+    [
+    select dlytrn.trndtl_id uc_data_change_hist_id,
+           dlytrn.to_value  uc_data_table_name
+    from dlytrn
+    where dlytrn_id = @dlytrn_id
+    ]
+|
+if ( @uc_data_table_name is not null )
+{
+    publish data
+    where uc_sessvar = 'uc_hlog_table_list_' || @uc_data_table_name
+    |
+    execute ossi moca and cache
+    where uc_cache_key = 'UC_HLOG_TABLE_LIST_' || upper(@uc_data_table_name)
+    and uc_inline = 1
+    and uc_moca_cmd = "
+    {
+        save session variable where name = @uc_sessvar and value = ''
+        ;
+        {
+            list table columns where table_name = 'usr_data_change_hist_log'  
+            >> res_his_table_cols
+            |
+            list table columns where table_name = @uc_data_table_name
+            |
+            {
+                publish data
+                where uc_data_table_column_name = @column_name 
+                |
+                publish data combination
+                where res = @res_his_table_cols
+                |
+                if ( upper(@column_name) = upper(@uc_data_table_column_name) )
+                {
+                    if ( ossi__sess_var ( @uc_sessvar, '', 'Y' ) is null )
+                        save session variable where name = @uc_sessvar and value = @uc_data_table_column_name
+                    else
+                        save session variable where name = @uc_sessvar and value = ossi__sess_var ( @uc_sessvar) || ',' || @uc_data_table_column_name
+                }
+            }
+            ;
+            publish data
+            where uc_table_select_clause = ossi__sess_var ( @uc_sessvar, '', 'Y' )
+        }
+    }"
+    |
+    publish data
+    where uc_select_clause = "uc_data_change_hist_id, uc_data_change_typ_cd, " || @uc_table_select_clause || ",uc_log_usr_id, uc_log_devcod,uc_log_oper_cd, wh_id, uc_log_table_name, trndte"
+}
+else
+{
+    publish data
+    where uc_select_clause = "*"
+}
+|
+{
+    [
+    select @uc_select_clause:raw
+    from usr_data_change_hist_log
+    where @*
+    and @+uc_data_change_hist_id
+    order by uc_data_change_hist_id, uc_data_change_typ_cd
+    ]
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+List the history log
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

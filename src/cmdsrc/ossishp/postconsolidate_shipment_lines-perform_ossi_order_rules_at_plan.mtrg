@@ -1,0 +1,49 @@
+<trigger>
+<name>perform ossi order rules at plan</name>
+<on-command>postconsolidate shipment lines</on-command>
+<description></description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+/*
+ * Change Log
+ * Initial Check In
+ * 20200415 mustafa.ahmed
+ */
+if( @ship_id is not null and @uc_inhibit_change_hook != '1')
+{
+    if ( ossi__polval ( 'USR-OSSI-DATA-CHANGE-HOOK', 'CMD_POSTCONSOLIDATE_SHIPMENT_LINES_POST', 'PERFORM-OSSI-ORDER-RULES-AT-PLAN', '', 'rtnum1', nvl(@wh_id,@@WH_ID)) != 0 )
+    {
+        perform ossi order rules at plan
+    }
+}
+
+]]>
+</local-syntax>
+<fire-sequence>10030</fire-sequence>
+<enable>yes</enable>
+<documentation>
+<remarks>
+<![CDATA[
+
+When shipment has been created by any process, then this rule runs to potentially update orders.  for example there may be order data that we wanted
+to delay update as later as possible - data such as allocation search path.
+This hook will then update such data.
+
+]]>
+</remarks>
+
+
+<seealso cref="perform ossi order rules at plan"></seealso>
+
+<policy
+    polcod="USR-OSSI-DATA-CHANGE-HOOK"
+    polvar="CMD_POSTCONSOLIDATE_SHIPMENT_LINES_POST"
+    polval="PERFORM-OSSI-ORDER-RULES-AT-PLAN"
+    rtnum1="1 to enable the functioality and 0 to disable"
+></policy>
+
+</documentation>
+
+</trigger>

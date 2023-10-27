@@ -1,0 +1,25 @@
+<trigger>
+<name>process usr issue</name>
+<on-command>create area for exit point for service</on-command>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ */
+process usr issue
+  where uc_table_name = 'WH_SERV_EXITPNT_ARECOD'
+    and uc_action = 'ADD'
+]]></local-syntax>
+<fire-sequence>10000</fire-sequence>
+<documentation>
+
+<remarks>
+This trigger process issue for creating area for exit point for service.
+</remarks>
+
+<seealso cref="process usr issue"></seealso>
+
+</documentation>
+</trigger>

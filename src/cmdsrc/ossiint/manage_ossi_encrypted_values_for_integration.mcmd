@@ -1,0 +1,103 @@
+<command>
+<name>manage ossi encrypted values for integration</name>
+<description>We can have communication method attributes with encrypted values.  This API will be used to decrypt them 
+or provide encrypted equivalent values.
+</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="uc_data">String that we want to handle</argument>
+<argument datatype="string" name="uc_enc_mode">Mode, i.e. encrypt or decrypt E or D</argument>
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20210418 saad.ahmad - 11989 - Autostore project
+ */
+publish data
+where uc_enc_prefix = "|SMART_ENC|"
+|
+publish data
+where uc_enc_prefix_len = len(@uc_enc_prefix)
+|
+{
+    if ( @uc_enc_mode = 'D' and ossi__sess_var ( 'uc_int_comm_context','','Y') != 'SMART_INT_CONTEXT' )
+        set return status
+        where status = 999999
+        and message = "Not called in proper context for requesting decrypt"
+    /*
+     * if string is not prefixed by our special value, then return as-is
+     */
+    else if ( @uc_enc_mode = 'D' and @uc_data not like @uc_enc_prefix || '%' ) 
+        publish data
+        where ret = @uc_data
+    else
+    {
+        [[
+        import javax.xml.bind.DatatypeConverter;
+        import java.security.Key;
+        import javax.crypto.Cipher;
+        import javax.crypto.spec.SecretKeySpec;
+        //
+        String key = "1#234SMARTISxd4#"; // 128 bit key
+        String str_return;
+        //
+        Key aesKey = new SecretKeySpec(key.getBytes(), "AES");
+        Cipher cipher = Cipher.getInstance("AES");
+        //
+        if ( uc_enc_mode == "E" )
+        {
+            cipher.init(Cipher.ENCRYPT_MODE, aesKey);
+            byte[] encrypted = cipher.doFinal(uc_data.getBytes());
+            str_return = uc_enc_prefix + DatatypeConverter.printBase64Binary(encrypted);
+        }
+        else
+        {
+            cipher.init(Cipher.DECRYPT_MODE, aesKey);
+            // first base 64 decode
+            byte[] decoded = DatatypeConverter.parseBase64Binary(uc_data.substring(uc_enc_prefix_len));
+            str_return = new String(cipher.doFinal(decoded));
+        }
+        [str_return:str_return,uc_enc_mode:uc_enc_mode]
+        ]]
+        |
+        publish data
+        where ret = @str_return
+    }
+    |
+    publish data
+    where usr_pswd = @ret
+    and uc_enc_mode = @uc_enc_mode
+    and uc_input = @uc_data
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+This is the core function to encrypt or decrypt a value.  idea is that we save encrypted values for credentials and then when we request them
+from communication algroithms, we will get the decrypted value retruned.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+<exception value="999999">Return an error if we detect that decrypt is called in a context without integration</exception>
+
+
+<retrows>1</retrows>
+<retcol name="usr_pswd" type="COMTYP_CHAR">This is the encrypted or decrypted.  Name is this because this is black-listed arg typically so this will not show in trace</retcol>
+<retcol name="uc_enc_mode" type="COMTYP_CHAR">E or D</retcol>
+<retcol name="uc_input" type="COMTYP_CHAR">What was the input</retcol>
+
+<seealso cref="ossi int_decrypt"></seealso>
+<seealso cref="set ossi integration communication context"></seealso>
+
+
+
+
+</documentation>
+
+
+</command>

@@ -1,0 +1,44 @@
+<command>
+<name>ossi get_dwnld_info_from_ifd_data_ptr</name>
+<description>Given an ifd data pointer that is available when logging an event,
+determine the dwnld_info</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+/*
+ * Expected argument is ifd_data_ptr
+ */
+sl_list ifd_data_ptr 
+catch (@?)
+|
+if ( @? = 0 and @ifd_data_seq )
+{
+	[
+	select d.dwnld_info
+	from sl_ifd_data_hdr h join sl_dwnld d on d.dwnld_seq = h.dwnld_seq
+	where 1=1
+	and h.ifd_data_seq = @ifd_data_seq
+	]
+	catch (-1403,510)
+}
+
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This command may be used to get download infor from ifd pointers.
+</remarks>
+
+
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

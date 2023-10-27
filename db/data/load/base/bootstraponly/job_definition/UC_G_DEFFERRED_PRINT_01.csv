@@ -1,0 +1,2 @@
+job_id,role_id,name,enabled,type,command,log_file,trace_level,overlap,schedule,start_delay,timer,grp_nam
+UC_G_DEFFERRED_PRINT_01,,Deferred Printing Job #1.  Via usr_ossi_doc_store,1,timer,execute ossi deferred commands async where exec_typ = 'DPRT' and uc_thread_group_by_col = 'exec_kv3' and comflg = 1,$LESDIR/log/UC_G_DEFFERRED_PRINT_01.log,,0,,0,30,GK

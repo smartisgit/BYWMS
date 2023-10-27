@@ -1,0 +1,127 @@
+<command>
+<name>process ossi ldap sync send user shutdown</name>
+<description>Process LDAP Sync for a user - Send dhutdown to disabled users</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="uc_ossi_job_seq"></argument>
+<argument datatype="string" name="uc_ossi_who"></argument>
+
+
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+
+publish data
+where uc_ldap_sync_send_shutdown = ossi__polval ( 'USR-OSSI-LDAP-SYNC', 'LES_USR_ATH', 'SEND-SHUTDOWN-ON-DISABLE', '', 'rtnum1', '----')
+|
+publish data
+where uc_ossi_module_seq = ossi__register_module ( @uc_ossi_job_seq, 'LES_USR_ATH', 'Send shutdown to disabled users', @uc_ossi_who )
+|
+try
+{
+   if ( @uc_ldap_sync_send_shutdown = 1 )
+   {
+      publish data
+      where uc_string_uc_ossi_job_seq = string(@uc_ossi_job_seq)
+      |
+      [
+      select movref uc_disabled_usr_id
+      from dlytrn
+      where traknm = @uc_string_uc_ossi_job_seq
+      and actcod = 'UC_LSYNCU'
+      and var_nam = 'usr_sts'
+      and to_value = 'I'
+      ]
+      catch (-1403,510)
+      |
+      if ( @? = 0 )
+      {
+         /*
+          * Find devices that this user is on right now as a CSV list
+          */
+         if (len(@uc_disabled_usr_id) >= 20)
+         {
+           [
+           select wh_id,
+                  devcod
+           from devmst
+           where lst_usr_id like @uc_disabled_usr_id || '%'
+           order by 1,2
+           ]
+           catch (-1403,510)
+         }
+         else
+         {
+           [
+           select wh_id,
+                  devcod
+           from devmst
+           where lst_usr_id = @uc_disabled_usr_id
+           order by 1,2
+           ]
+           catch (-1403,510)
+         }
+         |
+         if ( @? = 0 )
+         {
+            publish data
+            where uc_ldap_sync_send_shutdown_msgtyp = ossi__polval ( 'USR-OSSI-LDAP-SYNC', 'LES_USR_ATH', 'SEND-SHUTDOWN-ON-DISABLE', '', 'rtstr1', @wh_id)
+            and uc_ldap_sync_send_shutdown_msg = ossi__polval ( 'USR-OSSI-LDAP-SYNC', 'LES_USR_ATH', 'SEND-SHUTDOWN-ON-DISABLE', '', 'rtstr2', @wh_id)
+            |
+            if ( @uc_ldap_sync_send_shutdown_msgtyp is not null )
+            {
+               send message to device
+               where devcod = @devcod
+               and wh_id = @wh_id
+               and msgtyp = @uc_ldap_sync_send_shutdown_msgtyp
+               and msg = @uc_ldap_sync_send_shutdown_msg
+               catch(@?) /* dont stop on any error */
+               |
+               publish data where uc_send_message_status = @? and uc_send_message_message = @!
+               |
+               write daily transaction
+               where actcod = 'UC_LSYNCSH'
+               and movref = substr(@uc_disabled_usr_id,1,20)
+               and traknm = string(@uc_ossi_job_seq)
+               and reacod = 'SENDMSG'
+               and var_nam = 'msgtyp'
+               and fr_value = ''
+               and to_value = @uc_ldap_sync_send_shutdown_msgtyp
+               and adj_ref1 = @uc_send_message_status
+               and devcod = @devcod
+               and adj_ref2 = @msg_id /* returned by send */
+               and cmnt = 'Sent shutdown message.  Status Message =' || @uc_send_message_message
+               and wh_id = @wh_id
+            } /* have a message in pol */
+         } /* found devices connected */
+      } /* found disabled users in this round */
+   } /* is functionality enabled? */
+   ;
+   complete ossi job log
+} /* module */
+catch (@?)
+{
+   raise ossi job error
+   where uc_ossi_err_code  = @?
+   and   uc_ossi_err_descr = @!
+   and   is_job_flg = '0'
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+This component send shutdown message to disabled users
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

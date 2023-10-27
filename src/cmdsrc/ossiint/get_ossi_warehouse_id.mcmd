@@ -1,0 +1,47 @@
+<command>
+<name>get ossi warehouse id</name>
+<description>Get warehouse id</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+if ( nvl(@wh_id,'----') != '----' )
+   publish data
+   where wh_id = @wh_id
+else if ( nvl(@@WH_ID,'----') != '----' )
+   publish data
+   where wh_id = @@WH_ID
+else
+{
+   [
+   select wh_id
+   from 
+   (
+      select wh_id
+      from wh
+      where rownum < 99999
+      order by
+             decode(def_wh_flg, 1, 1, 2 ),
+             wh_id
+   ) x
+   where rownum < 2
+   ]
+}
+
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This command is used to get warehouse id.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

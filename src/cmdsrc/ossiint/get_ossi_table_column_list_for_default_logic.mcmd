@@ -1,0 +1,70 @@
+<command>
+<name>get ossi table column list for default logic</name>
+<description>per policy get the column list that can then be used to establish the context</description>
+
+<argument name="table_name" required="yes" datatype="string">Table that we want to query for</argument>
+
+<argument name="column_source_prefix" required="yes" datatype="string">A prefix for every column for select list use source column</argument>
+<argument name="column_name_prefix" required="yes" datatype="string">A prefix for every column for select list use name of the column</argument>
+
+<argument name="uc_output_col_select_clause" required="yes" datatype="string">What should be final output column for select clause</argument>
+<argument name="uc_output_col_group_clause" required="yes" datatype="string">What should be final output column for select clause</argument>
+
+<argument name="uc_col_ctxt_polcod" required="yes" datatype="string">Polcod that has the metadata.  Default to USR-OSSI-DEFAULT-CTXT-COLUMNS</argument>
+<argument name="uc_col_ctxt_polvar" required="yes" datatype="string">Polcod that has the metadata.  Default to COLUMN-LIST</argument>
+
+
+
+<type>Local Syntax</type>
+
+<local-syntax>
+<![CDATA[
+
+publish data
+where uc_output_col_select_clause = nvl(@uc_output_col_select_clause, "my_select_clause" )
+and uc_output_col_group_clause = nvl(@uc_output_col_group_clause, "my_group_clause" )
+and uc_col_ctxt_polcod = nvl(@uc_col_ctxt_polcod, 'USR-OSSI-DEFAULT-CTXT-COLUMNS')
+and uc_col_ctxt_polvar = nvl(@uc_col_ctxt_polvar, 'COLUMN-LIST' )
+|
+{
+    execute ossi moca and cache
+    where uc_cache_grp = 'OSSI_DEFAULT_RULES'
+    and uc_cache_key = @table_name || '__' || @column_source_prefix || '__' || @column_name_prefix || '__COL_LIST'
+    and uc_inline = 1
+    and uc_moca_cmd = "get ossi table column list for default logic core"
+    catch (-1403,510)
+    |
+    execute server command
+    where cmd = " publish data"
+             || " where " || @uc_output_col_select_clause || " = @sel_clause"
+             || " and   " || @uc_output_col_group_clause  || " = @group_clause"
+    and inline = 1
+}
+  
+]]>
+
+</local-syntax>
+
+<documentation>
+
+<remarks>
+<![CDATA[
+  <p>
+   This component calls the change and publishes old values that we are interested in
+  </p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+<retcol name="@uc_output_col_select_clause" type="String">select clause.  Column name is per input</retcol>
+<retcol name="@uc_output_col_group_clause" type="String">group clause.  Column name is per input</retcol>
+
+
+<exception value="eOK">Normal successful completion</exception>
+
+
+<seealso cref="get ossi table column list for default logic core"></seealso>
+
+
+</documentation>
+</command>

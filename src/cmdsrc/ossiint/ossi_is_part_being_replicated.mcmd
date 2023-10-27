@@ -1,0 +1,43 @@
+<command>
+<name>ossi is_part_being_replicated</name>
+<description>See if we are in middle of part being replicated</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+publish data
+where prtnum = @moca_farg1
+and prt_client_id = nvl(@moca_farg2,'----')
+|
+publish data
+where my_sess_var = ossi__get_part_replication_sess_var ( @prtnum, @prt_client_id )
+|
+publish data
+where uc_repl_wh_id = ossi__sess_var ( @my_sess_var, '', 'Y' )
+|
+if ( @uc_repl_wh_id = '----' )
+    publish data
+    where ret = '1'
+else
+    publish data
+    where ret = '0'
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<remarks>
+This command may be used to see if we are in middle of part being replicated.
+</remarks>
+
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

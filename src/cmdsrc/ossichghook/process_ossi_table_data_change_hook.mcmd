@@ -1,0 +1,172 @@
+<command>
+<name>process ossi table data change hook</name>
+<description>This command will process data change hook per policy</description>
+
+<argument name="table_name" required="yes" datatype="string">The parent table</argument>
+<argument name="uc_update_where_clause" required="yes" datatype="string">The update clause to use</argument>
+<argument name="uc_change_hook_logic_override" required="yes" datatype="string">For testing may pass in on where clause.</argument>
+
+<argument name="uc_inhibit_change_hook" required="yes" datatype="string">For testing may pass in to not do anything</argument>
+
+<type>Local Syntax</type>
+
+<local-syntax>
+<![CDATA[
+
+publish data
+where wh_id = nvl(@wh_id, @@WH_ID)
+and table_name = upper(@table_name)
+|
+publish data
+where uc_hook_logic = nvl(@uc_change_hook_logic_override, nvl(ossi__polval ( 'USR-OSSI-DATA-CHANGE-HOOK', @table_name, 'ENABLED', '', 'rtnum1', '----'),0) )
+|
+if ( @uc_inhibit_change_hook = '1' )
+    noop
+else if ( @uc_hook_logic = 1 )
+    publish data
+    where table_name = @table_name
+    and uc_hook_logic = @uc_hook_logic
+    and uc_process_logic = 'No action - job will process as needed'
+else
+{
+    ossi called_from_integrator /* we have some logic that behaves differntly if being called from a processing alg */
+    |
+    save session variable where name = 'uc_called_from_int' and value = @uc_called_from_int
+    |
+    /* We always want to mark the row as processed */
+    if ( @uc_update_where_clause is null )
+    {
+        get ossi clause for primary key from stack
+        |
+        publish data
+        where uc_update_where_clause = @uc_where_clause
+    }
+    |
+    {
+        if ( @uc_hook_logic = 2 ) /* inline hook call */
+        {
+            publish data
+            where uc_rule_grp_id = ossi__polval ( 'USR-OSSI-DATA-CHANGE-HOOK', @table_name, 'UC_RULE_GRP', '', 'rtstr1', '----')
+            and uc_rule_subgrp_id= ossi__polval ( 'USR-OSSI-DATA-CHANGE-HOOK', @table_name, 'UC_RULE_GRP', '', 'rtstr2', '----')
+            and uc_table_list_set_defaults = ossi__polval ( 'USR-OSSI-DATA-CHANGE-HOOK', @table_name, 'TABLE-LIST-DEFAULT',  '', 'rtstr1', '----' )
+            and uc_set_default_rule_grp_id = ossi__polval ( 'USR-OSSI-DATA-CHANGE-HOOK', @table_name, 'UC_RULE_GRP_DEFAULT', '', 'rtstr1', '----' )
+            and uc_delay_when_int = ossi__polval ( 'USR-OSSI-DATA-CHANGE-HOOK', @table_name, 'DELAY-EXECUTION-WHEN-CALLED-FROM-INTEGRATOR', '', 'rtnum1', '----' )
+            |
+            /*
+             * This call will update the row regustration status.  It will also then fire triggers
+             * triggers will then do the logic
+             */
+            {
+                publish data
+                where uc_command_call = " register ossi object created core "
+                                     || " where " || @uc_update_where_clause
+                                     || " and   uc_reg_table_name          = " || qq(@table_name)
+                                     || " and   uc_rule_grp_id             = " || qq(@uc_rule_grp_id)
+                                     || " and   uc_rule_subgrp_id          = " || qq(@uc_rule_subgrp_id)
+                                     || " and   uc_expanded_reg_sql_where  = " || qq(@uc_update_where_clause)
+                                     || " and   uc_table_list_set_defaults = " || qq(@uc_table_list_set_defaults)
+                                     || " and   uc_set_default_rule_grp_id = " || qq(@uc_set_default_rule_grp_id)
+                                     || " and   uc_get_context_cmd         = " || qq(@uc_get_context_cmd)
+                                     || " and   uc_hook_logic_code         = " || @uc_hook_logic
+                |
+                if ( @uc_called_from_int = '1' and @uc_delay_when_int = 1 )
+                    submit ossi command for delayed integration execution
+                    where uc_submit_unique_calls_only = 1
+                    and uc_command_call = @uc_command_call
+                else
+                    execute server command
+                    where cmd = @uc_command_call
+                    and inline = 1
+                |
+                filter data
+                where moca_filter_level = 1
+                and table_name = @table_name
+                and uc_hook_logic = @uc_hook_logic
+                and uc_rule_grp_id = @uc_rule_grp_id
+                and uc_rule_subgrp_id = @uc_rule_subgrp_id
+                and uc_process_logic = 'Processed Inline'
+            }
+        }
+    }
+}
+  
+]]>
+
+</local-syntax>
+
+<documentation>
+
+<remarks>
+<![CDATA[
+  <p>
+   This component will hanld the logic of managing the data change hook. 
+  </p>
+
+
+
+
+]]>
+</remarks>
+
+
+<exception value="eOK">Normal successful completion</exception>
+
+<retrows>1</retrows>
+<retcol name="@*" type="COMTYP_CHAR">Based on context either we call the [register ossi object created core] in line or we call
+[submit ossi command for delayed integration execution].  Whatever that output is - it is part of command output
+</retcol>
+<retcol name="table_name" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_hook_logic" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_rule_grp_id" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_rule_subgrp_id" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_process_logic" type="COMTYP_CHAR"></retcol>
+
+
+
+<policy 
+    polcod="USR-OSSI-DATA-CHANGE-HOOK"
+    polvar="table name"
+    polval="ENABLED"
+    rtnum1="1 to enable via job.  0 to disable complete.  2 means inline call on trigger"   
+></policy>
+
+<policy 
+    polcod="USR-OSSI-DATA-CHANGE-HOOK"
+    polvar="table name"
+    polval="UC_RULE_GRP"
+    rtstr1="uc_rule_grp_id"
+    rtstr2="uc_rule_subgrp_id"
+></policy>
+
+<policy 
+    polcod="USR-OSSI-DATA-CHANGE-HOOK"
+    polvar="table name"
+    polval="TABLE-LIST-DEFAULT"
+    rtstr1="This is the list of tables as coma-separated for which we will invoke the SET rule to set the values"
+></policy>
+
+<policy 
+    polcod="USR-OSSI-DATA-CHANGE-HOOK"
+    polvar="table name"
+    polval="UC_RULE_GRP_DEFAULT"
+    rtstr1="This is the rule group for the SET rules"
+></policy>
+
+<policy 
+    polcod="USR-OSSI-DATA-CHANGE-HOOK"
+    polvar="table name"
+    polval="DELAY-EXECUTION-WHEN-CALLED-FROM-INTEGRATOR"
+    rtnum1="If 1 then if we are called within integration we delay the execution till all processing algs are done"
+></policy>
+
+<seealso cref="register ossi object created core"></seealso>
+<seealso cref="submit ossi command for delayed integration execution"></seealso>
+<seealso cref="process ossi delayed execution for integration"></seealso>
+<seealso cref="ossi called_from_integrator"></seealso>
+<seealso cref="execute ossi all conditional rules"></seealso>
+
+
+
+
+</documentation>
+</command> 

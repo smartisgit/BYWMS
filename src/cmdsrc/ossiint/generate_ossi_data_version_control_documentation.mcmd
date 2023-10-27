@@ -1,0 +1,93 @@
+<command>
+<name>generate ossi data version control documentation</name>
+<description>Generate the data version control documentation</description>
+<type>Local Syntax</type>
+
+
+<argument name="uc_env_id_this" required="yes" datatype="string">This is how to look up the ossi_bugs_ckin_data in this environment</argument>
+<argument name="uc_env_id_hub" required="yes" datatype="string">This is how to look up the ossi_bugs_ckin_data in this environment</argument>
+
+<argument name="uc_include_hub" required="yes" datatype="string">If 1 include hub</argument>
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+ 
+publish data
+where uc_hub_url = @@UC_HUB_URL
+and uc_env_id_this = nvl(@uc_env_id_this, 'rpalwms' )
+and uc_env_id_hub = nvl(@uc_env_id_hub, 'rpalhub' )
+and uc_include_hub = nvl(@uc_include_hub, 1 )
+|
+{
+    /* Data Version Control */
+    {
+        generate ossi data version control documentation for data
+    }
+    &
+    /* First do this environment */
+    {
+        generate ossi data version control documentation base
+        ;
+        generate ossi data version control documentation core
+        where uc_env_id = @uc_env_id_this
+    }
+    &
+    if ( @uc_include_hub = 1 )
+    {
+        Remote ( @uc_hub_url ) 
+            publish data where uc_hub_lesdir = @@LESDIR
+        |
+        publish data
+        where uc_use_lesdir = @uc_hub_lesdir
+        |
+        {
+            generate ossi data version control documentation base
+            where url = @uc_hub_url
+            ;
+            generate ossi data version control documentation core
+            where uc_env_id = @uc_env_id_hub
+        }
+    }
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This generates version control documentation.  It takes care of laying out base and then on top lays down where we have modifications.  It can optionally take care of hub as well
+</p>
+]]>
+</remarks>
+
+<retrows>n</retrows>
+
+<retcol name="ossi_file_path" type="COMTYP_CHAR"></retcol>
+<retcol name="data_object_file" type="COMTYP_CHAR"></retcol>
+<retcol name="data_object_folder" type="COMTYP_CHAR"></retcol>
+<retcol name="data_object" type="COMTYP_CHAR"></retcol>
+<retcol name="filnam" type="COMTYP_CHAR"></retcol>
+<retcol name="path" type="COMTYP_CHAR"></retcol>
+
+
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+<seealso cref="get ossi documentation alg usage"></seealso>
+
+</documentation>
+
+
+
+</command>

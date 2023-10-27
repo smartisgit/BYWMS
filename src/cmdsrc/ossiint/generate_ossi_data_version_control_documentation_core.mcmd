@@ -1,0 +1,248 @@
+<command>
+<name>generate ossi data version control documentation core</name>
+<description>Generate the data version control documentation
+</description>
+<type>Local Syntax</type>
+
+<argument name="uc_env_id" required="yes" datatype="string">This is how to look up the ossi_bugs_ckin_data</argument>
+<argument name="uc_use_lesdir" required="yes" datatype="string">Where to place the stuff</argument>
+<argument name="uc_bug_id_url_prefix" required="yes" datatype="string">URL etc. to link to bugzilla</argument>
+<argument name="uc_rollout_url_prefix" required="yes" datatype="string">URL etc. to link to rollout</argument>
+<argument name="path_to_docs" required="yes" datatype="string">Relative path to get to docs folder</argument>
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+publish data
+where uc_use_lesdir = nvl(@uc_use_lesdir, @@LESDIR)
+and uc_bug_id_url_prefix = nvl(@uc_bug_id_url_prefix, 'https://bugzilla.oracular.com/bugzilla/show_bug.cgi?id=' )
+and uc_rollout_url_prefix= nvl(@uc_rollout_url_prefix,'https://bugzilla.oracular.com/RolloutApp/bugsinrollout.php?template=Y&rolloutname=' )
+and path_to_docs = nvl(@path_to_docs, '../../docs' )
+and my_table_html = '<table class="my-table" width="140%">'
+and my_td_style = 'valign="top" style="word-wrap: break-word;font-size: 10"'
+|
+publish data
+where uc_rev_log_main_folder = @uc_use_lesdir || '/uc_rev_log'
+and uc_int_path = '/trunk/db/data/load/base/usrOssiSLEXP/'
+|
+publish data
+where uc_int_object_lookup_expr = @uc_env_id || @uc_int_path || '%'
+|
+publish data
+where uc_main_lookup_expr = @uc_int_object_lookup_expr || '%'
+|
+{
+    release internal tables
+    ;
+
+    /*
+     * Extract the whole bug ckin data into internal table
+     */
+    execute ossi bugzilla select
+    where uc_select_stmt = " select ckin.bug_id, "
+                        || "        ckin.ossi_seqnum,"
+                        || "        ckin.ossi_action,"
+                        || "        ckin.ossi_file_path,"
+                        || "        ckin.ossi_author,"
+                        || "        ckin.ossi_rev,"
+                        || "        ckin.ossi_ckin_dt,"
+                        || "        bugs.short_desc,"
+                        || "        bugs.cf_rollout,"
+                        || "        bugs.cf_customer_issue_number,"
+                        || "        bugs.cf_release_notes"
+                        || " from ossi_bug_ckin_data ckin"
+                        || "      join bugs on bugs.bug_id = ckin.bug_id"
+                        || " where ckin.ossi_file_path like @uc_int_object_lookup_expr "
+                        || " and ckin.ossi_file_path not like '%/'"
+    >> res_all_int
+    |
+    {
+        create internal table where table_name = 'uc_all_int' and res = @res_all_int
+    }
+    ;
+    select from internal table
+    where select_stmt = " select distinct ossi_file_path"
+    and where_clause = "where ossi_file_path like '" || @uc_main_lookup_expr || "'"
+    and table_name = 'uc_all_int'
+    |
+    {
+        publish data
+        where len_ossi_file_path = len(@ossi_file_path)
+        |
+        /* Extract last slash position */
+        [
+        select instr(@ossi_file_path, '/', -1 ) int_last_slash
+        from dual
+        ]
+        |
+        /* Extract last slash position */
+        [
+        select instr(@ossi_file_path, '/', -1*(@len_ossi_file_path-@int_last_slash+2) ) int_2nd_last_slash
+        from dual
+        ]
+        |
+        /* Extrat the name of int object */
+        [
+        select substr(@ossi_file_path, @int_last_slash +1) data_object_file,
+               substr(@ossi_file_path, @int_2nd_last_slash+1, @int_last_slash - @int_2nd_last_slash - 1 ) data_object_folder
+        from dual
+        ]
+        |
+        {
+            if ( @data_object_folder like '%_sl_%' )
+                publish data
+                where uc_typ = substr(@data_object_folder, instr(@data_object_folder, '_' ) + 1 )
+            |
+            publish data
+            where uc_typ = @uc_typ
+            and uc_rev_log_folder = @uc_rev_log_main_folder || '/' || @uc_typ
+            and uc_object_file_path_expr = @uc_env_id || @uc_int_path || '%' || @uc_typ || '/'
+            |
+            filter data 
+            where moca_filter_level = '1'
+            and path = @uc_rev_log_folder
+        }
+        |
+        /*
+         * Get a suitable title
+         */
+        if ( @uc_typ = 'sl_alg' )
+            publish data where uc_doc_title_typ = 'Algorithm'
+        else if ( @uc_typ = 'sl_alt_evt_arg' )
+            publish data where uc_doc_title_typ = 'Alternate Event Arguments'
+        else if ( @uc_typ = 'sl_comm_mthd' )
+            publish data where uc_doc_title_typ = 'Communication Method'
+        else if ( @uc_typ = 'sl_eo' )
+            publish data where uc_doc_title_typ = 'Event Output'
+        else if ( @uc_typ = 'sl_evt' )
+            publish data where uc_doc_title_typ = 'Event'
+        else if ( @uc_typ = 'sl_i_ifd' )
+            publish data where uc_doc_title_typ = 'Inbound IFD'
+        else if ( @uc_typ = 'sl_o_ifd' )
+            publish data where uc_doc_title_typ = 'Result IFD'
+        else if ( @uc_typ = 'sl_o_ifd_sys_map' )
+            publish data where uc_doc_title_typ = 'Result IFD - System Map'
+        else if ( @uc_typ = 'sl_retr_mthd' )
+            publish data where uc_doc_title_typ = 'Retrieve Method'
+        else if ( @uc_typ = 'sl_retr_mthd_impl_def' )
+            publish data where uc_doc_title_typ = 'Retrieve Method Implementation'
+        else if ( @uc_typ = 'sl_sql_crsr_component' )
+            publish data where uc_doc_title_typ = 'SQL Cursor Component'
+        else if ( @uc_typ = 'sl_sys' )
+            publish data where uc_doc_title_typ = 'System'
+        else if ( @uc_typ = 'sl_sys_comm' )
+            publish data where uc_doc_title_typ = 'System Communication'
+        else if ( @uc_typ = 'sl_sys_comm_val' )
+            publish data where uc_doc_title_typ = 'System Communication Values'
+        else if ( @uc_typ = 'sl_sys_comm_val_bnd_data' )
+            publish data where uc_doc_title_typ = 'System Communication Values Bind Values'
+        else 
+            publish data where uc_doc_title_typ = 'Integration Object'
+        |
+        publish data
+        where data_object = ossi__replace ( ossi__replace ( @data_object_file, '.slexp', '' ), '.csv', '' )
+        |
+        publish data
+        where filnam = ossi__html_val (@data_object, 1 ) ||  '.html' 
+        |
+        {
+            create directory 
+            where directory = @path
+            catch(@?)
+            ;
+            get ossi head for integration documentation
+            where doc_title = @uc_doc_title_typ || ':' || @data_object
+            |
+            {
+                write output file 
+                where data = @uc_typical_file_header 
+                          || @my_table_html
+                          || @uc_typical_tr_head
+                          ||     '<th width="2%" ' || @my_td_style || '>Bug#</th>'
+                          ||     '<th width="8%" ' || @my_td_style || '>Customer Issue#</th>'
+                          ||     '<th width="25%" '|| @my_td_style || '>Synopsis</th>'
+                          ||     '<th width="30%" '|| @my_td_style || ' style="word-wrap: break-word;">Release Notes</th>'
+                          ||     '<th width="18%" '|| @my_td_style || '>Rollout</th>'
+                          ||     '<th width="10%" '|| @my_td_style || '>Checked In On</th>'
+                          ||     '<th width="7%" '|| @my_td_style || '>Checked In By</th>'
+                          || '</tr>'
+                and mode = "w"
+                ;
+                /* Now fetch all the details of this object */
+                select from internal table
+                where select_stmt = " select bug_id, cf_customer_issue_number, short_desc, cf_release_notes, cf_release_notes, cf_rollout, ossi_author, max(ossi_ckin_dt) ossi_ckin_dt"
+                and where_clause = "where ossi_file_path like '" || @uc_object_file_path_expr || @data_object_file || "'"
+                and table_name = 'uc_all_int'
+                and group_by_clause = "group by bug_id, cf_customer_issue_number, short_desc, cf_release_notes, cf_release_notes, cf_rollout, ossi_author"
+                and order_by_clause = "order by ossi_ckin_dt desc, bug_id"
+                |
+                {
+                    write output file 
+                    where data = @uc_typical_tr_data
+                              ||     ossi__html_data ( @bug_id, 'td', @my_td_style, @uc_bug_id_url_prefix,1 )
+                              ||     ossi__html_data ( @cf_customer_issue_number, 'td', @my_td_style)
+                              ||     ossi__html_data ( @short_desc, 'td', @my_td_style)
+                              ||     ossi__html_data ( @cf_release_notes, 'td', @my_td_style, null, 0, '<pre style="white-space: pre-wrap;">', '</pre>')
+                              ||     ossi__html_data ( @cf_rollout, 'td', @my_td_style, @uc_rollout_url_prefix, 1 )
+                              ||     ossi__html_data ( @ossi_ckin_dt, 'td', @my_td_style)
+                              ||     ossi__html_data ( ossi__replace(@ossi_author, 'ossi\', ''), 'td', @my_td_style)
+                              || "</tr>"
+                    and mode = "a"
+                }
+                ;
+                write output file 
+                where mode = "a"
+                and data = "</table>" || @uc_typical_file_footer
+            } /* have head iun scope */
+            ;
+            publish data
+            where ossi_file_path = @ossi_file_path
+            and data_object_file = @data_object_file
+            and data_object_folder = @data_object_folder
+            and data_object = @data_object
+            and filnam = @filnam
+            and path = @path
+        }
+    } /* main select */    
+} /* main */
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This generates html documentation for the version control stuff
+</p>
+]]>
+</remarks>
+
+<retrows>n</retrows>
+
+<retcol name="ossi_file_path" type="COMTYP_CHAR"></retcol>
+<retcol name="data_object_file" type="COMTYP_CHAR"></retcol>
+<retcol name="data_object_folder" type="COMTYP_CHAR"></retcol>
+<retcol name="data_object" type="COMTYP_CHAR"></retcol>
+<retcol name="filnam" type="COMTYP_CHAR"></retcol>
+<retcol name="path" type="COMTYP_CHAR"></retcol>
+
+
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+<seealso cref="get ossi documentation alg usage"></seealso>
+
+</documentation>
+
+
+
+</command>

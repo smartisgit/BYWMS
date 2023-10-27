@@ -1,0 +1,37 @@
+<command>
+<name>remove inventory status progression</name>
+<description>This deletes 1 or more statuses at once, so log beforehand</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ */
+{
+  [select invsts
+     from prgmst
+    where invsts_prg = @invsts_prg#keep
+  ]
+  |
+  process usr issue
+    where table = 'PRGMST'
+      and action = 'REMOVE'
+  ;
+  ^remove inventory status progression  
+    where @*    
+}
+
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This command can be used to remove inventory status progression, this can delete one or more status at once.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

@@ -1,0 +1,40 @@
+<command>
+<name>parse ossi xml node values</name>
+<description>Parse the given XML and return the contents of the given node name</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+
+parse xml
+  where mxml_xml = @mxml_xml
+|
+get xml elements by tagname
+  where mxml_ctxt = @mxml_ctxt
+    and mxml_tag = @mxml_tag
+|
+get xml node values
+
+]]>
+</local-syntax>
+<argument name="mxml_xml" required="yes" datatype="string"></argument>
+<argument name="mxml_tag" required="yes" datatype="string"></argument>
+
+<documentation>
+
+<remarks>
+Parse the given XML.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+
+
+</command>

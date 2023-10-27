@@ -1,0 +1,53 @@
+<command>
+<name>ossi cat_str</name>
+<description>Concatenate string together</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="moca_farg1">delimiter</argument>
+<argument datatype="string" name="moca_farg2">string</argument>
+<argument datatype="string" name="moca_farg3">String</argument>
+<argument datatype="string" name="moca_farg4">string</argument>
+<argument datatype="string" name="moca_farg5">String</argument>
+<argument datatype="string" name="moca_farg6">string</argument>
+<argument datatype="string" name="moca_farg7">String</argument>
+
+
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+publish data
+where common_delim = nvl(@moca_farg1, '-' )
+|
+if ( upper(@common_delim)='NONE' )
+    publish data
+    where common_delim = ''
+|
+publish data
+where ret = @moca_farg2 || iif ( @moca_farg3 is not null, @common_delim, '' )
+         || @moca_farg3 || iif ( @moca_farg4 is not null, @common_delim, '' )
+         || @moca_farg4 || iif ( @moca_farg5 is not null, @common_delim, '' )
+         || @moca_farg5 || iif ( @moca_farg6 is not null, @common_delim, '' )
+         || @moca_farg6 || iif ( @moca_farg7 is not null, @common_delim, '' )
+         || @moca_farg7
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+Build a concatenated string
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

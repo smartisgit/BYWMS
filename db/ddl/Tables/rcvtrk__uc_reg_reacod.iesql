@@ -1,0 +1,26 @@
+#use $DCSDIR/include
+#include <dcsddl.h>
+#include <dcscolwid.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+
+#use $SALDIR/include
+#include <salcolwid.h>
+
+mset command on
+[
+ALTER_TABLE_TABLE_INFO(rcvtrk)
+ALTER_TABLE_ADD_COLUMN_START(uc_reg_reacod)
+      STRING_TY(10)
+ALTER_TABLE_ADD_COLUMN_END
+] catch (-2705,-1430 )
+RUN_DDL
+
+create db column comment
+where table_name   = 'rcvtrk'
+and column_name    = 'uc_reg_reacod'
+and column_comment = 'The reason for this registration reason.  Values can be A,C,D (Add Change Delete) and AD,CD,DD (Add Change Delete on detail table)'
+RUN_DDL
+
+
+mset command off

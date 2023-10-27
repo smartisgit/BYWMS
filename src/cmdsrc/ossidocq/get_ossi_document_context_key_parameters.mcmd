@@ -1,0 +1,201 @@
+<command>
+<name>get ossi document context key parameters</name>
+<description>This command will return multiple rows for key values for a document that is going to be uploaded
+</description>
+<type>Local Syntax</type>
+
+<argument name="uc_doc_pgm_cd" required="yes" datatype="string">RPT or LBL</argument>
+<argument name="uc_doc_pgm_id" required="yes" datatype="string">Report Id or label name</argument>
+<argument name="wh_id" required="yes" datatype="string"></argument>
+<argument name="devcod" required="yes" datatype="string">Report Id</argument>
+<argument name="usr_id" required="yes" datatype="string">Label name</argument>
+<argument name="locale_id" required="yes" datatype="string"></argument>
+<argument name="keywords_list" required="yes" datatype="string"></argument>
+<argument name="format_typ" required="yes" datatype="string"></argument>
+<argument name="dest_typ" required="yes" datatype="string"></argument>
+<argument name="dest" required="yes" datatype="string"></argument>
+<argument name="num_copies" required="yes" datatype="string"></argument>
+<argument name="dig_sig_req_flg" required="yes" datatype="string"></argument>
+<argument name="uc_doc_typ_cd" required="yes" datatype="string"></argument>
+<argument name="uc_doc_subtyp_cd" required="yes" datatype="string"></argument>
+
+<argument name="uc_include_null_value_parms" required="no" datatype="string">If '1' then we return parameters without values.  Default is '0'</argument>
+
+
+
+
+
+
+<local-syntax>
+<![CDATA[
+
+publish data
+where uc_doc_ctxt_parm_typ = 'KEY'
+and main_ctxt_var_list = 'uc_doc_pgm_cd,uc_doc_pgm_id,uc_doc_typ_cd,uc_doc_subtyp_cd,'
+                      || 'wh_id,devcod,usr_id,locale_id,keywords_list,format_typ,dest_typ,dest,num_copies,dig_sig_req_flg'
+and uc_include_null_value_parms = nvl(@uc_include_null_value_parms, '0' )                      
+|
+{
+    {
+        {
+            {
+                convert list where string = @main_ctxt_var_list and type = 'L' and separator = ','
+                |
+                if ( @retstr is not null )
+                {
+                    [[
+                    int varavailable = 0;
+                    String varvalue = "";
+                    MocaContext currentContext = MocaUtils.currentContext();
+                    if ( currentContext.isVariableAvailable ( retstr) )
+                    {
+                        varvalue = currentContext.getVariable(retstr);
+                        if ( varvalue != null )
+                        {
+                            varvalue = varvalue.toString().trim();
+                            varavailable = 1
+                        }
+                    }
+                    [uc_doc_ctxt_parm_id:retstr, uc_doc_ctxt_parm_val:varvalue, uc_doc_ctxt_parm_exists:varavailable]
+                    ]]
+                }
+                |
+                if ( @uc_doc_ctxt_parm_exists = 1 )
+                {
+                    publish data
+                    where uc_doc_ctxt_parm_catg = 'GLOBAL'
+                    and uc_doc_ctxt_parm_id = @uc_doc_ctxt_parm_id
+                    and uc_doc_ctxt_parm_val = @uc_doc_ctxt_parm_val
+                }
+            }
+            &
+            {
+                if ( @uc_doc_pgm_cd = 'RPT' or @uc_doc_pgm_cd = 'LBL' )
+                {
+                    {
+                        if ( @uc_doc_pgm_cd = 'RPT' )
+                        {
+                            list moca report parameters
+                            where rpt_id = @uc_doc_pgm_id
+                            catch(@?) /* for whatever reason environmental or otherwise we dont want error to be raised */
+                        }
+                        else
+                        {
+                            [
+                            select distinct
+                                   doc_typ_arg.doc_typ_arg parm_name
+                            from doc_lblfmt
+                                 join doc_typ_arg on doc_typ_arg.doc_typ = doc_lblfmt.doc_typ
+                            where 1=1
+                            and doc_lblfmt.lblfmt = @uc_doc_pgm_id
+                            order by 1
+                            ]
+                        }
+                    }
+                    catch(@?)
+                    |
+                    if ( @? = 0 and @parm_name is not null )
+                    {
+                        publish data
+                        where uc_doc_ctxt_parm_id = lower(@parm_name)
+                        |
+                        /* Our variable being in the list above means it is already logged so dont log again */
+                        if ( ossi__multi_instr(@main_ctxt_var_list, @uc_doc_ctxt_parm_id) = 0 )
+                        {
+                            [[
+                            int varavailable = 0;
+                            String varvalue = "";
+                            StringBuffer ctxt_parm_list = new StringBuffer ( "," );
+                            MocaContext currentContext = MocaUtils.currentContext();
+                            if ( currentContext.isVariableAvailable ( uc_doc_ctxt_parm_id) )
+                            {
+                                varavailable = 1;
+                                varvalue = currentContext.getVariable(uc_doc_ctxt_parm_id);
+                                if ( varvalue == null )
+                                    varvalue = "";
+                                else
+                                    varvalue = varvalue.toString().trim();
+                                if ( varvalue != "" )
+                                {
+                                    ctxt_parm_list.append ( uc_doc_ctxt_parm_id + "," );
+                                }
+                            }
+                            [
+                            uc_doc_ctxt_parm_id:uc_doc_ctxt_parm_id, 
+                            uc_doc_ctxt_parm_val:varvalue, 
+                            uc_doc_ctxt_parm_exists:varavailable,
+                            uc_ctxt_parm_list:ctxt_parm_list.toString()
+                            ]
+                            ]]
+                            |
+                            if ( @uc_include_null_value_parms = '1' or @uc_doc_ctxt_parm_val is not null )
+                            {
+                                save session variable
+                                where name = 'uc_doc_ctxt_parm_list'
+                                and value = lower(@uc_ctxt_parm_list)
+                                ;
+                                publish data
+                                where uc_doc_ctxt_parm_catg = 'PGM'
+                                and uc_doc_ctxt_parm_id = @uc_doc_ctxt_parm_id
+                                and uc_doc_ctxt_parm_val = @uc_doc_ctxt_parm_val
+                            }
+                        }
+                    }
+                } /* is a report or label */
+            } /* report or label parameters */
+        }
+        |
+        if ( @uc_doc_ctxt_parm_id is not null )
+            publish data
+            where uc_doc_ctxt_parm_typ  = @uc_doc_ctxt_parm_typ
+            and   uc_doc_ctxt_parm_catg = @uc_doc_ctxt_parm_catg
+            and   uc_doc_ctxt_parm_id   = @uc_doc_ctxt_parm_id
+            and   uc_doc_ctxt_parm_val  = @uc_doc_ctxt_parm_val
+    } /* block for all data */
+    >> uc_ctxt_res
+    |
+    enrich ossi document parameter context
+    |
+    {
+        publish data combination where res = @uc_ctxt_res
+        &
+        publish data combination where res = @uc_enriched_res
+        &
+        publish data combination where res = @uc_more_res
+    }
+} /* main block */
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+   This command returns global report label parameter values that can be pushed to the document queue context latrer
+</p>
+]]>
+</remarks>
+
+<retrows>n</retrows>
+<retcol name="uc_doc_ctxt_parm_typ" type="COMTYP_CHAR">Literal KEY</retcol>
+<retcol name="uc_doc_ctxt_parm_catg" type="COMTYP_CHAR">PGM for report level parameter value.  GLOBAL for global context</retcol>
+<retcol name="uc_doc_ctxt_parm_id" type="COMTYP_CHAR">name of the parameter</retcol>
+<retcol name="uc_doc_ctxt_parm_val" type="COMTYP_CHAR">Value.  Can be null as well</retcol>
+
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+<seealso cref="enqueue ossi document output for upload"></seealso>
+<seealso cref="enrich ossi document parameter context"></seealso>
+
+
+
+</documentation>
+
+
+
+</command>

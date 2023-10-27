@@ -1,0 +1,158 @@
+<command>
+<name>flatten ossi res with rows as columns</name>
+<description>Idea is that input res needs to be flattened into one row.  This is primarily needed for labels</description>
+
+<argument name="res" alias="level" datatype="resultset">Input result set</argument>
+<argument name="uc_column_name_list"  datatype="string">A coma-separted list for which we need to make rows into single.  Note that each member in the list is formatted as name:type.  Name
+is the name of the column as it exists in res.  type can be S for string, I for integrer, D for date/time and N for number.  If not provided we assume string</argument>
+<argument name="uc_row_count"  datatype="integer">If passed in and > 0 then we want exactly thee many rows</argument>
+
+<argument name="uc_column_name_suffix_fmt"  datatype="string">Suffix of columns will be a number starting with 1 and with this number format.  The format is java format.  For example %03d means number of 3 with leading 0s</argument>
+<argument name="uc_column_name_prefix"  datatype="string">this is the prefix</argument>
+
+<argument name="uc_return_orig_res"  datatype="string">1 or 0.  Default 1.  If 1 then we return top row of input res as well</argument>
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+publish data
+where uc_column_name_prefix = nvl(@uc_column_name_prefix, 'uc_r2c_')
+and uc_column_name_suffix_fmt = nvl(@uc_column_name_suffix_fmt, '%02d')
+and uc_row_count = nvl(@uc_row_count, 0 )
+and uc_return_orig_res = nvl(@uc_return_orig_res, 1 )
+|
+{
+    /*
+     * Create a new resultset 
+     */
+    [[
+    Integer rr = 0;
+    String this_column_name;
+    ret = new SimpleResults();
+    //
+    for ( String colAndTyp : uc_column_name_list.split(',') )
+    {
+        col = colAndTyp.split ( ':' )[0];
+        if ( colAndTyp.split ( ':' ).size() > 1 )
+            typ = (colAndTyp.split ( ':' )[1]).toUpperCase();
+        else
+            typ = 'S';
+        //
+        if ( typ == 'S' )
+            moca_typ = MocaType.STRING;
+        else if ( typ == 'I' )
+            moca_typ = MocaType.INTEGER;
+        else if ( typ == 'N' )
+            moca_typ = MocaType.DOUBLE;
+        else 
+            moca_typ = MocaType.DATETIME;
+
+        //
+        // If we are passed in exact row count then make that many varianles exactly
+        // if not, create based on rows in res
+        //
+        if ( uc_row_count > 0 )
+        {
+            for ( rr = 1; rr <= uc_row_count; rr++ )
+            {
+                this_column_name = uc_column_name_prefix + col + '_' + String.format(uc_column_name_suffix_fmt , rr);
+                ret.addColumn ( this_column_name, moca_typ );
+            }
+        }
+        else
+        {
+            res.reset();
+            rr = 0;
+            while ( res.next() )
+            {
+                rr++;
+                this_column_name = uc_column_name_prefix + col + '_' + String.format(uc_column_name_suffix_fmt , rr);
+                ret.addColumn ( this_column_name, moca_typ );
+            }
+        } // row count not passed in
+    } // next col
+    //
+    ret.addRow();
+    res.reset();
+    rr = 0;
+    while ( res.next()  )
+    {
+        rr++;
+        //        
+        // if explit row count provided, we cannot exceed that
+        if ( rr <= uc_row_count || uc_row_count == 0 )
+        {
+            for ( String colAndTyp : uc_column_name_list.split(',') )
+            {
+                col = colAndTyp.split ( ':' )[0];
+                if ( res.getColumnNumber ( col ) >= 0 )
+                {
+                    this_column_name = uc_column_name_prefix + col + '_' + String.format(uc_column_name_suffix_fmt , rr);
+                    ret.setValue ( this_column_name, res.getValue ( col ) );
+                }
+            } // next col 
+        } // is it a valid row to process
+        else
+            break;
+    }
+    [ret:ret]
+    ]]
+}
+|
+{
+    if ( @uc_return_orig_res = 1 )
+    {
+        publish top rows 
+        where res = @res 
+        and rows = 1
+        catch (-1403,510)
+        >> res1
+    }
+    else
+        noop >> res1
+    |
+    combine ossi columns from multiple results
+    where uc_cmb_res1 = @res1
+    and uc_cmb_res2 = @ret
+    and uc_cmb_res_cnt = 2
+}
+
+
+    
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+   For labels we have to return a single row.  The columns in source have to be flattened out as columns.  This command can be used to do that.
+   It will return optionally the top row from main res as well.  Idea is that probably some of the columns in main res are same throughout
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+<retcol name="(flex)" type="COMTYP_CHAR"></retcol>
+
+<example>
+<code>
+{ do loop where count = 5 | filter data where str = 'String' || @i and dd = sysdate} >> res
+|
+publish data where uc_column_name_list = 'i:i,str:s,dd:d' and uc_row_count = 3
+|
+flatten ossi res with rows as columns
+</code>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+<seealso cref="list active commands"></seealso>
+
+</documentation>
+
+</command>

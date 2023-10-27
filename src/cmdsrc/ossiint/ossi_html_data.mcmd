@@ -1,0 +1,114 @@
+<command>
+<name>ossi html_data</name>
+<description>Function to put value in HTML</description>
+
+<argument name="moca_farg1" required="yes" datatype="string">Value</argument>
+<argument name="moca_farg2" required="no" datatype="string">main eclosing tag.  e.g. for table data pass in td</argument>
+<argument name="moca_farg3" required="no" datatype="string">Attribute of arg2, e.g. width</argument>
+<argument name="moca_farg4" required="no" datatype="string">A prefix for value</argument>
+<argument name="moca_farg5" required="no" datatype="string">1 or 0 to indicate if value is an href</argument>
+<argument name="moca_farg6" required="no" datatype="string">Tag#2 e.g. if value within td is pre</argument>
+<argument name="moca_farg7" required="no" datatype="string">Tag#2 e.g. if value within td is pre</argument>
+<argument name="moca_farg8" required="no" datatype="string">Alternate URL</argument>
+
+
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161208 saad.ahmad - 10291 - Origial
+ */
+publish data
+where val = string(@moca_farg1)
+and enclosing_tag = @moca_farg2
+and enclosing_tag_attr = @moca_farg3
+and value_prefix = @moca_farg4
+and is_link = nvl(@moca_farg5, 0)
+and pre_tag2 = @moca_farg6
+and post_tag2 = @moca_farg7
+and alt_url = @moca_farg8
+/*
+ * overall delimited list of tuples.  Delimited on ,
+ * then within - delimted on :
+ * left is source and right is what it is replaced with
+ */
+and cnv_map = "&:&amp;,>:&gt;,<:^lt;"
+|
+if ( @enclosing_tag is not null )
+    publish data
+    where pre_tag = '<' || @enclosing_tag || iif ( @enclosing_tag_attr is not null, ' ', '' ) || @enclosing_tag_attr || '>'
+    and post_tag  = '</'|| @enclosing_tag || '>'
+|
+if ( @val is not null )
+{
+    /*
+     * Do html related fixup of val
+     */
+    [[
+    String[] my_cnv_map = cnv_map.split(',');
+    StringBuffer ret = new StringBuffer(val);
+    for ( String mm : my_cnv_map )
+    {
+        ret = new StringBuffer (ret.replaceAll( (mm.split(':'))[0], (mm.split(':'))[1] ));
+    }
+    [escaped_val:ret.toString()]
+    ]]
+}
+|
+{
+    if ( @is_link = 1 )
+    {
+        publish data
+        where url = nvl(@alt_url, @value_prefix || @val )
+        |
+        if ( @alt_url is not null and @alt_url like '%uc_rev_log%' )
+            publish data
+            where target_expr = ' target="_blank"'
+        else
+            publish data
+            where target_expr = ''
+        |
+        publish data
+        where show_val = '<a href="' || @url || '"' || @target_expr || '>' || @escaped_val || '</a>'
+    }
+    else
+    {
+        publish data
+        where show_val =  @escaped_val
+    }
+    |
+    publish data
+    where final_ret = @pre_tag
+                   ||     @pre_tag2
+                   ||         @show_val
+                   ||     @post_tag2
+                   || @post_tag
+}
+    
+]]>
+</local-syntax>
+
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+To put data in an html
+</p>
+]]>
+</remarks>
+
+<retrows>MOCA Function - So one row is returned</retrows>
+
+<exception value="eOK">The command completed successfully.</exception>
+<exception value="510">If variable was not passed and no default was passed.</exception>
+
+<seealso cref="get session variable"></seealso>
+</documentation>
+
+</command>

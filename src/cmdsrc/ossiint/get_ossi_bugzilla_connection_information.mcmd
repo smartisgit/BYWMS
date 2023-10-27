@@ -1,0 +1,49 @@
+<command>
+<name>get ossi bugzilla connection information</name>
+<description>Get bugzilla connection information</description>
+<type>Local Syntax</type>
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+get server information
+|
+{
+   publish data
+   where uc_bugzilla_db_driver = nvl ( @@UC_BUGZILLA_DB_DRIVER, 'com.mysql.jdbc.Driver' )
+   and uc_bugzilla_db_conn = nvl(@@UC_BUGZILLA_DB_CONN, 'jdbc:mysql://10.10.10.119:3306/bugs' )
+   and uc_bugzilla_db_userid = nvl( @@UC_BUGZILLA_DB_USERID, 'bugs' )
+   and uc_bugzilla_db_password = @@UC_BUGZILLA_DB_PASSWORD /* bugs user does not have password so keep blank*/
+   and uc_bugzilla_rp_url = nvl( @@UC_BUGZILLA_RP_URL, @url )
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+Get connection parameters for bugzilla
+</remarks>
+
+<retcol name="uc_bugzilla_db_driver" type="String"></retcol>
+<retcol name="uc_bugzilla_db_conn" type="String"></retcol>
+<retcol name="uc_bugzilla_db_userid" type="String"></retcol>
+<retcol name="uc_bugzilla_db_password" type="String"></retcol>
+<retcol name="uc_bugzilla_rp_url" type="String">In environments other than sandbox, this is sandbox URL.  This is because db driver is not installed
+in other environments.  If we have this pointed to sandbox then other parameters like db driver, conn, userid, password do not apply.  Those
+settings will really matter only on sandbox.
+</retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

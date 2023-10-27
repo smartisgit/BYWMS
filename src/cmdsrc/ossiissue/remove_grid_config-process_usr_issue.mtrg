@@ -1,0 +1,29 @@
+<trigger>
+<name>process usr issue</name>
+<on-command>remove grid config</on-command>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20170331 mehreen.saeed.sisc - 7026 - core ossi
+ */
+if ( @usr_id = 'LES' )
+{
+   process usr issue
+   where uc_table_name = 'LES_GRID_CONFIG'
+   and uc_action = 'REMOVE'
+}
+
+]]></local-syntax>
+<fire-sequence>10000</fire-sequence>
+<documentation>
+
+<remarks>
+This trigger process issue for deleting grid config.
+</remarks>
+
+<seealso cref="process usr issue"></seealso>
+
+</documentation>
+</trigger>

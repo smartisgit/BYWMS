@@ -1,0 +1,7 @@
+<component-level>
+<name>usrdatachglog</name>
+<description>Smart IS Audit components and triggers</description>
+<sort-sequence>8005</sort-sequence>
+<library>ossiint</library>
+<editable>true</editable>
+</component-level>

@@ -1,0 +1,18 @@
+<!-- Sets several key variables -->
+<project project-dir="." js-dir="${project-dir}/ossi-autowaveopr" app-id="${appId}" hf-compliant="true">
+
+
+    <target name="les.ossi-autowaveopr" type="js" source-dir="${js-dir}">
+
+        <include name="store/MainGridStore.js" />
+        <include name="store/DetailGridStore.js" />
+        <include name="store/DefGridStore.js" />
+        <include name="store/GeneralGridStore.js" />
+        <include name="store/HelpStore.js" />
+        <include name="store/OrdSelParmStore.js" />
+        <include name="view/Main.js" />
+        <include name="controller/MainController.js" />
+        <include name="App.js" />
+ 
+    </target>
+</project>

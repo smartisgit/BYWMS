@@ -1,0 +1,77 @@
+<command>
+<name>ossi txt_substr</name>
+<description>Same as substr but starting position is a text field and we mean start where this is found</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="moca_farg1">Source String</argument>
+<argument datatype="string" name="moca_farg2">look for this</argument>
+<argument datatype="string" name="moca_farg3">1-Extract after the look string, 0-Extract including the look string</argument>
+<argument datatype="string" name="moca_farg4">Length</argument>
+<argument datatype="string" name="moca_farg5">Optional: BW (between) = (=)</argument>
+<argument datatype="string" name="moca_farg6">Optional: If 5th is BW, then first value.  If 5th is = then value</argument>
+<argument datatype="string" name="moca_farg7">Optional: If 5th is BW, then second value.</argument>
+
+
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+
+publish data
+where source_string   = @moca_farg1
+and   look_for_string = @moca_farg2
+and   extract_after_l = @moca_farg3
+and   extract_len     = @moca_farg4
+and   cmp_oper        = @moca_farg5
+and   cmp_val1        = @moca_farg6
+and   cmp_val2        = @moca_farg7
+|
+if (@source_string is not null)
+{
+   publish data
+   where len_look_for    = len(@look_for_string)
+   |
+   publish data
+   where found_at = instr(@source_string, @look_for_string )
+   |
+   if ( @found_at > 0 )
+      publish data
+      where ret = substr( @source_string, @found_at + iif ( @extract_after_l ='1', @len_look_for, 0 ), @extract_len )
+   else
+      publish data
+      where ret = ''
+   |
+   if ( @cmp_oper is not null )
+   {
+      if ( @cmp_oper = 'BW' )
+         publish data where final_ret = iif ( @ret >= @cmp_val1 and @ret <= @cmp_val2, '1', '0' )
+      else if ( @cmp_oper = '=' )
+         publish data where final_ret = iif ( @ret = @cmp_val1, '1', '0' )
+      else
+         publish data where final_ret = '0'
+
+   }
+   else
+      publish data where final_ret = @ret
+}
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+MOCA Function to get a substring of a string but index can be a string value.  The logic is to look up the substring
+and find the index
+
+The same function can be used to use the substring value in a comparison.  Pass in BW to imply between or = for
+equal
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

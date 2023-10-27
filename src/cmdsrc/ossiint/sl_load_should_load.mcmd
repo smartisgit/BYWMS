@@ -1,0 +1,48 @@
+<command>
+<name>sl_load should_load</name>
+<description>In order to do one off override to allow loads of base data</description>
+
+<argument name="@*" required="yes" datatype="string">base</argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161208 saad.ahmad - 10291 - Origial
+ */
+if ( @@UC_OVERRIDE_SL_LOAD_SHOULD_LOAD = 'F' )
+    publish data
+    where sl_load_dont_load_flg = 'F'
+else if ( @@UC_OVERRIDE_SL_LOAD_SHOULD_LOAD = 'T' )
+    publish data
+    where sl_load_dont_load_flg = 'T'
+else
+    ^sl_load should_load
+
+
+    
+]]>
+</local-syntax>
+
+
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+Standard integrator calls this in middle of load.  Provide a way to overide it in special cases
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+<exception value="eOK">The command completed successfully.</exception>
+<exception value="510">If variable was not passed and no default was passed.</exception>
+
+<seealso cref="sl_list mappings for result ifd"></seealso>
+</documentation>
+
+</command>

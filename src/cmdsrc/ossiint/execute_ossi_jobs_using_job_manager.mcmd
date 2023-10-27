@@ -1,0 +1,330 @@
+<command>
+<name>execute ossi jobs using job manager</name>
+<description>Execute jobs as defined in job manager</description>
+
+<argument name="uc_wh_id"  datatype="string" />
+<argument name="uc_exec_job_id"  datatype="string" />
+<argument name="uc_exec_job_grp"  datatype="string" />
+<argument name="uc_test_mode"  datatype="string" >If '1' then do not run command just publish it out </argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+
+publish data
+where polcod = 'USR-JOB-MANAGER'
+and uc_wh_id = nvl(@uc_wh_id,'----')
+|
+publish data
+where uc_job_id = 'JOB-EXEC-MANAGER'
+and   uc_ossi_who = @@USR_ID
+|
+if ( @uc_exec_job_id is null ) hide stack variable where name = 'uc_exec_job_id'
+|
+if ( @uc_exec_job_grp is null ) hide stack variable where name = 'uc_exec_job_grp'
+|
+{
+   /*
+    * See if this job execution would end up executing an archive job.  If so push the uc_ossi_arnum and uc_ossi_archive_start_dt to stack
+    */
+   [
+   select 1
+   from dual
+   where exists (
+                   select 1
+                   from poldat_view
+                   where polcod = @polcod
+                   and @%polvar^uc_exec_job_grp
+                   and @%polval^uc_exec_job_id
+                   and polval not in ( '_PARAMETERS', '_WH_LIST' )
+                   and upper(rtstr1) like '%PROCESS%OSSI%ARCHIVE%'
+                   and rtnum2 != 2 /* special node for parameters for the job*/
+                   and wh_id = @uc_wh_id
+                   and rtnum1 = 1
+                )
+   ]
+   catch (-1403,510)
+   |
+   if ( @? = 0 )
+      publish data
+      where uc_ossi_archive_start_dt_default = sysdate
+      and   uc_ossi_arcnum_default           = nextval ('uc_ossi_arcnum' )
+   |
+   publish data
+   where uc_ossi_job_seq = ossi__register_job ( @uc_job_id, nvl(@uc_exec_job_grp,'----'), @uc_ossi_who )
+   |
+   try
+   {
+      [
+      select polvar uc_exec_job_grp,
+             polval uc_exec_job_id,
+             rtstr1 uc_command,
+             rtstr2 uc_job_descr,
+             rtnum2 uc_exec_for_all_wh
+      from poldat_view
+      where polcod = @polcod
+      and @%polvar^uc_exec_job_grp
+      and @%polval^uc_exec_job_id
+      and polval not in ( '_PARAMETERS', '_WH_LIST' )
+      and rtstr1 != 'WH_ID'
+      and rtnum2 != 2 /* special node for parameters for the job*/
+      and wh_id = @uc_wh_id
+      and rtnum1 = 1
+      order by polcod, uc_exec_job_grp, rtflt1, uc_exec_job_id
+      ]
+      catch (-1403,510)
+      |
+      if ( @? = 0 )
+      {
+         publish data
+         where uc_ossi_module_seq_main = ossi__register_module ( @uc_ossi_job_seq, @uc_exec_job_id, @uc_job_descr, @uc_ossi_who )
+         |
+         try
+         {
+            publish data
+            where uc_ossi_module_seq_build_where = ossi__register_module ( @uc_ossi_job_seq, 'BUILD-GRP-WHERE', '', @uc_ossi_who )
+            |
+            try
+            {
+               /*
+                * The job parameters can be under the job node.  In that case rtnum2 = 2 and WH_ID is a special one.
+                * Or the whole job group can have the same parameters as we do with purge jobs
+                */
+               [
+               select '1' uc_grp,
+                      srtseq,
+                      rtstr1 uc_fld,
+                      rtstr2 uc_val_expr
+               from poldat_view
+               where polcod = @polcod
+               and polvar = @uc_exec_job_grp
+               and polval = @uc_exec_job_id
+               and wh_id = @uc_wh_id
+               and rtstr1 != 'WH_ID'
+               and rtnum1 = 1
+               and rtnum2 = 2
+               union all
+               select '2' uc_grp,
+                      srtseq,
+                      rtstr1 uc_fld,
+                      rtstr2 uc_val_expr
+               from poldat_view
+               where 1=1
+               and not exists (
+                                 select 1
+                                 from poldat_view p2
+                                 where p2.polcod = poldat_view.polcod
+                                 and p2.polvar = poldat_view.polvar
+                                 and p2.polval = @uc_exec_job_id
+                                 and p2.rtstr1 = poldat_view.rtstr1
+                                 and p2.wh_id = poldat_view.wh_id
+                              )
+               and polcod = @polcod
+               and polvar = @uc_exec_job_grp
+               and polval = '_PARAMETERS'
+               and wh_id = @uc_wh_id
+               and rtnum1 = 1
+               order by 1,2
+               ]
+               catch (-1403,510)
+               >> res_fld
+               |
+               [[
+               StringBuilder  cmd = new  StringBuilder( "publish data where uc_never_have_this_as_par = '1' " );
+               res_fld.reset();
+               while ( res_fld.next() )
+               {
+                  cmd.append ( " and " + res_fld.getString ( 'uc_fld' ) + ' = ' + res_fld.getString ( 'uc_val_expr' ) );
+               }
+               [uc_leading_publish_data:cmd.toString()]
+               ]]
+               |
+               {
+                  publish data where uc_leading_publish_data = @uc_leading_publish_data
+               }
+            } /* get report parameters */
+            finally
+            {
+               if ( @? = 0 )
+                  complete ossi job log
+                  where uc_ossi_module_seq = @uc_ossi_module_seq_build_where
+               else
+                  raise ossi job error
+                  where uc_ossi_err_code  = @?
+                  and   uc_ossi_err_descr = @!
+                  and   is_job_flg = '0'
+                  and   uc_ossi_module_seq = @uc_ossi_module_seq_build_where
+            }
+            |
+            {
+               /* 
+                * if this job is to be run by warehouse, create the resultset for warehouse ids
+                */
+               {
+                  if ( @uc_exec_for_all_wh = 1 )
+                     [
+                     select wh_id
+                     from wh
+                     order by wh_id
+                     ]
+                     catch (-1403,510)
+                  else
+                  {
+                     [
+                     select poldat.rtstr2 wh_id
+                     from poldat_view poldat
+                          join wh on wh.wh_id = poldat.rtstr2
+                     where poldat.polcod = @polcod
+                     and poldat.polvar = @uc_exec_job_grp
+                     and poldat.polval = @uc_exec_job_id
+                     and poldat.rtstr1 = 'WH_ID'
+                     and poldat.wh_id = @uc_wh_id
+                     and poldat.rtnum1 = 1
+                     order by rtstr2
+                     ]
+                     catch (-1403,510)
+                     |
+                     if ( @? != 0 )
+                     {
+                        [
+                        select rtstr1 uc_wh_id_expr
+                        from poldat_view
+                        where polcod = @polcod
+                        and polvar = @uc_exec_job_grp
+                        and polval = '_WH_LIST'
+                        and rtnum1 = 1
+                        and wh_id = @uc_wh_id
+                        ]
+                        catch (-1403,510)
+                        |
+                        if ( @? = 0 )
+                           [
+                           select wh_id
+                           from wh
+                           where wh_id like @uc_wh_id_expr
+                           ]
+                           catch (-1403,510)
+                     }
+                     else
+                        filter data where moca_filter_level = 1
+                  }
+               }
+               >> uc_res_wh
+               |
+               if ( rowcount(@uc_res_wh) > 0 )
+                  publish data combination
+                  where res = @uc_res_wh
+               else
+                  publish data
+                  where uc_by_wh = '0'
+               |
+               {
+                  publish data
+                  where uc_ossi_module_seq_exec_cmd = ossi__register_module ( @uc_ossi_job_seq, 'EXEC-CMD', substr(@uc_command,1,255), 
+                                                                              decode(@uc_by_wh,'0', 'wh_id=n/a', 'wh_id=' || @wh_id)  )
+                  |
+                  {
+                     publish data
+                     where uc_exec_cmd =  @uc_leading_publish_data || '|' || @uc_command
+                     |
+                     {
+                        {
+                           if ( @uc_test_mode != '1' )
+                              execute server command
+                              where cmd = @uc_leading_publish_data || '|' || @uc_command
+                              catch (@?)
+                           else
+                              noop catch(@?)
+                        }
+                        >> uc_res_cmd
+                        |
+                        publish data
+                        where uc_job_exec_status_code = @?
+                        and uc_job_exec_message = @!
+                        |
+                        {
+                           if ( @uc_job_exec_status_code = 0 )
+                              complete ossi job log
+                              where uc_ossi_module_seq = @uc_ossi_module_seq_exec_cmd
+                           else
+                              raise ossi job error
+                              where uc_ossi_err_code  = @uc_job_exec_status_code
+                              and   uc_ossi_err_descr = @uc_job_exec_message
+                              and   is_job_flg = '0'
+                              and   uc_raise_error = '0' /* dont raise error - want to commit or rollback */
+                              and   uc_ossi_module_seq = @uc_ossi_module_seq_exec_cmd
+                           ;
+                           publish data
+                           where uc_ossi_module_seq_c = ossi__register_module ( @uc_ossi_job_seq, 'COMMIT/ROLLBACK', 
+                                                                                substr(@uc_job_exec_status_code||':' || @uc_job_exec_message,1,255),
+                                                                                @uc_ossi_who )
+                           |
+                           {
+                              if ( @uc_job_exec_status_code = 0 )
+                                 commit catch(@?)
+                              else
+                                 rollback catch(@?)
+                              ;
+                              complete ossi job log
+                              where uc_ossi_module_seq = @uc_ossi_module_seq_c
+                           } /* commit or rollback block */
+                           ;
+                           publish data 
+                           where uc_exec_job_grp = @uc_exec_job_grp
+                           and uc_exec_job_id = @uc_exec_job_id
+                           and wh_id = decode(@uc_by_wh,'0', 'n/a', @wh_id )
+                           and uc_res_wh_cnt = rowcount(@uc_res_wh)
+                           and uc_exec_cmd = @uc_exec_cmd
+                           and uc_job_exec_status_code =@uc_job_exec_status_code
+                           and uc_job_exec_message = @uc_job_exec_message
+                           and uc_ossi_archive_start_dt_default = @uc_ossi_archive_start_dt_default
+                           and uc_ossi_arcnum_default = @uc_ossi_arcnum_default
+                        } /* has status of exec */
+                     } /* uc_exec_cmd block */
+                  } /* exec command module */
+               } /* block for the wh_id */
+            } /* block that has uc_leading_publish_data */
+         } /* module to exec one job */
+         finally
+         {
+            if ( @? = 0 )
+               complete ossi job log
+               where uc_ossi_module_seq = @uc_ossi_module_seq_main
+            else
+               raise ossi job error
+               where uc_ossi_err_code  = @? 
+               and   uc_ossi_err_descr = @!
+               and   is_job_flg = '0'
+               and   uc_raise_error = '0' /* dont raise error - want to try next job */
+               and   uc_ossi_module_seq = @uc_ossi_module_seq_main
+         } /* for module - one job */
+      } /* loop on jobs */
+   } /* block for the whole job */
+   finally
+   {
+      if ( @? = 0 )
+         complete ossi job
+      else
+         raise ossi job error
+         where uc_ossi_err_code  = @?
+         and   uc_ossi_err_descr = @!
+         and   is_job_flg = '1'
+   } /* job */
+} /* main block */
+
+]]>
+</local-syntax>
+<documentation>
+<remarks>
+<![CDATA[
+This is the command that is scheduled in MOCA job manager.
+
+]]>
+</remarks>
+</documentation>
+</command>

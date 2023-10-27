@@ -1,0 +1,71 @@
+<command>
+<name>find ossi file in path list</name>
+<description>Given a path list, find the file</description>
+
+<argument datatype="string" name="uc_object_type">Defult to LBL.  Other option is RPT</argument>
+<argument datatype="string" name="uc_object_name">This is the name of the label  (not the file)</argument>
+<argument datatype="string" name="printer_type">If not specified we default from policy SYSTEM-INFORMATION/REPORTS/DEF-LBL-PRINTER-TYPE</argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+publish data
+where uc_object_type = nvl(@uc_object_type, 'LBL' )
+and printer_type = nvl(@printer_type, ossi__polval ( 'SYSTEM-INFORMATION', 'REPORTS', 'DEF-LBL-PRINTER-TYPE', '', 'rtstr1', '----' ) )
+|
+{
+    [
+    select rtstr1 lookup_folder
+    from poldat
+    where polcod = 'SYSTEM-INFORMATION'
+    and polvar = 'REPORTS'
+    and polval = 'REPORTS-PATH'
+    and wh_id_tmpl = '----'
+    order by srtseq
+    ]
+    catch (-1403,510)
+    >> res
+    |
+    if ( @? = 0 )
+    {
+        [[
+        uc_object_found_pathname="";
+        uc_object_found_folder="";
+        while ( res.next() )
+        {
+            if ( uc_object_type == 'LBL' )
+                uc_check_file_path = res.getString ( "lookup_folder" ) + "/" + printer_type + "/" + uc_object_name + ".POF"
+            else
+                uc_check_file_path = res.getString ( "lookup_folder" ) + "/" + uc_object_name + ".jrxml"
+            ;
+            res_fi = moca.executeCommand ( "get file info where pathname = @pathname", [pathname:uc_check_file_path] );
+            if ( res_fi.next() && res_fi.getString("type") == 'F' )
+            {
+                uc_object_found_pathname = res_fi.getString("pathname");
+                uc_object_found_folder = res.getString ( "lookup_folder" );
+                break;
+            }
+        }
+        [uc_object_found_pathname:uc_object_found_pathname,uc_object_found_folder:uc_object_found_folder]
+        ]]
+    }
+}
+
+]]>
+</local-syntax>
+<documentation>
+<remarks>
+Labels and reports may be in one of several locations.
+</remarks>
+
+<retrows>One or zero rows are returned</retrows>
+
+<retcol name="uc_object_found_pathname" type="string">Full path name</retcol>
+<retcol name="uc_object_found_folder" type="string">Folder where it is found</retcol>
+
+
+
+<exception value="eOK">Normal successful completion</exception>
+</documentation>
+</command>

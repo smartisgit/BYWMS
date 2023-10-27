@@ -1,0 +1,66 @@
+<command>
+<name>list ossi smart rule values</name>
+<description>Read data from usr_rule_engine_expr table</description>
+
+<argument name="uc_rule_grp_id" required="yes" datatype="string"></argument>
+<argument name="uc_rule_subgrp_id" required="yes" datatype="string"></argument>
+<argument name="uc_rule_value" required="yes" datatype="string"></argument>
+<argument name="seqnum" required="yes" datatype="string">This user does not see.  Ever ascending value based on max and add 1</argument>
+
+<argument name="srtseq" required="yes" datatype="string">This is what user sees during sorting</argument>
+<argument name="ena_flg" required="yes" datatype="string">This is what user sees during sorting</argument>
+<argument name="uc_rule_expr" required="yes" datatype="string"></argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+publish data
+  where uc_rule_subgrp_id = @uc_rule_subgrp_id
+    and uc_rule_subgrp_id = @uc_rule_subgrp_id
+    and uc_rule_value = @uc_rule_value
+    and ena_flg = @ena_flg
+|
+if (@uc_rule_value is null)
+   hide stack variable
+     where name = 'uc_rule_value'
+|
+if (@ena_flg is null)
+   hide stack variable
+     where name = 'ena_flg'
+|
+[select *
+   from usr_rule_engine_expr
+  where uc_rule_grp_id = @uc_rule_grp_id
+    and uc_rule_subgrp_id = @uc_rule_subgrp_id
+    and @+uc_rule_value
+    and @+ena_flg
+  order by srtseq
+]
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+Get the smart rule values from usr_rule_engine_expr.
+</p>
+]]>
+</remarks>
+
+<retrows>n</retrows>
+
+
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+
+<seealso cref="list ossi conditional rules"></seealso>
+
+</documentation>
+
+</command>

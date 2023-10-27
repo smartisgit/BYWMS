@@ -1,0 +1,201 @@
+<command>
+<name>load ossi language pack</name>
+<description>
+Add a new locale
+</description>
+
+<argument name="uc_language_pack_home" required="no" datatype="string">New locale to load</argument>
+<argument name="new_locale_id" required="no" datatype="string"></argument>
+<argument name="uc_use_ctl_from_lesdir" required="no" datatype="string"></argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+publish data
+where uc_language_pack_home = nvl(@uc_language_pack_home, @@LESDIR || '/db/data/load/base/usr_language_pack' )
+and   uc_use_ctl_from_lesdir= nvl(@uc_use_ctl_from_lesdir, '1' )
+and   new_locale_id         = nvl(@new_locale_id, 'FRENCH' )
+and   uc_rp_home_dir        = @@LESDIR || '/../'
+and   log_file_path         = @@LESDIR || '/log'
+and   log_file              = 'lang_load_' || to_char(sysdate,'YYYYMMDD-HH24MISS') || '.log'
+and   newline               = 'Y'
+and   mode                  = 'a'
+|
+[[ newline_character = System.getProperty("line.separator")]]
+|
+{
+   /*
+    * First directory contains the various products
+    */
+   find file
+   where pathname = @uc_language_pack_home || '/' || @new_locale_id || '/*'
+   |
+   if ( @type = 'D' )
+   {
+      hide stack variable where name = 'type'
+      |
+      publish data
+      where uc_prod_dir = @pathname
+      and uc_prod = @filename
+      |
+      {
+         /*
+          * See if this product is installed.  If not ignore it 
+          */
+         find file
+         where pathname = @uc_rp_home_dir || @uc_prod
+         |
+         if ( @type != 'D' )
+         {
+            write output file
+            where path = @log_file_path
+            and filnam = @log_file
+            and data = '**** Ignoring ' || @uc_prod_dir || ' because not installed'
+         }
+         else
+         {
+            if ( @uc_use_ctl_from_lesdir = '0' )
+            {
+               publish data
+               where uc_dscmst_ctl_file = @pathname || '/db/data/load/base/bootstraponly/dscmst.ctl'
+               and uc_les_mls_cat_ctl_file = @pathname || '/db/data/load/base/safetoload/les_mls_cat.ctl'
+               and uc_sys_dsc_mst_ctl_file = @pathname || '/db/data/load/base/safetoload/sys_dsc_mst.ctl'
+               |
+               get file info where pathname = @uc_dscmst_ctl_file | publish data where uc_dscmst_typ = @type
+               |
+               get file info where pathname = @uc_les_mls_cat_ctl_file  | publish data where uc_les_mls_cat_typ = @type
+               |
+               get file info where pathname = @uc_sys_dsc_mst_ctl_file | publish data where uc_sys_dsc_mst_typ = @type
+               |
+               publish data
+               where @+uc_dscmst_ctl_file 
+               and @+uc_les_mls_cat_ctl_file 
+               and @+uc_sys_dsc_mst_ctl_file 
+               and @+uc_dscmst_typ 
+               and @+uc_les_mls_cat_typ 
+               and @+uc_sys_dsc_mst_typ 
+            }
+            else
+            {
+               publish data
+               where uc_dscmst_ctl_file    = @@LESDIR || '/db/data/load/base/bootstraponly/dscmst.ctl'
+               and uc_les_mls_cat_ctl_file = @@LESDIR || '/db/data/load/base/safetoload/les_mls_cat.ctl'
+               and uc_sys_dsc_mst_ctl_file = @@LESDIR || '/db/data/load/base/safetoload/sys_dsc_mst.ctl'
+               and uc_dscmst_typ      = 'F'
+               and uc_les_mls_cat_typ = 'F'
+               and uc_sys_dsc_mst_typ = 'F'
+            }
+            |
+            /*
+             * If we have ctl files then do the load
+             */
+            if ( @uc_dscmst_typ = 'F' and @uc_les_mls_cat_typ = 'F' and @uc_sys_dsc_mst_typ = 'F' )
+            {
+               list ossi system files
+               where pathname = @uc_prod_dir 
+               and pattern = '*.*'
+               and do_recursive_scan = '1'
+               |
+               {
+                  sl_split filename
+                  where full_file_name = @pathname
+                  |
+                  publish data
+                  where uc_dir_only = substr(@s_dir, 1, len(@s_dir)-1)
+                  |
+                  sl_get basename
+                  where file_name = @uc_dir_only
+                  |
+                  publish data
+                  where uc_table_name = @base_file_name
+                  |
+                  publish data
+                  where ctl_file = decode ( @uc_table_name, 
+                                            'dscmst', @uc_dscmst_ctl_file,
+                                            'les_mls_cat', @uc_les_mls_cat_ctl_file,
+                                            'sys_dsc_mst', @uc_sys_dsc_mst_ctl_file, 'other.ctl' )
+                  |
+                  if ( @ctl_file != 'other.ctl' )
+                  {
+                     write output file
+                     where path = @log_file_path
+                     and filnam = @log_file
+                     and data = 'Loading file ' || @filename || ' from ' || @s_dir || ' using ' || @ctl_file || ' table=' || @uc_table_name
+                     ;
+                     /* Now we do the loading magic */
+                     load data file
+                     where data_dir = @s_dir
+                     and data_file = @filename
+                     and ctl_file = @ctl_file
+                     and use_header = 1
+                     and delim = ','
+                     catch(@?)
+                     |
+                     if ( @? = 0  )
+                        write output file
+                        where path = @log_file_path
+                        and filnam = @log_file
+                        and data = '.... Loaded ok'
+                     else 
+                        write output file
+                        where path = @log_file_path
+                        and filnam = @log_file
+                        and data = '.... Load failed with ' || @? || '-' || @!
+                     ;
+                     [commit] catch(@?)
+                  }
+                  else
+                  {
+                     write output file
+                     where path = @log_file_path
+                     and filnam = @log_file
+                     and data = '**** Ignoring ' || @filename || ' because table is unexpected'
+                  }
+               }
+            }
+            else
+            {
+               write output file
+               where path = @log_file_path
+               and filnam = @log_file
+               and data = '**** Ignoring ' || @uc_prod_dir || ' because a needed ctl file is missing'
+            }
+         }
+      }
+   }
+}
+
+
+]]>
+</local-syntax>
+
+
+<documentation>
+
+<remarks>
+
+</remarks>
+
+<retcol name="nothing" type="string"></retcol>
+
+<retrows>0</retrows>
+
+<example>
+load ossi locale
+where default_all = '1'
+and new_locale_id = 'FRENCH'
+
+</example>
+<exception value="eOK">Normal successful completion</exception>
+
+<seealso cref="sl_change gen_maint"></seealso>
+
+</documentation>
+</command>

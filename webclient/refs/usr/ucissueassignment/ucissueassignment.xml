@@ -1,0 +1,12 @@
+<project project-dir='.' js-dir='${project-dir}' app-id='${appId}' hf-compliant='true'>
+	<target name='les.usr.ucissueassignment' type='js' source-dir='${js-dir}'>
+		<include name = 'MainStore.js' />
+		<include name = 'UcissueassignmentfilesStore.js' />
+		<include name = 'UcissueassignmentseamlesStore.js' />
+		<include name = 'UcissueassignmentStore.js' />
+		<include name = 'UcissueassignmenttablesStore.js' />
+		<include name = 'MainView.js' />
+		<include name = 'MainController.js' />
+		<include name = 'App.js' />
+	</target>
+</project>

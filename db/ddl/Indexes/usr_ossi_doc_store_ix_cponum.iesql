@@ -1,0 +1,15 @@
+#use $LESDIR/include
+#include <usrddl.h>
+#include <usrtbldef.h>
+#use $MOCADIR/include
+#include <sqlDataTypes.h>
+
+mset command on
+[
+CREATE_INDEX_BEGIN(usr_ossi_doc_store, usr_ossi_doc_store_ix_cponum)
+(cponum,wh_id,uc_doc_typ_cd,uc_doc_subtyp_cd,uc_doc_id)
+CREATE_INDEX_END
+] 
+catch(ERR_TABLE_ALREADY_EXISTS, ERR_INDEX_ALREADY_EXISTS)
+RUN_DDL
+mset command off

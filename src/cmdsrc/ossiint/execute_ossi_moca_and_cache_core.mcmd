@@ -1,0 +1,82 @@
+<command>
+<name>execute ossi moca and cache core</name>
+<description>Wrapper for executing moca command and cache </description>
+<type>Local Syntax</type>
+
+<argument name="uc_cache_grp" required="yes" datatype="string"></argument>
+<argument name="uc_moca_cmd" required="no" datatype="string"></argument>
+<argument name="uc_inline" required="yes" datatype="Integer"></argument>
+<argument name="uc_cache_key" required="yes" datatype="string"></argument>
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ */
+publish data
+where uc_my_infispan_cache = nvl(@uc_cache_grp, 'OSSI__MISC' )
+and   uc_my_inline = string ( nvl(@uc_inline,0) )
+and   uc_inhibit_infinispan_cache = nvl( @uc_inhibit_infinispan_cache, @@UC_INHIBIT_INFINISPAN_CACHE )
+|
+{
+   if ( @uc_inhibit_infinispan_cache = '1' )
+      execute ossi moca and cache core using c
+   else
+   {
+      [[
+      import com.redprairie.moca.cache.*;
+      import java.util.concurrent.*;
+      import com.redprairie.moca.cache.infinispan.*;
+      //
+      ConcurrentMap<String, String> cache = CacheManager.getCache(uc_my_infispan_cache, new InfinispanCacheProvider(), null, null); 
+      //
+      // First get the cache_key
+      //
+      my_rs = cache.get ( uc_cache_key );
+      if ( my_rs == null )
+      {
+         try 
+         {
+            if ( uc_my_inline == "1" )
+               my_rs = moca.executeInline ( uc_moca_cmd )
+            else
+               my_rs = moca.executeCommand ( uc_moca_cmd )
+            //
+            cache.put ( uc_cache_key, my_rs );
+         } 
+         catch (MocaException e)
+         {
+           /* Put the MocaException in the cache and throw it */
+           cache.put ( uc_cache_key, e );
+           throw e;
+         }
+      }
+      /* If a MocaException was saved in the cache, throw it */
+      else if (my_rs instanceof MocaException)
+      {
+        throw my_rs;
+      }
+      [ret:my_rs]
+      ]] 
+      |
+      publish data combination
+      where res = @ret
+   }
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+Wrapper command to call moca command and cache
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

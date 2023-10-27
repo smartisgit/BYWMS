@@ -1,0 +1,31 @@
+<command>
+<name>process usr issue base</name>
+<description>Process usr issue base</description>
+<type>Java Method</type>
+<class>OSSIIssueLogger</class>
+<method>logIssue</method>
+<package>com.redprairie.les.oracular.issue</package>
+<argument name="uc_table_name" alias="table" required="yes" datatype="string">
+</argument>
+<argument name="uc_action"  alias="action"  required="yes" datatype="string">
+</argument>
+<argument name="uc_list_mode" datatype="string">
+If 1, lists objects instead of logging them.
+</argument>
+<documentation>
+<remarks>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ */
+This command is used to process issue base.
+]]>
+</remarks>
+
+<retrows>One</retrows>
+<retcol name="result" type="string">Result</retcol>
+<exception value="eOK">The command completed successfully.</exception>
+</documentation>
+</command>

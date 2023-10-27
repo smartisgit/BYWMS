@@ -1,0 +1,96 @@
+<command>
+<name>ossi build_sel_list</name>
+<description>Given a list of columns construct appropriate select clause</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="moca_farg1">CSV list</argument>
+<argument datatype="string" name="moca_farg2">sum if want to construct sum clause.  Else constant</argument>
+<argument datatype="string" name="moca_farg3">List of alternate values for colimns</argument>
+
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+publish data
+where moca_farg3 = nvl(@moca_farg3, "" )
+and moca_farg2 = nvl(@moca_farg2, "" )
+|
+convert list 
+where string = @moca_farg1 
+and type = 'L' 
+and separator = ','
+>> res
+|
+{
+    [[
+    StringBuffer ret = new StringBuffer ( "" );
+    boolean found;
+    boolean have_field_map = false;
+    //
+    if ( moca_farg3 != "" )
+    {
+        field_map = moca_farg3.split ( "," );
+        have_field_map = true;
+    }
+    while ( res.next() )
+    {
+        found = false;
+        //
+        if ( have_field_map )
+        {
+            for ( ii in field_map )
+            {
+                colnam = ii.split("=")[0];
+                colval = ii.split("=")[1];
+                if ( colnam == res.getString("retstr") )
+                {
+                    if ( colval == "sum" || colval == "min" || colval == "max" )
+                        col_data = colval + "(" + colnam + ") " +  colnam;
+                    else
+                        col_data = colval + " " + colnam;
+                    found = true;
+                    break;
+                }
+            }
+        }
+        //
+        if ( !found )
+        {
+            if ( moca_farg2 == "sum" || moca_farg2 == "min" || moca_farg2 == "max" )
+            {
+                col_data = moca_farg2 + "(" + res.getString("retstr") + ") " +  res.getString("retstr")
+                found = true;
+            }
+            else if ( moca_farg2 == "" )
+                col_data = res.getString("retstr");
+            else
+                col_data = moca_farg2 + " " + res.getString("retstr");
+        }
+        if ( ret.toString() != "" )
+            ret.append ( "," );
+        ret.append ( col_data );
+    }
+    [retstr:ret]
+    ]]
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+If we have a list of fields - call this function to modify list for select clayse.   e.g. put literals for some columnms or sum function
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

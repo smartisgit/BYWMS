@@ -1,0 +1,61 @@
+<command>
+<name>convert ossi file characterset</name>
+<description>Convert the file characterset.  Convert the source file in place, i.e. same filename should now be converted
+</description>
+
+<argument name="uc_target_charset" required="yes" datatype="string"></argument>
+<argument name="uc_src_filepath" required="yes" datatype="string"></argument>
+<argument name="uc_src_charset" required="yes" datatype="string">Default to UTF-8</argument>
+<argument name="uc_dst_filepath" required="no" datatype="string">Default to uc_src_filepath</argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+publish data 
+  where uc_src_charset = nvl(@uc_src_charset, 'UTF-8')
+    and uc_dst_filepath = nvl(@uc_dst_filepath, @uc_src_filepath)
+|
+[[
+    moca.trace("Start read file.....");
+    File file = new File(uc_src_filepath);
+    byte[] file_data = new byte[(int) file.length()];
+    new FileInputStream(file).read(file_data);
+    String filecontents = new String(file_data, uc_src_charset);
+    moca.trace("Read file successfully.....");
+    
+    moca.trace("Start Conversion to " + uc_target_charset);
+    byte[] convertedBytes = filecontents.getBytes(uc_target_charset);
+    String value = new String(convertedBytes, uc_target_charset);
+    if (uc_target_charset.equals("MS932"))
+    {
+        char questionMarkChar = '?';
+        value = value.replace(questionMarkChar, toChar("U+3000"));
+    }
+    moca.trace("Finish Conversion to " + uc_target_charset);
+    
+    FileOutputStream fos = new FileOutputStream(uc_dst_filepath);
+    fos.write(value.getBytes(uc_target_charset));
+    fos.flush();
+    fos.close();
+    moca.trace("Override the file by " + uc_target_charset + " successfully.....");
+  
+    private char toChar(String value) {
+        return (char)Integer.parseInt(value.trim().substring("U+".length()), 16);
+    }
+]]
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<remarks>
+This command converts the characterset of an input file. Convert the source file in place, i.e. same filename should now be converted
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

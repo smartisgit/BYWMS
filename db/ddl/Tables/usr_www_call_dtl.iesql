@@ -1,0 +1,77 @@
+#use $LESDIR/include
+#use $DCSDIR/include
+#use $MOCADIR/include
+#use $LESDIR/db/ddl/Indexes
+
+#include <dcsddl.h>
+#include <dcscolwid.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+
+mset command on
+[
+CREATE_TABLE (usr_www_call_dtl)
+(
+   uc_www_call_seq          STRING_TY(12)            not null,
+   uc_www_call_dtl_seq      INTEGER_TY               not null,
+   /**/
+   uc_sf_host_adr_id        STRING_TY(HOST_EXT_ID_LEN),
+   uc_www_sonum             STRING_TY(100),
+   /**/
+   uc_www_errorcode         STRING_TY(100),
+   uc_www_errordetails      STRING_TY(500),
+   uc_www_errordescription  STRING_TY(500),
+   uc_www_status            STRING_TY(100),
+   uc_www_statusdesc        STRING_TY(500),
+   uc_www_warning           STRING_TY(1000),
+   /**/
+   uc_www_carrier             STRING_TY(100),
+   uc_www_servicedescription  STRING_TY(200),   
+   uc_www_service             STRING_TY(100),
+   uc_www_ratetotal           STRING_TY(100),
+   uc_www_servicedays         STRING_TY(100),
+   uc_www_servicedaysdetail   STRING_TY(100),
+   uc_www_deliverydate        STRING_TY(100),
+   uc_www_deliverytime        STRING_TY(100),
+   uc_www_upchargefactor      STRING_TY(100),
+   uc_www_retailratetotal     STRING_TY(100),
+   /**/
+   uc_www_printfile           STRING_TY(500),
+   uc_www_totalcharge         STRING_TY(100),
+   uc_www_basecharge          STRING_TY(100),
+   uc_www_accessorialcharge   STRING_TY(100),
+   uc_www_bolnumber           STRING_TY(100),
+   uc_www_orderprobill        STRING_TY(100),
+   /**/
+   uc_www_msn                 STRING_TY(100),
+   uc_www_host_mancls         STRING_TY(100),
+   uc_www_host_shpdte         STRING_TY(50),
+   /**/
+   uc_www_plc_piecenum                STRING_TY(100),
+   uc_www_plc_piecetotalcharge        STRING_TY(100),
+   uc_www_plc_pieceacccharge          STRING_TY(100),
+   /**/
+   uc_www_ptn_piecenum        STRING_TY(100),
+   uc_www_ptn_trackingno      STRING_TY(100),
+   uc_www_ptn_packageweight   STRING_TY(100),
+   /**/
+   uc_frtrte_abs_overhead     FLOAT_TY,
+   uc_frtrte_pct_overhead     FLOAT_TY,
+   uc_intransit_abs_overhead  FLOAT_TY,
+   uc_carcod_valid_flg        FLAG_TY,
+   uc_carcod_in_carxrf_flg    FLAG_TY,
+   /**/
+   uc_request_body_file            STRING_TY(500),
+   uc_response_body_file_raw       STRING_TY(500),
+   uc_response_body_file_decoded   STRING_TY(500),
+   /**/
+   ins_dt                   DATE_TY,
+   last_upd_dt              DATE_TY,
+   ins_user_id              STRING_TY(40),
+   last_upd_user_id         STRING_TY(40)
+)
+] catch (/* ERR_TABLE_ALREADY_EXISTS */ -2714,-955)
+RUN_DDL
+mset command off
+ 
+#include <usr_www_call_dtl_pk.iesql>

@@ -1,0 +1,64 @@
+<command>
+<name>ossi normalize_flag</name>
+<description>
+FUNCTION:  RP sometimes give inconsitent input for flags.  e.g. 1.0 instead of 1 and sometimes even T/F.  Normalize them to 1 and 0 string
+all the time
+</description>
+
+<argument name="moca_farg1" required="no" datatype="string">Input value</argument>
+<argument name="moca_farg2" required="no" datatype="string">Default if we dont find it.  Default null</argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+
+publish data
+where uc_input = @moca_farg1
+and uc_default = @moca_farg2
+|
+publish data
+where uc_input_str = string(@uc_input)
+|
+if ( @uc_input_str is null )
+   publish data
+   where uc_input_has_dec = 0
+else
+   publish data
+   where uc_input_has_dec = instr(@uc_input_str, '.' )
+|
+if ( @uc_input_has_dec > 0 )
+   publish data
+   where uc_input_str = string(int(@uc_input_str))
+|
+publish data
+where ret = decode(@uc_input_str,'1', '1', 'Y', '1', 'T', '1', '0', '0', 'N', '0', 'F', '0', @uc_default )
+
+]]>
+</local-syntax>
+
+
+<documentation>
+
+
+<remarks>
+Noticed that RP was sending input for flags inconsistently.  This function will normalize it to string '1' or '0'
+</remarks>
+
+<retcol name="ret" type="string">Value of the parameter</retcol>
+
+<retrows>One or zero rows are returned</retrows>
+
+<example>
+
+</example>
+<exception value="eOK">Normal successful completion</exception>
+
+<seealso cref="publish data"></seealso>
+
+</documentation>
+</command>

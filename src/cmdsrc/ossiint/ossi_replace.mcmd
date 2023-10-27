@@ -1,0 +1,49 @@
+<command>
+<name>ossi replace</name>
+<description>
+FUNCTION: Replace all occurrances in a string with another.  This can be used
+as a function expression</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ * 20170930 ossi\saad.ahmad - 8004 - ossiint foundation
+ */
+if ( !@moca_farg2 )
+   publish data where x=@moca_farg1
+else
+   sl_replace
+   where str      = @moca_farg1
+   and   look_for = @moca_farg2
+   and   repl_with= @moca_farg3
+   and   ci       = nvl(@moca_farg4,'T')
+
+]]>
+</local-syntax>
+
+<argument name="moca_farg1" required="no" datatype="string">String to search</argument>
+<argument name="moca_farg2" required="no" datatype="string">Lookup this string</argument>
+<argument name="moca_farg3" required="no" datatype="string">Replace with this string</argument>
+<argument name="moca_farg4" required="no" datatype="string">Case Insensitive, T or F - default T</argument>
+<documentation>
+
+<remarks>
+This command may be used as an expression to replace all occurances of a substring.
+If a substring is not provided, then original string is left as-is. 
+</remarks>
+
+<example>
+publish data where x=ossi_replace('test string', 's', 'X' )
+
+will return
+x
+-----------
+teXt Xtring
+</example>
+
+<exception value="eOK">Normal successful completion</exception>
+</documentation>
+</command>

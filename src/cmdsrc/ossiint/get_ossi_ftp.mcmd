@@ -1,0 +1,112 @@
+<command>
+<name>get ossi ftp</name>
+<description>get a file via ftp.</description>
+<type>Local Syntax</type>
+<argument name="host" required="yes" datatype="string">
+</argument>
+<argument name="port" default-value="21" datatype="string">
+</argument>
+<argument name="user" datatype="string">
+</argument>
+<argument name="pass" datatype="string">
+</argument>
+<argument name="destdir" datatype="string">
+</argument>
+<argument name="destfile" datatype="string">
+</argument>
+<argument name="srcdir" datatype="string">
+</argument>
+<argument name="srcfile" required="yes" datatype="string">
+</argument>
+<argument name="mode" datatype="string">
+</argument>
+<argument name="use_sftp" default-value="0" datatype="integer">
+</argument>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+[[
+  import java.io.File;
+  
+  import com.jscape.inet.ftp.Ftp;
+  import com.jscape.inet.sftp.Sftp;
+  import com.jscape.inet.ssh.util.SshParameters;
+  
+  String error = null;
+  if (use_sftp == 0)
+  {
+    Ftp ftp = new Ftp(host, user, pass, port);
+    try {
+      ftp.connect();
+      if (mode.equals("B")) {
+        ftp.setBinary();
+      }
+      else {
+        ftp.setAscii();
+      }
+      ftp.setLocalDir(new File(destdir));
+      ftp.setDir(srcDir);
+      ftp.download(destfile, srcfile);
+      ftp.disconnect();
+    } 
+    catch (Exception e) {
+      error = e.getMessage();
+    }
+  }
+  else
+  {
+    if (port == 21) {
+      port = 22;
+    }
+    SshParameters params = new SshParameters(host, port, user, pass)
+    Sftp ftp = new Sftp(params);
+    try {
+      ftp.connect();
+      if (mode.equals("B")) {
+        ftp.setBinary();
+      }
+      else {
+        ftp.setAscii();
+      }
+      ftp.setLocalDir(new File(destdir));
+      ftp.setDir(srcDir);
+      ftp.download(destfile, srcfile);
+      ftp.disconnect();
+    } catch (Exception e) {
+      error = e.getMessage();
+    }
+  }
+  [error:error]
+]]
+|
+if (@error != null)
+{
+  set return status where status = 97050
+                      and action = 'get'
+                      and err_msg = @error
+}
+
+]]>
+</local-syntax>
+<documentation>
+<remarks>
+<![CDATA[
+ This command gets a file from another host via ftp or sftp.
+]]>
+</remarks>
+<retrows>One</retrows>
+<retcol name="status" type="string">A string describing the number of bytes transferred.</retcol>
+<exception value="eOK">The command completed successfully.</exception>
+<exception value="eMOCA_FTP_COM_FAILURE">An FTP communication failure occurred.</exception>
+<seealso cref="remove ftp">
+</seealso>
+<seealso cref="put ftp">
+</seealso>
+</documentation>
+</command>

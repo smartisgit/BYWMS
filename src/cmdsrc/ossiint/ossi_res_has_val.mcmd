@@ -1,0 +1,65 @@
+<command>
+<name>ossi res_has_val</name>
+<description>See if a resultset named uc_res_eval has a value</description>
+<type>Local Syntax</type>
+<argument datatype="string" name="moca_farg1">result set</argument>
+<argument datatype="string" name="moca_farg2">field name</argument>
+<argument datatype="string" name="moca_farg3">value</argument>
+
+
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+publish data
+where uc_res_eval  = @moca_farg1
+and   uc_colnam  = @moca_farg2
+and   uc_cmp_val = @moca_farg3
+|
+{
+   [[
+   String ret = "0";
+   String val = "INIT";
+   moca.trace(" *** Look for " + uc_cmp_val + " in column " + uc_colnam);
+   uc_res_eval.reset();
+   while ( uc_res_eval.next() )
+   {
+      val = uc_res_eval.getString ( uc_colnam );
+      if ( val == uc_cmp_val )
+      {
+         moca.trace(val + " equals " + uc_cmp_val + ". Break.");
+         ret = "1";
+         break;
+      }
+      else
+      {
+         moca.trace(val + " != " + uc_cmp_val);
+      }
+   }
+   moca.trace(" * Found? " + ret);
+   [ret:ret]
+   ]]
+   catch(@?)
+   |
+   if (@? = 0 )
+      publish data where ret = @ret
+   else
+      publish data where ret = 0
+}
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+MOCA Function to return 1 if a value exists in a res
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

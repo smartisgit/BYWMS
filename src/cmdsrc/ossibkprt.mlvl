@@ -1,0 +1,7 @@
+<component-level>
+<name>ossibkprt</name>
+<description>OSSI Backport fixes in standard.  Make sure before ossiint</description>
+<sort-sequence>8000</sort-sequence>
+<library>ossiint</library>
+<editable>true</editable>
+</component-level>

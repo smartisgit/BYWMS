@@ -1,0 +1,76 @@
+<command>
+<name>generate ossi mload ctl file</name>
+<description>Generate an mload ctl file</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="table_name"></argument>
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+publish data
+where ctl_filename = lower(@table_name) || '.ctl'
+and ctl_filepath = @@LESDIR || '/db/data/load/base/bootstraponly'
+|
+publish data
+where uc_full_filepath = @ctl_filepath || '/' || @ctl_filename
+|
+[
+select chr(13)||chr(10) nl
+from dual
+]
+|
+publish data
+where filnam = @ctl_filename
+and path = @ctl_filepath
+and mode = 'a'
+and newline = 'Y'
+and newline_character = @nl
+|
+{
+    remove file
+    where filnam = @uc_full_filepath
+    catch (@?)
+    ;
+    write output file
+    where data = "publish data where table = '"||@table_name || "' and uc_called_from_mload = '1'"
+    ;
+    list table columns where table_name = @table_name
+    |
+    if ( @column_name != 'moddte' and @column_name != 'mod_usr_id' and @column_name != 'u_version' and @column_name != 'ins_dt' and @column_name != 'last_upd_dt'
+         and @column_name != 'ins_user_id' and @column_name != 'last_upd_user_id' )
+    {
+        write output file 
+        where data = "and " || @column_name || " = '@" || @column_name || "@'"
+    }
+    ;
+    write output file 
+    where data = "|" || @nl 
+               ||"{" || @nl
+               ||"    create record " || @nl
+               ||"    catch (-1,512)" || @nl
+               ||"    |" || @nl
+               ||"    if ( @? != 0 )" || @nl
+               ||"        change record catch (-1403,510)" || @nl
+               ||"}"
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+Generate a ctl file
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

@@ -1,0 +1,60 @@
+<command>
+<name>execute ossi rules for data validation</name>
+<description>per a policy see rules and then if a rule passes raise error as listed in policy</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="polcod"></argument>
+<argument datatype="string" name="polvar"></argument>
+
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+publish data
+where wh_id = nvl(@wh_id, @@WH_ID)
+|
+{
+    get ossi rules for policy based rules engine
+    where polcod = @polcod
+    and polvar = @polvar
+    catch (-1403,510)
+    |
+    if ( @? = 0 )
+    {
+        if ( @rtstr1 is not null and @rtnum2 != 0 )
+        {
+            /* If condition is true, we have a problem to report */
+            execute server command
+            where cmd = "publish data where uc_error = iif ( " || @rtstr1 || ",'1','0')"
+            and inline = 1
+            |
+            if ( @uc_error = '1' )
+            {
+                set return status
+                where status = @rtnum2
+                and message = @rtstr2
+            }
+        }
+    }
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+based on a policy execute rules and if any rule passes that error is raised
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

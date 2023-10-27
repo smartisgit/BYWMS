@@ -1,0 +1,49 @@
+<command>
+<name>create ossi app monitor</name>
+<description>Create an application monitor</description>
+
+<argument name="uc_monitor_id" required="yes" datatype="string"></argument>
+<argument name="uc_monitor_descr" required="yes" datatype="string"></argument>
+<argument name="ena_flg" required="yes" datatype="string"></argument>
+<argument name="uc_check_cmd" required="yes" datatype="string"></argument>
+<argument name="uc_fix_cmd" required="yes" datatype="string"></argument>
+<argument name="uc_raise_ems_alert_on_fail_flg" required="yes" datatype="string"></argument>
+<argument name="uc_log_mon_dlytrn_flg" required="yes" datatype="string"></argument>
+<argument name="uc_mon_srtseq" required="yes" datatype="string"></argument>
+<argument name="uc_time_since_last_run" required="yes" datatype="string"></argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+capture ossi table data for history logging
+where uc_log_table_name = 'usr_ossi_mon'
+|
+create record
+where table = 'usr_ossi_mon'
+and uc_cust_flg = decode ( ossi__is_dev_env(), 1, null, 1 )
+|
+filter data 
+where moca_filter_level = 1
+and old_uc_captured_table_data = @uc_captured_table_data
+
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<remarks>
+This command is used to create application monitor.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

@@ -1,0 +1,9 @@
+job_id,role_id,name,enabled,type,command,log_file,trace_level,overlap,schedule,start_delay,timer,grp_nam
+UC_W_WMD1_RCVTRK_CRTREG,,Register RCVTRK registeration for WMD1 warehouse,0,timer,"register ossi object instances created
+where wh_id = 'WMD1'
+and uc_reg_table_name = 'RCVTRK'
+and uc_rule_grp_id = 'OSSI-RCVTRK-CREATED'
+and uc_rule_subgrp_id = 'GLOBAL-MAP'
+and uc_pk_col = 'trknum'
+and uc_data_col = 'trknum'
+and comflg = 1",$LESDIR/log/UC_W_WMD1_RCVTRK_CRTREG.log,,0,,0,60,GK

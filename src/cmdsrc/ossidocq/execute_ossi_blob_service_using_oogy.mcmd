@@ -1,0 +1,292 @@
+<command>
+<name>execute ossi blob service using oogy</name>
+<description>This command is to download/upload data from/to oogy database through APIs</description>
+<type>Local Syntax</type>
+
+<argument name="uc_oogy_service" required="yes" datatype="string">This is a tag for the service.  Following are supported
+    blob list:  List all the blobs
+    blob upload: To upload a blob
+    blob download: Download a blob content
+</argument>
+
+<argument name="serverid" required="no" datatype="string">Server ID</argument>
+<argument name="uc_doc_upload_q_id" required="no" datatype="string">Document Upload Queue ID</argument>
+<argument name="decode_from_base64" required="no" datatype="string">Default 0 returns encoded char string, 1 returns a binary string</argument>
+<argument name="uc_contents_base64" required="no" datatype="string">When uploading we are passed in the contents</argument>
+
+
+
+<argument name="uc_upload_filepath" required="no" datatype="string">When blob upload, the file path</argument>
+<argument name="uc_upload_id" required="no" datatype="string">When blob upload or blob url, the name of the uploded file</argument>
+<argument name="uc_doc_download_path" required="no" datatype="string">When blob download, the file path</argument>
+
+
+<local-syntax>
+<![CDATA[
+
+publish data
+where uc_oogy_url = nvl(@uc_oogy_url, @@UC_DOC_Q_SERVICE_URL)
+and   serverid    = nvl(@serverid,    @@UC_DOC_Q_OOGY_SERVERID)
+|
+validate stack variable not null where name = 'uc_oogy_service'
+|
+validate stack variable not null where name = 'uc_oogy_url'
+|
+if ( @uc_oogy_service = 'blob list' )
+{  
+    [select rtstr1, rtstr2, srtseq
+       from poldat_view
+      where polcod = 'USR-OSSI-DOC-UPLOAD-Q'
+        and polvar = 'CONTEXT'
+        and polval = 'MAIN-COLUMN-LIST'
+        and wh_id = '----'
+        and rtnum1 = 1
+    union
+     select rtstr2 rtstr1, '' rtstr2, 10000 + srtseq srtseq
+       from poldat_view
+      where polcod = 'USR-OSSI-DOC-UPLOAD-Q'
+        and polvar = 'INPUT'
+        and polval = 'COLUMN-LIST'
+        and wh_id = '----'
+        and rtnum1 = 1
+    union
+     select rtstr1, '' rtstr2, 20000 + srtseq srtseq
+       from poldat_view
+      where polcod = 'USR-OSSI-DOC-UPLOAD-Q'
+        and polvar = 'INPUT'
+        and polval = 'COLUMN-LIST-FOR-SELECT'
+        and wh_id = '----'
+        and rtnum1 = 1        
+      order by srtseq
+    ] >> res
+    |
+    [[
+        StringBuilder ctxt_condition = new StringBuilder("{");
+        String final_value = "";
+
+        while(res.next())
+        {
+            String colnam = res.getString("rtstr1");
+            String value_expr = res.getString("rtstr2");
+            if (value_expr == null || value_expr.isEmpty())
+            {
+                value_expr = "@" + colnam;
+            }
+            res_tmp = moca.executeInline ( "publish data where vv = " + value_expr);
+            res_tmp.next();
+            final_value = res_tmp.getString ( "vv" );
+                
+            if (final_value != null && !final_value.isEmpty())
+            {
+                ctxt_condition.append(toJSON(colnam, final_value));
+            }
+        }
+        if (uc_hdr_flexible_where_clause != null && !uc_hdr_flexible_where_clause.isEmpty())
+        {
+            ctxt_condition.append(toJSON("uc_hdr_flexible_where_clause", uc_hdr_flexible_where_clause));
+        }
+        if (uc_dtl_flexible_where_clause != null && !uc_dtl_flexible_where_clause.isEmpty())
+        {
+            ctxt_condition.append(toJSON("uc_dtl_flexible_where_clause", uc_dtl_flexible_where_clause));
+        }
+        // strip off last comma
+        if (ctxt_condition.length() > 1)
+        {
+            ctxt_condition.deleteCharAt(ctxt_condition.length()-1);
+        }
+        ctxt_condition.append('}');
+
+        String toJSON(String key, String value)
+        {
+            return '"' + key + '":"' + value + '",';
+        }
+        
+        [ctxt_condition:ctxt_condition]
+    ]]
+    |
+    publish data
+    where uc_smartproduct = 'smartdocstore'
+    and uc_smartservice = 'listblob'
+    and request_method = 'POST'
+    and body = 
+    '{ "serverId":"' || @serverid || '",' ||
+       '"docUploadQueryId":"' || @uc_upload_id || '",' ||
+       '"docProgramCode":"' || @docProgramCode || '",' ||
+       '"docProgramId":"' || @docProgramId || '",' ||
+       '"ctxtConditions":' || @ctxt_condition || 
+    '}'
+}
+else if ( @uc_oogy_service = 'blob upload' )
+{
+    publish data
+    where blob_ctxt = ossi__replace (@blob_ctxt, '"', '\"') /* escape double quote */
+    and generatedDate = ossi__get_wh_local_time(@wh_id, "yyyy-MM-dd'T'HH:mm:ss.SSSXXX", @uc_q_dt)
+    and uploadedDate = ossi__get_wh_local_time(@wh_id, "yyyy-MM-dd'T'HH:mm:ss.SSSXXX", @uc_upload_dt)
+    and body =  '{'||
+           '"serverId":"' || @serverid || '",' ||
+           '"docUploadQueryId":"' || @uc_upload_id || '",' ||
+           '"docUploadTypeCode":"' || @uc_doc_upload_typ_cd || '",' ||
+           '"docExtendCode":"' || @uc_doc_ext_cd || '",' ||
+           '"docProgramCode":"' || @uc_doc_pgm_cd || '",' ||
+           '"docProgramId":"' || @uc_doc_pgm_id || '",' ||
+           '"formatType":"' || @format_typ || '",' ||
+           '"destinationType":"' || @dest_typ || '",' ||
+           '"destination":"' || @dest || '",' ||
+           '"numberofCopies":"' || @num_copies || '",' ||
+           '"digitalSignatureRequired":"' || @dig_sig_req_flg || '",' ||
+           '"keywordsList":"' || @keywords_list || '",' ||
+           '"generatedDate":"' || @generatedDate || '",' ||
+           '"reportArchiveId":"' || ossi__replace(@uc_upload_filepath,'\','\\') || '",' ||
+           '"docTypeCode":"' || @uc_doc_typ_cd || '",' ||
+           '"docSubtypeCode":"' || @uc_doc_subtyp_cd || '",' ||
+           '"warehouseID":"' || @wh_id || '",' ||
+           '"generatedUserId":"' || @gen_usr_id || '",' ||
+           '"getGeneratedLocaleId":"' || @gen_locale_id || '",' ||
+           '"deviceCode":"' || @devcod || '",' ||
+           '"contents":"' || @uc_contents_base64 || '",' ||
+           '"uploadedDate":"' || @uploadedDate || '",' ||
+           '"applicationId":"' || nvl(@app_id, '') || '",' ||
+           '"ipAddress":"' || nvl(@ip_adr, '') || '",' ||
+           '"oogyBlobContext":"' || ossi__res_to_json(@uc_upload_metadata,'1','1') ||
+       '"}'
+    and uc_smartproduct = 'smartdocstore'
+    and uc_smartservice = 'uploadblob'
+    and request_method = 'POST'
+}
+else if ( @uc_oogy_service = 'blob download' )
+{
+    publish data
+    where body = 
+    '{ "serverId":"' || @serverid || '",' ||
+       '"docUploadQueryId":"' || @uc_upload_id || '",' ||
+       '"decodeFromBase64":"' || nvl(@decode_from_base64, 0) || '"}'
+    and uc_smartproduct = 'smartdocstore'
+    and uc_smartservice = 'getblobcontents'
+    and request_method = 'POST'
+}
+|
+if (@uc_smartproduct is null or @uc_smartservice is null)
+{
+    set return status where status = 99990
+       and message = 'Invalid Service Request'
+}
+|
+publish data
+  where uc_full_url = @uc_oogy_url || '/smartgateway?smartproduct=' || @uc_smartproduct || '&smartservice=' || @uc_smartservice
+    and uc_oogy_username = nvl(@uc_oogy_username, 'SUPER')
+    and uc_oogy_password = nvl(@uc_oogy_password, 'SUPER')
+|
+{
+   [[
+        import com.google.gson.Gson;
+        
+        try {
+            moca.trace("URL: " + uc_full_url);
+            moca.trace("JSON: " + body);
+
+            body = body.replace("\\\"", "\\\\\"").replace("\"", "\\\""); // escape double quotes
+            String bodyWithWrapper = "{serverid=" + serverid + ",app_username=" + uc_oogy_username + ",app_password=" + uc_oogy_password + ",data=\"" + body + "\"}";
+        
+            BufferedReader rd  = null;
+            StringBuilder sb = null;
+            String line = null;
+
+            URL url = new URL(uc_full_url);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod(request_method);
+            connection.setRequestProperty("Content-Type", "application/json");
+            connection.setDoOutput(true);
+
+            String json = bodyWithWrapper;
+            OutputStream os = connection.getOutputStream();
+            byte[] input = json.getBytes("utf-8");
+            os.write(input, 0, input.length);
+
+            connection.connect();
+            rd  = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+            sb = new StringBuilder();
+
+            while ((line = rd.readLine()) != null) {
+                sb.append(line + '\n');
+            }
+            moca.trace("Result: " + sb);
+            [cmd_result:sb.toString()]
+
+        } catch (Exception e) {
+            [error:e.getMessage()]
+        }
+  ]]
+}
+|
+if (@error != null)
+{
+     set return status where status = 99991
+         and message = @uc_oogy_service ||': ' || @error
+}
+else
+{
+    if (@uc_oogy_service = 'blob download')
+    {
+        [[
+            import org.json.JSONArray;
+            import org.json.JSONException;
+            import org.json.JSONObject;
+            //
+			// smartgateway will wrap the results in another JSON, so parse the "data" field
+			JSONObject wrapper = new JSONObject(cmd_result);
+			String data = wrapper.getString("data");            
+            JSONObject obj = new JSONObject(data);
+            blob_contents=obj.getString("blob_contents");
+        ]]
+        |
+        decode from base64
+        where str = @blob_contents
+        |
+        write output file
+        where path = @uc_doc_download_path 
+        and filnam =  @uc_upload_id
+        and mode = "wb"
+        and data_bin = @base64_decoded
+        and charset = null
+        and data = null
+        catch(@?)
+    }
+    ; 
+    /*add the etag*/
+    publish data
+    where cmd_result = iif( @uc_oogy_service = 'blob upload', ossi__replace(@cmd_result,'"status":','"etag":"oogy","status":'), @cmd_result)
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This command is to read a result set based on the service parameter passed in.
+    blob list:  List all the blobs records from oogy blob master table.
+    blob upload: Upload a blob record into oogy blob tables and return a row with added record.
+    blob download: Download a blob content from blob master table.
+</p>
+]]>
+</remarks>
+
+<retrows>*</retrows>
+
+<example> 
+    execute ossi blob service using oogy
+    where uc_oogy_url = 'http://localhost:8081'
+    and uc_oogy_service = 'blob list'
+    and uc_doc_upload_q_id = '123456'
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+<seealso cref="execute ossi blob service"></seealso>
+
+
+</documentation>
+
+
+</command>

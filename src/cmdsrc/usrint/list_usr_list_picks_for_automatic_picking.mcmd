@@ -1,0 +1,39 @@
+<command>
+<name>list usr list picks for automatic picking</name>
+<description></description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * mustafa.ahmed - 10731
+ */
+[select distinct 
+        pw.list_id,
+        pw.ship_id,
+        pw.ordnum,
+        pw.wrkref,
+        pw.srcloc,
+        pw.lodlvl
+   from pckwrk_view pw
+   join pcklst l
+     on pw.list_id = l.list_id
+  where @+pw.list_id
+    and @+pw.srcare
+    and @+pw.srcloc
+    and @+pw.ordnum
+    and @+pw.ship_id
+    and @+pw.list_id
+    and @+pw.lodlvl
+    and pw.appqty = 0
+    and pw.pckqty > 0
+    and pw.pcksts = 'R'
+    and l.list_sts = 'R'
+    and pw.wrktyp in ( 'P', 'B' )
+  order by 1,2,3,4
+]
+
+]]>
+</local-syntax>
+</command>

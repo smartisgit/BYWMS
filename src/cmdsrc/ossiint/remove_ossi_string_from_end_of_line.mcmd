@@ -1,0 +1,51 @@
+<command>
+<name>remove ossi string from end of line</name>
+<description>Remove last line on all lines.  used in comm metod algorithm UC_SL_O_IFD_MEM_FTP_RENAME.
+It changes the file in place, so that afterwards same file exists as if it did not have the character on ech line</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="filnam">Just file name</argument>
+<argument datatype="string" name="path">Path</argument>
+<argument datatype="string" name="char_to_look_for">If this string is the last char, then remove it</argument>
+
+<local-syntax>
+<![CDATA[
+
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 11371 - Trim last char off from every line of the file
+ */
+
+if (@char_to_look_for != '')
+{
+   publish data 
+      where full_file_name = @path || @filnam
+   |
+   [[
+        File old_file = new File(full_file_name);
+        File new_file = new File(full_file_name + ".tmp");
+        new_file << old_file.text.replaceAll(char_to_look_for + "\r\n","\r\n").replaceAll(char_to_look_for + "\n","\n");
+        old_file.delete();
+        new_file.renameTo(old_file);
+        
+        [full_file_name:full_file_name]
+   ]]
+   
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+Remove last line on all lines.  used in comm metod algorithm UC_SL_O_IFD_MEM_FTP_RENAME.
+</remarks>
+
+<seealso cref="write output file"></seealso>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

@@ -1,0 +1,35 @@
+<trigger>
+<name>execute ossi conditional commands</name>
+<on-command>register ossi object created core</on-command>
+<fire-sequence>19000</fire-sequence>
+
+<local-syntax>
+<![CDATA[
+
+process ossi post tasks for crud action using rules
+where uc_table_list_set_defaults = @uc_table_list_set_defaults
+and uc_set_default_rule_grp_id = @uc_set_default_rule_grp_id
+and uc_rule_grp_id = @uc_rule_grp_id
+and uc_rule_subgrp_id = @uc_rule_subgrp_id
+and uc_les_cmd_cond_rules = null
+and uc_transaction_action = 'R'
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+  <p>
+  We simply call the listed component to perform all actions.  Refer to that documentation
+  </p>
+]]>
+</remarks>
+
+
+<seealso cref="process ossi post tasks for crud action using rules"></seealso>
+
+
+</documentation>
+
+</trigger>

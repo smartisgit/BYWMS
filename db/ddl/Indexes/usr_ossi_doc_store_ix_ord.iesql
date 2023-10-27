@@ -1,0 +1,14 @@
+#use $LESDIR/include
+#include <usrddl.h>
+#include <usrtbldef.h>
+#use $MOCADIR/include
+#include <sqlDataTypes.h>
+
+mset command on
+[
+CREATE_INDEX_BEGIN(usr_ossi_doc_store, uc_ossi_doc_store_ix_ord)
+(ordnum,wh_id,uc_doc_typ_cd,uc_doc_subtyp_cd, uc_doc_id)
+CREATE_INDEX_END
+] catch (-1408,-1779,-955,-2260, -2714,-1913) 
+RUN_DDL
+mset command off

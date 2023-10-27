@@ -1,0 +1,13 @@
+<project name='ucissueassignment' default='build'>
+	<property environment='env' />
+	<import file='${env.REFSDIR}\buildfiles\client.xml' />
+	<property name='appId' value='ucissueassignment' />
+	<property name='configFile' value='ucissueassignment.xml' />
+	<target name='build' description='build the app' depends='clean'>
+		<csbuilder-macrodef configFile='${configFile}' appId='${appId}' />
+	</target>
+	<target name='clean' description='clean admin app'>
+		<delete dir='E:/JDA/prtl_172/rpweb/web/${appId}'/>
+		<delete dir='E:/JDA/prtl_172/rpweb/deploy/${appId}'/>
+	</target>
+</project>

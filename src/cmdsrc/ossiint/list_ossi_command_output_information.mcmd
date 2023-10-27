@@ -1,0 +1,140 @@
+<command>
+<name>list ossi command output information</name>
+<description>Standard MOCA servies do not provide this, so we have built it</description>
+
+<argument name="cmplvl" alias="level" datatype="string">Component level name</argument>
+<argument name="command" alias="cmd_nam" datatype="string">Command name</argument>
+
+<argument name="uc_search_1_tag" alias="" datatype="string">Command name</argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+publish data
+where uc_usr_starts_at = 8999
+and uc_dcs_starts_at = 300
+and uc_search_1_tag = nvl(@uc_search_1_tag, 'retcol' )
+/*
+ * Following approach is needed because cdata end tag cannot exist in the file.  That causes XML parse error
+ */
+and cdata_start_tag = '<![' || 'CDATA' || '['
+and cdata_end_tag = ']' || ']>'
+|
+{
+    list active commands
+    catch (@?)
+    |
+    if ( @? = 0 and @filename is not null )
+    {
+        if ( @cmplvlseq < @uc_dcs_starts_at )
+            publish data
+            where uc_my_cmd_folder = @@SALDIR
+        else if ( @cmplvlseq < @uc_usr_starts_at )
+            publish data
+            where uc_my_cmd_folder = @@DCSDIR
+        else
+            publish data
+            where uc_my_cmd_folder = @@LESDIR
+        |
+        read file 
+        where filename = @uc_my_cmd_folder||'/src/cmdsrc/' || @cmplvl || '/' || @filename 
+        and mode = 'F'
+        catch (@?)
+        |
+        if ( @? = 0 and @text is not null )
+        {
+            parse xml 
+            where mxml_xml = @text
+            catch(@?)
+            |
+            if ( @? = 0 )
+            {
+                get xml elements by tagname where mxml_tag = @uc_search_1_tag
+                |
+                if ( @? = 0 )
+                {
+                    /*
+                     * Get the child nodes and that is where description is
+                     */
+                    {
+                        get xml child nodes where mxml_parent_node = @mxml_node
+                        |
+                        get xml where mxml_start_node = @mxml_node       
+                        |
+                        publish data
+                        where uc_this_node_descr = @mxml_xml
+
+                    }
+                    |
+                    get xml node values
+                    catch(@?)
+                    |
+                    if (@?= 0 )
+                    {
+                        publish data
+                        where cmplvl = @cmplvl
+                        and cmplvlseq = @cmplvlseq
+                        and command = @command
+                        and uc_search_1_tag = @uc_search_1_tag
+                        and uc_variable = @name
+                        and uc_variable_type = nvl(@datatype,@type)
+                        and uc_variable_descr = ossi__replace( ossi__replace ( sl_fmt__trim(nvl(@uc_this_node_descr,nvl(@retcol, @argument)), 'B'), @cdata_start_tag, ''), @cdata_end_tag, '' )
+                        and uc_variable_required = @required
+                        and uc_variable_alias = @alias
+                        |
+                        filter data
+                        where moca_filter_level = 1
+                        and uc_variable_default_descr = ossi__get_field_help ( @uc_variable )
+                    } /* get xml node values */
+                } /* get xml by tagname */
+            } /* parse xml */
+        } /* read file output */
+    } /* list active command output */
+} /* block */
+
+
+    
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+   This command returns the output field information for a command
+</p>
+]]>
+</remarks>
+
+<retrows>n</retrows>
+
+<retcol name="cmplvl" type="COMTYP_CHAR"></retcol>
+<retcol name="cmplvlseq" type="COMTYP_CHAR"></retcol>
+<retcol name="command" type="COMTYP_CHAR"></retcol>
+
+<retcol name="uc_search_1_tag" type="COMTYP_CHAR"></retcol>
+
+<retcol name="uc_variable" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_variable_type" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_variable_descr" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_variable_required" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_variable_alias" type="COMTYP_CHAR"></retcol>
+
+<retcol name="uc_variable_default_descr" type="COMTYP_CHAR"></retcol>
+
+
+
+
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+<seealso cref="list active commands"></seealso>
+
+</documentation>
+
+</command>

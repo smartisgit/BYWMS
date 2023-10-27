@@ -1,0 +1,28 @@
+<command>
+<name>check usr codmst exclusion</name>
+<description>Check user codmst exclusion</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ */
+check usr column exclusion
+  where table = 'CODMST'
+    and column = 'COLNAM'
+    and rtstr1 = @colnam
+    
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This command is used to check user codmst exclusion.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

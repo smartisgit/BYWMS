@@ -1,0 +1,153 @@
+<command>
+<name>list ossi data clinic surgery actions</name>
+<description>Get the actions for the data surgery</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="uc_data_surg_id">Surgery Id</argument>
+<argument datatype="string" name="uc_data_surg_cmd_id_act">Action</argument>
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+publish data
+where polcod = 'USR-OSSI-DATA-CLINIC'
+and polval = 'MAIN-COMMAND-IDS'
+and i_uc_data_surg_cmd_id_act = @uc_data_surg_cmd_id_act
+and locale_id = nvl(@locale_id, @@LOCALE_ID)
+|
+{
+    if ( @init = 1 )
+    {
+        [
+        select /*#nobind*/
+               cast(null as varchar(100)) uc_data_surg_id,
+               cast(null as varchar(100)) uc_data_surg_dtl_typ,
+               cast(null as varchar(100)) uc_data_surg_cmd_id_act,
+               cast(null as varchar(100)) uc_data_surg_cmd_id_act_cmd,
+               cast(null as number)       uc_data_surg_cmd_id_act_cl,
+               cast(null as varchar(100)) uc_data_surg_action_dda_id,
+               cast(null as varchar(100)) uc_data_surg_action_mls_text,
+               cast(null as number)       uc_data_surg_action_mls_cl,
+               cast(null as number)       uc_data_surg_cmd_id_act_ctl
+        from dual
+        where 1=2
+        ]
+    }
+    else
+    {
+        publish data
+        where uc_data_surgery_cmd_id_action_prefix = ossi__polval_nc ( @polcod, @uc_data_surg_id, @polval, 'ACTION-PREFIX', 'rtstr2', '----' )
+        and uc_data_surgery_cmd_id_action_min = ossi__polval_nc ( @polcod, @uc_data_surg_id, @polval, 'ACTION-PREFIX', 'rtnum1', '----' )
+        and uc_data_surgery_cmd_id_action_max = ossi__polval_nc ( @polcod, @uc_data_surg_id, @polval, 'ACTION-PREFIX', 'rtnum2', '----' )
+        and uc_data_surgery_dda_action_prefix = ossi__polval_nc ( @polcod, @uc_data_surg_id, 'DDA-IDS', 'ACTION-PREFIX', 'rtstr2', '----' )
+        /**/
+        and uc_data_surgery_cmd_id_tab_prefix = ossi__polval_nc ( @polcod, @uc_data_surg_id, @polval, 'TAB-PREFIX', 'rtstr2', '----' )
+        and uc_data_surgery_cmd_id_tab_min = ossi__polval_nc ( @polcod, @uc_data_surg_id, @polval, 'TAB-PREFIX', 'rtnum1', '----' )
+        and uc_data_surgery_cmd_id_tab_max = ossi__polval_nc ( @polcod, @uc_data_surg_id, @polval, 'TAB-PREFIX', 'rtnum2', '----' )
+        and uc_data_surgery_dda_tab_prefix = ossi__polval_nc ( @polcod, @uc_data_surg_id, 'DDA-IDS', 'TAB-PREFIX', 'rtstr2', '----' )
+        |
+        do loop 
+        where iterations = iif ( @uc_data_surgery_cmd_id_tab_prefix is null, 1, 2 )
+        |
+        {
+            publish data
+            where main_loop = @i
+            |
+            publish data
+            where 
+                uc_my_min        = decode ( @main_loop, 0, @uc_data_surgery_cmd_id_action_min,     @uc_data_surgery_cmd_id_tab_min )
+            and uc_my_max        = decode ( @main_loop, 0, @uc_data_surgery_cmd_id_action_max,     @uc_data_surgery_cmd_id_tab_max )
+            and uc_my_cmd_prefix = decode ( @main_loop, 0, @uc_data_surgery_cmd_id_action_prefix,  @uc_data_surgery_cmd_id_tab_prefix )
+            and uc_my_dda_prefix = decode ( @main_loop, 0, @uc_data_surgery_dda_action_prefix,     @uc_data_surgery_dda_tab_prefix )
+            |
+            do loop 
+            where iterations = (@uc_my_max - @uc_my_min)+1
+            |
+            {
+                publish data
+                where uc_data_surg_action_seq = @i+@uc_my_min
+                |
+                publish data
+                where uc_data_surg_cmd_id_act = @uc_my_cmd_prefix  || @uc_data_surg_action_seq
+                and uc_data_surg_action_dda_id = @uc_my_dda_prefix || @uc_data_surg_action_seq
+                |
+                if ( @i_uc_data_surg_cmd_id_act is null or @i_uc_data_surg_cmd_id_act = @uc_data_surg_cmd_id_act )
+                {
+                    {
+                        [
+                        select x.mls_text uc_data_surg_action_mls_text,
+                               x.cust_lvl uc_data_surg_action_mls_cl
+                        from
+                        (
+                            select *
+                            from sys_dsc_mst
+                            where colnam = 'dda_id'
+                            and colval = @uc_data_surg_action_dda_id
+                            and locale_id = @locale_id
+                            order by cust_lvl desc
+                        ) x
+                        where rownum < 2
+                       ]
+                       catch (-1403,510)
+                    }
+                    |
+                    {
+                        [
+                        select count(*) cnt
+                        from les_mnu_opt
+                        where opt_nam = @uc_data_surg_cmd_id_act
+                        ]
+                        |
+                        publish data
+                        where uc_data_surg_cmd_id_act_ctl = iif ( @cnt > 0, 1, 0 )
+                    } 
+                    |
+                    get ossi les command 
+                    where les_cmd_id = @uc_data_surg_cmd_id_act  
+                    catch(-1403,510) 
+                    | 
+                    publish data 
+                    where uc_data_surg_cmd_id_act_cmd = @syntax
+                    and uc_data_surg_cmd_id_act_cl = @cust_lvl
+                    |
+                    publish data
+                    where uc_data_surg_id = @uc_data_surg_id
+                    and uc_data_surg_dtl_typ = decode ( @main_loop, 0, 'ACTION', 'TAB' )
+                    and uc_data_surg_cmd_id_act = @uc_data_surg_cmd_id_act
+                    and uc_data_surg_cmd_id_act_cmd = @uc_data_surg_cmd_id_act_cmd
+                    and uc_data_surg_cmd_id_act_cl = @uc_data_surg_cmd_id_act_cl
+                    and uc_data_surg_action_dda_id = @uc_data_surg_action_dda_id
+                    and uc_data_surg_action_mls_text = @uc_data_surg_action_mls_text
+                    and uc_data_surg_action_mls_cl = @uc_data_surg_action_mls_cl
+                    and uc_data_surg_cmd_id_act_ctl = @uc_data_surg_cmd_id_act_ctl
+                } /* matched input */
+            } /* do loop */
+        } /* block */
+    } /* fetch data */
+} /* main */
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+List the meta data for surgery actions
+</remarks>
+
+<retrows>1</retrows>
+
+<retcol name="@* " type="COMTYP_CHAR">See command</retcol>
+
+
+<exception value="eOK">The command completed successfully.</exception>
+
+</documentation>
+
+
+</command>

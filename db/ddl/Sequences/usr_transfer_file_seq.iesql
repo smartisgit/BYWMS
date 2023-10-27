@@ -1,0 +1,23 @@
+#use $DCSDIR/include
+#include <dcsddl.h>
+#include <sqlDataTypes.h>
+#include <dcscolwid.h>
+
+#define SEQ  usr_transfer_file_seq
+#define SEED 1
+#define INC  1
+#define MAX  78364164095
+
+mset command on
+[
+CREATE_SEQUENCE(SEQ, SEED, INC, MAX)
+] catch (ERR_TABLE_ALREADY_EXISTS)
+RUN_DDL
+mset command off
+
+mset command on
+[insert into sysctl (numcod, prefix, prelen, prlflg, seqlen, suflen, btsflg, lstseq, seqflg, grp_nam)
+    values ('usr_transfer_file_seq', 'W2R', 3, 0, 10, 0, 1, 0, 0, '')
+] catch (-1)
+RUN_DDL
+mset command off

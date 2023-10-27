@@ -1,0 +1,28 @@
+#use $DCSDIR/include
+#include <dcsddl.h>
+#include <dcscolwid.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+
+#use $SALDIR/include
+#include <salcolwid.h>
+
+
+mset command on
+[
+ALTER_TABLE_TABLE_INFO(les_usr_ath)
+ALTER_TABLE_ADD_COLUMN_START(uc_ldap_pk)
+    STRING_TY(200)
+ALTER_TABLE_ADD_COLUMN_END
+] catch (ERR_COLUMN_ALREADY_EXISTS)
+RUN_DDL
+
+create db column comment 
+where table_name   = 'les_usr_ath' 
+and column_name    = 'uc_ldap_pk'
+and column_comment = 'When syncing with LDAP, this is the PK in ldap.  Typically the distinguishName attribute'
+RUN_DDL
+
+
+mset command off
+

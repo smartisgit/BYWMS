@@ -1,0 +1,2 @@
+polcod,polvar,polval,wh_id_tmpl,srtseq,rtstr1,rtstr2,rtnum1,rtnum2,rtflt1,rtflt2,grp_nam
+USR-EMSLITE,SETUP,MAIL-SEND-FROM,----,1,saad.ahmad@smart-is.com,Put the from address needed for email messages,0,0,0.0,0.0,OSSISVN_12567

@@ -1,0 +1,36 @@
+<trigger>
+<name>process usr issue</name>
+<on-command>write command</on-command>
+<description></description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ */
+[select replace(@command, ' ', '_') command from dual]
+|
+publish data where filename = @cmplvl || '/' || @command || '.mcmd'
+               and pathname = @@LESDIR || '/src/cmdsrc/' || @filename
+|
+if (@? = 0)  
+process usr issue
+  where uc_table_name = 'FILE'
+    and uc_action = 'UPDATE'
+
+]]>
+</local-syntax>
+<fire-sequence>10000</fire-sequence>
+<enable>yes</enable>
+<documentation>
+
+<remarks>
+This trigger process issue for writing commands.
+</remarks>
+
+<seealso cref="process usr issue"></seealso>
+
+</documentation>
+</trigger>

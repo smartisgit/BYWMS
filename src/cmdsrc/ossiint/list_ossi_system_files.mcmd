@@ -1,0 +1,87 @@
+<command>
+<name>list ossi system files</name>
+<description>List system files</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="dir">Path name without LES</argument>
+<argument datatype="string" name="pathname">If passed in use exactly</argument>
+<argument datatype="string" name="pattern">pattern</argument>
+<argument datatype="string" name="pattern_recursive">pattern</argument>
+<argument datatype="string" name="do_recursive_scan">If directory scan the directory</argument>
+<argument datatype="string" name="is_recursive_call">Is this from the recursive call</argument>
+
+
+<argument datatype="string" name="filter_modified_since">Only show files modified since</argument>
+<argument datatype="string" name="filter_filename">Only show if it is this filename</argument>
+
+
+<local-syntax>
+<![CDATA[
+
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+publish data
+where pathname = nvl(@pathname, @@LESDIR || '/' || @dir || '/' || @pattern )
+and   do_recursive_scan = nvl (@do_recursive_scan, '0' )
+and   pattern = nvl (@pattern,'*')
+and   pattern_recursive = nvl(@pattern_recursive, '*')
+and   is_recursive_call = nvl(@is_recursive_call,'0')
+/**/
+and   my_modified_since = to_char(@filter_modified_since, 'YYYY-MM-DD HH24:MI:SS' )
+and   passed_modifed_since = @filter_modified_since#onstack
+and   my_filter_filename = @filter_filename
+and   passed_filter_filename = @filter_filename#onstack
+|
+{
+   find file
+   |
+   if ( @filename )
+   {
+      get file info
+      |
+      /* Ignore dates for directories
+       * Take the max of created/modified for files
+       */
+      if ( @type = 'D' or !@passed_modifed_since or ossi__max(@created, @modified) > @my_modified_since )
+      {
+         filter data
+         where moca_filter_level = 2
+         and filename = @filename
+         |
+         if ( @filename != '.' and @filename != '..' )
+         {
+            if ( @type = 'D' and @do_recursive_scan = '1' )
+               list ossi system files
+               where pathname = @pathname || '/' || @pattern_recursive
+               and   do_recursive_scan = @do_recursive_scan
+               and   filename = null
+               and   is_recursive_call = '1'
+            else
+            {
+               if ( !@passed_filter_filename or lower(@filename) = lower(@my_filter_filename) )
+                  filter data
+                  where moca_filter_level = 3
+            }
+         }
+      }
+   }
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+MOCA Function to get a policy value
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

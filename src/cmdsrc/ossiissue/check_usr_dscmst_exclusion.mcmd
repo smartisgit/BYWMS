@@ -1,0 +1,28 @@
+<command>
+<name>check usr dscmst exclusion</name>
+<description></description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ */
+check usr column exclusion
+  where table = 'DSCMST'
+    and column = 'COLNAM'
+    and rtstr1 = @colnam
+    
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This command can be used to check dscmst exclution.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

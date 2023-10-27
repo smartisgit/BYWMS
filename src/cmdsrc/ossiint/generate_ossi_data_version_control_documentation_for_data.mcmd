@@ -1,0 +1,261 @@
+<command>
+<name>generate ossi data version control documentation for data</name>
+<description>Generate the data version control documentation for data</description>
+<type>Local Syntax</type>
+
+<argument name="uc_bug_id_url_prefix" required="yes" datatype="string"></argument>
+<argument name="uc_rollout_url_prefix" required="yes" datatype="string"></argument>
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+publish data
+where polcod = 'USR-GENERATED-DOCUMENTATION'
+and my_table_html = '<table class="my-table" width="140%">'
+and my_td_style = 'valign="top" style="word-wrap: break-word;font-size: 10"'
+and my_td_style_sub = 'valign="top" style="word-wrap: break-word;font-size: 8"'
+and uc_bug_id_url_prefix = nvl(@uc_bug_id_url_prefix, 'https://bugzilla.oracular.com/bugzilla/show_bug.cgi?id=' )
+and uc_rollout_url_prefix= nvl(@uc_rollout_url_prefix,'https://bugzilla.oracular.com/RolloutApp/bugsinrollout.php?template=Y&rolloutname=' )
+and uc_sess_var_list_files = 'uc_all_filnam_list'
+|
+{
+    [
+    select distinct polcod, polvar uc_table_name
+    from poldat
+    where polcod = @polcod
+    and wh_id_tmpl = '----'
+    and polvar != 'SETUP'
+    order by 1,2
+    ]
+    catch (-1403,510)
+    |
+    if ( @? = 0 )
+    {
+        [
+        select distinct polval uc_data_grp
+        from poldat
+        where polcod = @polcod
+        and polvar = @uc_table_name
+        and wh_id_tmpl = '----'
+        and polvar != 'SETUP'
+        order by 1
+        ]
+        catch (-1403,510)
+        |
+        if ( @? = 0 )
+        {
+            publish data
+            where uc_data_version_control_lookup_expr = ossi__polval_cat ( @polcod, @uc_table_name, @uc_data_grp, 'UC_DATA_VERSION_CONTROL_LOOKUP_EXPR', 'rtstr2', '1=1', '', '----' )
+            and uc_data_version_control_rpt_object_expr = ossi__polval_cat ( @polcod, @uc_table_name, @uc_data_grp, 'UC_DATA_VERSION_CONTROL_RPT_OBJECT_EXPR', 'rtstr2', '1=1', '', '----' )
+            and uc_data_version_control_get_all_keys_suffix_expr = ossi__polval_cat ( @polcod, @uc_table_name, @uc_data_grp, 'UC_DATA_VERSION_CONTROL_GET_ALL_KEYS_SUFFIX_EXPR', 'rtstr2', '1=1', '', '----' )
+            and uc_svn_env_id = ossi__polval ( @polcod, @uc_table_name, @uc_data_grp, 'UC_SVN_ENV_ID', 'rtstr2', '----' )
+            and uc_get_lesdir_cmd = ossi__polval ( @polcod, @uc_table_name, @uc_data_grp, 'GET-LESDIR-CMD', 'rtstr2', '----' )
+            and path_to_docs = nvl( ossi__polval ( @polcod, @uc_table_name, @uc_data_grp, 'PATH_TO_DOCS', 'rtstr2', '----' ), '../../docs' )
+            |
+            {
+                if ( @url is null )
+                    get server information
+                |
+                if ( @uc_get_lesdir_cmd is null )
+                    publish data
+                    where uc_use_lesdir = @@LESDIR
+                else
+                    execute server command 
+                    where cmd = @uc_get_lesdir_cmd
+                    and inline = 1
+                |
+                publish data
+                where uc_rev_log_main_folder = @uc_use_lesdir || '/uc_rev_log'
+                |
+                publish data
+                where uc_rev_log_this_table_folder = @uc_rev_log_main_folder || '/' || lower(@uc_table_name)
+                |
+                {
+                    create directory 
+                    where directory = @uc_rev_log_this_table_folder
+                    catch(@?)
+                    ;
+                    list ossi version control information for data core
+                    catch (-1403,510)
+                    |
+                    if ( @? = 0 )
+                    {
+                        publish data
+                        where path = @uc_rev_log_this_table_folder
+                        and filnam = @use_uc_rev_log_filnam
+                        |
+                        get ossi head for integration documentation
+                        where doc_title = 'Data: ' || @uc_rev_log_filnam
+                        |
+                        {
+                            /*
+                             * As we go through, we keep a session variable for file name that will be set to 1 to indate that we have already processed it.
+                             * If we dont have ses var, then we remove that file
+                             */
+                            if ( ossi__sess_var ( @use_uc_rev_log_filnam, '', 'Y' ) != '1' )
+                            {
+                                save session variable 
+                                where name = @use_uc_rev_log_filnam 
+                                and value = '1'
+                                ;
+                                /*
+                                 * Also keep track of all file names 
+                                 */
+                                save session variable
+                                where name = @uc_sess_var_list_files
+                                and value = ossi__sess_var ( @uc_sess_var_list_files, '', 'Y' ) || ',' || @use_uc_rev_log_filnam
+                                ;
+                                write output file
+                                where data = @uc_typical_file_header 
+                                          || @my_table_html
+                                          ||     @uc_typical_tr_data
+                                          ||     '<th width="2%" ' || @my_td_style || '>Bug#</th>'
+                                          ||     '<th width="6%" ' || @my_td_style || '>Customer Issue#</th>'
+                                          ||     '<th width="20%" '|| @my_td_style || '>Synopsis</th>'
+                                          ||     '<th width="25%" '|| @my_td_style || ' style="word-wrap: break-word;">Release Notes</th>'
+                                          ||     '<th width="18%" '|| @my_td_style || '>Rollout</th>'
+                                          ||     '<th width="10%" '|| @my_td_style || '>Checked In On</th>'
+                                          ||     '<th width="6%" ' || @my_td_style || '>Checked In By</th>'
+                                          ||     '<th width="13%" '|| @my_td_style || '>Affected Keys</th>'
+                                          || '</tr>'
+                                and mode = 'w'
+                            }
+                            ;
+                            write output file 
+                            where mode = 'a' 
+                            and data = @uc_typical_tr_data
+                                    ||     ossi__html_data ( @bug_id, 'td', @my_td_style, @uc_bug_id_url_prefix,1 )
+                                    ||     ossi__html_data ( @cf_customer_issue_number, 'td', @my_td_style)
+                                    ||     ossi__html_data ( @short_desc, 'td', @my_td_style)
+                                    ||     ossi__html_data ( @cf_release_notes, 'td', @my_td_style, null, 0, '<pre style="white-space: pre-wrap;">', '</pre>')
+                                    ||     ossi__html_data ( @cf_rollout, 'td', @my_td_style, @uc_rollout_url_prefix, 1 )
+                                    ||     ossi__html_data ( @ossi_ckin_dt, 'td', @my_td_style)
+                                    ||     ossi__html_data ( ossi__replace(@ossi_author, 'ossi\', ''), 'td', @my_td_style)
+                                    ||     '<td ' || @my_td_style || '>'
+                                    ||         '<table border="1" cellpadding="0" cellspacing="0">'
+                                    ||             @uc_typical_tr_data
+                                    ||                 '<th ' || @my_td_style_sub || '>Action</th>'
+                                    ||                 '<th ' || @my_td_style_sub || '>Key</th>'
+                                    ||             '</tr>' 
+                            ;
+                            /*
+                             * Now in loop show the Primary keys
+                             */
+                            if ( @uc_res_pks_affected is not null )
+                            {
+                                publish data combination
+                                where res = @uc_res_pks_affected
+                                |
+                                {
+                                    write output file 
+                                    where mode = "a"
+                                    and data = @uc_typical_tr_data
+                                            ||     ossi__html_data ( @ossi_action, 'td', @my_td_style_sub )
+                                            ||     ossi__html_data ( @uc_ossi_file_path_pk_part, 'td', @my_td_style_sub )
+                                            || '</tr>'
+                                }
+                            }
+                            ;
+                            /* Close the open row */
+                            write output file 
+                            where mode = 'a'
+                            and data =  "</table></td></tr>"
+                        } /* have file header */
+                    } /* each object */
+                    ;
+                    /*
+                     * Now append closing tag on each file 
+                     */
+                    convert list
+                    where string = ossi__sess_var ( @uc_sess_var_list_files, '', 'Y' )
+                    and type = 'L'
+                    and separator = ','
+                    |
+                    {
+                        publish data
+                        where filnam = @retstr
+                        and path = @uc_rev_log_this_table_folder
+                        and mode = 'a'
+                        |
+                        if ( @filnam is not null )
+                        {
+                            write output file
+                            where data = '</table>' || @uc_typical_file_footer 
+                            ;
+                            publish data
+                            where path = @path
+                            and filnam = @filnam
+                            and uc_table_name = @uc_table_name
+                            and uc_data_grp = @uc_data_grp
+                            and uc_data_version_control_lookup_expr = @uc_data_version_control_lookup_expr
+                            and uc_data_version_control_rpt_object_expr = @uc_data_version_control_rpt_object_expr
+                            and uc_data_version_control_get_all_keys_suffix_expr = @uc_data_version_control_get_all_keys_suffix_expr
+                            and uc_svn_env_id = @uc_svn_env_id
+                            and uc_use_lesdir = @uc_use_lesdir
+                            and path_to_docs = @path_to_docs
+                            and uc_get_lesdir_cmd = @uc_get_lesdir_cmd
+                        }
+                    } /* list of all files */
+                } /* have parameters like folder */
+            } /* fetched policies */
+        } /* have data groups */
+    } /* have tables */
+} /* block */
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This generates version control documentation for objects like policies, i.e. under db/data tree.  It can deal with other environments as well e.g. HUB
+</p>
+]]>
+</remarks>
+
+<retrows>n</retrows>
+
+<retcol name="path" type="COMTYP_CHAR"></retcol>
+<retcol name="filnam" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_table_name" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_data_grp" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_data_version_control_lookup_expr" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_data_version_control_rpt_object_expr" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_data_version_control_get_all_keys_suffix_expr" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_svn_env_id" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_use_lesdir" type="COMTYP_CHAR"></retcol>
+<retcol name="path_to_docs" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_get_lesdir_cmd" type="COMTYP_CHAR"></retcol>
+
+
+
+
+<example>
+</example>
+
+
+<policy 
+    polcod="USR-GENERATED-DOCUMENTATION" 
+    polvar="TABLE within SVN version control tree" 
+    polval="a name for this grouping.  Prefix HUB with HUB-" 
+    srtseq="A number to keep rows unique"
+    rtstr1="An identifier.  Supports UC_DATA_VERSION_CONTROL_LOOKUP_EXPR, UC_DATA_VERSION_CONTROL_RPT_OBJECT_EXPR, UC_SVN_ENV_ID, GET-LESDIR-CMD"
+    rtstr2="Value for the identifier"
+>
+</policy>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+<seealso cref="list ossi version control information for data core"></seealso>
+
+</documentation>
+
+
+
+</command>

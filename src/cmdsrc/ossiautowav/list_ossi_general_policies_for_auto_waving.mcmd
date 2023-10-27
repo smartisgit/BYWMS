@@ -1,0 +1,77 @@
+<command>
+<name>list ossi general policies for auto waving</name>
+<description>This command will list general policies of auto waving</description>
+ 
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+      [ select tmp.*
+        from (  select 'CTXT' uc_auto_wave_setting_cd,
+                     polval uc_auto_wave_rule_id,
+                     poldat.srtseq,
+                     rtnum1 uc_gnrl_ena_flg,
+                     rtstr1 uc_setting_1,
+                     rtstr2 uc_setting_2
+                from poldat 
+                join wave_rule on poldat.polval = wave_rule.rule_nam
+                where polcod = 'USR-WAVE-PLANNING'
+                and polvar = 'AUTO-WAVE'
+                and wh_id_tmpl = '----'
+                union
+                select 'RULE_PARM-MAP' uc_auto_wave_setting_cd,
+                     polval uc_auto_wave_rule_id,
+                     poldat.srtseq,
+                     rtnum1 uc_gnrl_ena_flg,
+                     rtstr1 uc_setting_1,
+                     rtstr2 uc_setting_2
+                from poldat 
+                join wave_rule on poldat.polval = wave_rule.rule_nam
+                where polcod = 'USR-WAVE-PLANNING'
+                and polvar = 'WAVE-RULE-PARAMETER-TABLE'
+                and wh_id_tmpl = '----' 
+             ) tmp
+       order by 1 desc,2,3 desc,4,5,6
+      ] catch (-1403,510)
+ 
+   
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This will list general policies of auto waving.
+</p>
+]]>
+</remarks>
+
+<retrows>n</retrows>
+
+<retcol name="uc_auto_wave_setting_cd" type="COMTYP_CHAR">Wave setting code</retcol>
+<retcol name="uc_auto_wave_rule_id" type="COMTYP_CHAR">Wave Rule</retcol>
+<retcol name="uc_gnrl_ena_flg" type="COMTYP_CHAR">General Setting Enable</retcol>
+<retcol name="uc_setting_1" type="COMTYP_CHAR">This is how the module will be listed</retcol>
+<retcol name="uc_setting_2" type="COMTYP_CHAR">This is how the module will be listed</retcol>
+
+
+<example>
+<![CDATA[
+<p>
+</p>
+]]>
+
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+<seealso cref="change ossi general policy for auto waving"></seealso>
+<seealso cref="create ossi general policy for auto waving"></seealso>
+<seealso cref="remove ossi general policy for auto waving"></seealso>
+
+</documentation>
+
+
+</command>

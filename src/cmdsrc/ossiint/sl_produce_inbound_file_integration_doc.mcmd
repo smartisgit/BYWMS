@@ -1,0 +1,141 @@
+<command>
+<name>sl_produce inbound file integration doc</name>
+<description>Produce inbound file integration documentation.</description>
+<type>Local Syntax</type>
+<argument name="doc_evt_id" datatype="string">
+</argument>
+<argument name="ena_flg" datatype="string">
+</argument>
+<argument name="locale_id" datatype="string">
+</argument>
+<argument name="xsd_flg" datatype="string">
+</argument>
+<local-syntax>
+<![CDATA[
+
+/*
+ * Change Log
+ * Initial Check In
+ * 20191003 saad.ahmad - 10291 - Generate docymentaion.  The inbound IFDs were not showing up that used SL_DUMMY_RM
+ */
+
+if ( @doc_evt_id ) {
+   publish data where doc_evt_id = @doc_evt_id
+} else {
+   publish data where doc_evt_id = 'SL_PRODUCE I_IFD DOC'
+} |
+[select distinct idef.ifd_grp_id,idef.ifd_id, idef.ifd_ver
+from     sl_sys_def sdef,
+    sl_i_sys_ifd_id sifd,
+    sl_sys_def isd,
+    sl_evt_def,
+           sl_i_ifd_evt_map emap,
+    sl_ifd_def idef
+where   isd.sys_id = emap.sys_id
+and    isd.ena_flg= decode(@ena_flg,'T','T',isd.ena_flg)
+and    sl_evt_def.evt_id = emap.evt_id
+and    emap.ena_flg=decode(@ena_flg,'T','T',emap.ena_flg)
+and      emap.sys_id = sifd.sys_id
+and    sdef.ena_flg=decode(@ena_flg,'T','T',sdef.ena_flg)
+and    sdef.sys_id = sifd.sys_id
+and      sifd.ena_flg= decode(@ena_flg,'T','T',sifd.ena_flg)
+and      sifd.ifd_id = emap.ifd_id
+and      sifd.ifd_ver = emap.ifd_ver
+and      idef.ifd_id = sifd.ifd_id
+and      idef.ifd_ver = sifd.ifd_ver
+and          idef.ifd_grp_id not like 'SL\_%' escape '\'
+and exists  /*verify at least one result IF is enabled */
+(select 'x'
+from    sl_sys_def osys,
+    sl_o_ifd_sys_map oimap,
+    sl_ifd_def idef,
+    sl_eo_def eodef
+where    osys.ena_flg=decode(@ena_flg,'T','T',osys.ena_flg)
+and     osys.sys_id = oimap.sys_id
+and    oimap.ena_flg=decode(@ena_flg,'T','T',oimap.ena_flg)
+and     oimap.ifd_ver = idef.ifd_ver
+and     oimap.ifd_id = idef.ifd_id
+and     idef.eo_ver  = eodef.eo_ver
+and     idef.eo_id = eodef.eo_id
+and     eodef.evt_id = emap.evt_id)
+and (/*disabled this clause as custom*/ 1=1 or not exists /*make sure no file based RMs exists */
+(select  'x'
+from     sl_ifd_def,
+         sl_i_sys_ifd_id sifd,
+         sl_i_ifd_evt_map emap,
+         sl_evt_def, sl_eo_def,
+         sl_eo_col where exists
+    (select 'x' from sl_eo_col c_i
+    where c_i.eo_id=sl_eo_col.eo_id
+    and   c_i.eo_ver=sl_eo_col.eo_ver
+    and   c_i.eo_fld_id=sl_eo_col.eo_fld_id
+    and   c_i.retr_mthd_impl_genid like 'SEG%')
+and  sl_eo_col.retr_mthd_impl_genid like 'SYS%'
+and  sl_eo_col.eo_id not like 'SL%'
+and  sl_eo_col.eo_id = sl_eo_def.eo_id
+and  sl_eo_col.eo_ver = sl_eo_def.eo_ver
+and  sl_evt_def.evt_id = sl_eo_def.evt_id
+and  emap.sys_id  = substr(sl_eo_col.retr_mthd_impl_genid,5,30)
+and  emap.evt_id = sl_evt_def.evt_id
+and  emap.sys_id = sifd.sys_id
+and  sifd.ifd_id = emap.ifd_id
+and  sifd.ifd_ver = emap.ifd_ver
+and  sl_ifd_def.ifd_id = sifd.ifd_id
+and  sl_ifd_def.ifd_ver = sifd.ifd_ver
+and  idef.ifd_id = sl_ifd_def.ifd_id
+and  idef.ifd_ver = sl_ifd_def.ifd_ver
+group by sl_ifd_def.ifd_id, sl_ifd_def.ifd_ver))
+union
+select distinct idef.ifd_grp_id,idef.ifd_id, idef.ifd_ver
+from     sl_sys_def sdef,
+    sl_i_sys_ifd_id sifd,
+    sl_sys_def isd,
+           sl_i_ifd_evt_map emap,
+    sl_ifd_def idef
+where   isd.sys_id = emap.sys_id
+and    isd.ena_flg= decode(@ena_flg,'T','T',isd.ena_flg)
+and    emap.ena_flg=decode(@ena_flg,'T','T',emap.ena_flg)
+and      emap.evt_id is null
+and      emap.sys_id = sifd.sys_id
+and    sdef.ena_flg=decode(@ena_flg,'T','T',sdef.ena_flg)
+and    sdef.sys_id = sifd.sys_id
+and      sifd.ena_flg= decode(@ena_flg,'T','T',sifd.ena_flg)
+and      sifd.ifd_id = emap.ifd_id
+and      sifd.ifd_ver = emap.ifd_ver
+and      idef.ifd_id = sifd.ifd_id
+and      idef.ifd_ver = sifd.ifd_ver
+and          idef.ifd_grp_id not like 'SL\_%' escape '\'
+order by 1, 2, 3]
+|
+{
+   sl_get sys_parm where parm_id = 'SL_DOC_IFD_SCHEMA' catch(-1403)
+   |
+   if (@xsd_flg = 'T')
+   {
+      publish data where SysParmValue = 'W3C'
+   }
+   |
+   sl_log event 
+   where sys_id='SL_DOC' 
+     and evt_id=@doc_evt_id
+     and ifd_schema = @SysParmValue
+     and locale_id = nvl(@locale_id, nvl(@@locale_id, 'US_ENGLISH'))
+}
+
+]]>
+</local-syntax>
+<documentation>
+<private>
+</private>
+<remarks>
+<![CDATA[
+<p>
+This component is used to produce inbound file integration documentation.
+NOTE: When using the ena_flg and xsd_flg they should be set to 'T' or 'F'.
+</p>
+]]>
+</remarks>
+<exception value="eOK">Normal successful completion</exception>
+<exception value="eDB_NO_ROWS_AFFECTED">Did not find any records.</exception>
+</documentation>
+</command>

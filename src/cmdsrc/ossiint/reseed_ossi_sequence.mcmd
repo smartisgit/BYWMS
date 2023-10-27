@@ -1,0 +1,87 @@
+<command>
+<name>reseed ossi sequence</name>
+<description>Set the new starting value for a sequence</description>
+<type>Local Syntax</type>
+
+
+<argument datatype="string" name="sequence_name">Sequence name - must exist</argument>
+<argument datatype="string" name="new_next_value">What the new next value should be</argument>
+<argument datatype="string" name="uc_non_dev_only">Only do this for non-dev environments</argument>
+
+
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+if ( @uc_non_dev_only = '1' and ossi__is_dev_env() = '1' )
+    noop
+else
+{
+    publish data
+    where uc_dbtype = dbtype()
+    and uc_next_value = nextval ( @sequence_name )
+    |
+    if ( int(@uc_next_value) < int(@new_next_value) )
+    {
+        if ( @uc_dbtype = 'ORACLE' )
+        {
+            publish data
+            where uc_sequence_difference = int(@new_next_value) - int(@uc_next_value)
+            |
+            if ( @uc_sequence_difference > 1 )
+            {
+                [alter sequence @sequence_name:raw increment by @uc_sequence_difference:raw]
+                ;
+                publish data
+                where tmp_nextval = nextval ( @sequence_name )
+                ;
+                [alter sequence @sequence_name:raw increment by 1]
+                ;
+                publish data
+                where uc_new_next_value = nextval ( @sequence_name )
+                and   in_new_next_value = @new_next_value
+                and   uc_actions_done = 'alter increment by, next value'
+            }
+            else
+            {
+                [alter sequence @sequence_name:raw increment by 1]
+                ;
+                publish data
+                where uc_new_next_value = nextval ( @sequence_name )
+                and   in_new_next_value = @new_next_value
+                and   uc_actions_done = 'alter increment by 1, next value'
+            }
+        }
+        else
+        {
+            set return status
+            where status = 999999
+            and message = "Reseed like this is for oracle only.  Manually set next value for this to " || @new_next_value
+        }
+    }
+    else
+    {
+        publish data
+        where uc_new_next_value = nextval ( @sequence_name )
+        and   in_new_next_value = @new_next_value
+        and   uc_actions_done = 'next value'
+    }
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+Reseed a sequence.  Useful to change prefix and then also adjust max
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

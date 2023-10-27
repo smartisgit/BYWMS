@@ -1,0 +1,25 @@
+<trigger>
+<name>process usr issue</name>
+<on-command>remove pick list sequence criteria</on-command>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20170711 ossi\saad.ahmad - 7026 - Bring the core Oracular components
+ */
+process usr issue
+  where uc_table_name = 'PCKLST_SEQ_CRI'
+    and uc_action = 'REMOVE'
+]]></local-syntax>
+<fire-sequence>10000</fire-sequence>
+<documentation>
+
+<remarks>
+This trigger process issue for deleting list sequence criteria.
+</remarks>
+
+<seealso cref="process usr issue"></seealso>
+
+</documentation>
+</trigger>

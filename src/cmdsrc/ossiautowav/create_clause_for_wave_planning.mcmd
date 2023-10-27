@@ -1,0 +1,546 @@
+<command>
+
+<name>create clause for wave planning</name>
+
+<description>Create Clause For Wave Planning</description>
+
+<type>Local Syntax</type>
+
+<local-syntax>
+ 
+<![CDATA[
+
+if (!@rule_nam#onstack or @rule_nam is null) 
+{
+    /* eAPP_MISSING_ARG */
+    set return status
+         where status = 2005
+           and errnum = '2005'
+           and argid = 'rule_nam'
+           and lookup_argdsc = 'rule_nam'
+}
+|
+/* Get the rule parameters (i.e., all the columns to use) for
+ * this rule name
+ */
+list rule parameters
+    where rule_nam = @rule_nam catch (-1403) >> res
+|
+if (@? = -1403)
+{
+    write trace message
+        where message = 'No parameters for this wave rule are defined'
+    |
+    publish data
+        where whereClause = " and 1=1 "
+         and invAttrWhereClause= " and 1=1 "
+         and uc_outer_q_filter = "1=1"
+         and uc_outer_q_filter2 = "1=1"
+         and uc_max_ord = 0
+         and uc_max_appt = 0
+         and uc_max_shp = 0
+
+}
+else
+{
+    /* CUSTOM - START HANDLE RELATIVE RANGES */
+    {
+        publish data
+        where uc_local_now = date(ossi__get_wh_local_time(@wh_id,'yyyyMMdd000000'))
+        |
+        {
+            list rule parameters 
+            where rule_nam = @rule_nam 
+            and parm_id like 'uc%relrng' 
+            catch (-1403,510) 
+            |
+            if ( @? = 0 )
+                filter data
+                where moca_filter_level = 1
+                and dt_column_name = ossi__replace ( ossi__replace ( @parm_id, 'uc_', '' ), '_relrng', '' )
+        }
+        >> uc_rel_rule
+        |
+        [[
+        StringBuffer publish_data_cmd = new StringBuffer("publish data where uc_dummy_value_never_there = 1 " );
+        MocaContext currentContext = MocaUtils.currentContext();
+        while ( uc_rel_rule.next() )
+        {
+            fieldName      = uc_rel_rule.getString("parm_id" );
+            dt_column_name = uc_rel_rule.getString("dt_column_name" );
+            if ( currentContext.isVariableAvailable(fieldName) )
+            {
+                ctxColVal = currentContext.getVariable(fieldName).toString().trim();
+                rangeArr = ctxColVal.split('/' );
+                fromOffset = rangeArr[0];
+                from_res = moca.executeCommand ( "publish data where val = to_char(@now_dat + int(@offset),'YYYYMMDDHH24MISS')", [now_dat:uc_local_now, offset:fromOffset] );
+                if ( from_res.next() )
+                    from_value = from_res.getString ( "val" );
+                //
+                publish_data_cmd.append ( " and " );
+                publish_data_cmd.append ( "from_" + dt_column_name + "= '" + from_value + "'" );
+                toOffset = "";
+                if ( rangeArr.size() >= 2 )
+                {
+                    toOffset = rangeArr[1];
+                    to_res = moca.executeCommand ( "publish data where val = to_char(@now_dat + int(@offset),'YYYYMMDDHH24MISS')", [now_dat:uc_local_now, offset:toOffset] );
+                    if ( to_res.next() )
+                    {
+                        to_value = to_res.getString ( "val" );
+                        publish_data_cmd.append ( " and " );
+                        publish_data_cmd.append ( "to_" + dt_column_name + "= '" + to_value + "'" );
+                    }
+                } // have a to value
+            } // have value on stack //
+        } // rules
+        [uc_rel_range_publish_cmd:publish_data_cmd.toString()]
+        ]]
+        |
+        execute server command
+        where cmd = @uc_rel_range_publish_cmd
+        and inline = 1
+    }
+    /* CUSTOM END TO PUSH RELATIVE DATE RANGES */
+    |
+    [[
+        /* whereClause is used by buildClause() to build up the 'where' clause.
+         * This is a global string to this groovy script so that we don't have
+         * to pass the string back and forth to the buildClause.
+         */
+
+        whereClause = "";
+        invAttrWhereClause = "";
+
+        /* This is the main function that will build the 'where' clause. For
+         * each rule parameter that is on the stack, this function will be
+         * called using that parameter and the whereClause strings is appended
+         * with the new parameters.
+         */
+
+        void buildClause(fieldName, colnam, oper, colType, colVal, isList, tableName)
+        {
+            /* CUSTOM -- if colnam starts with uc get the column */
+            if ( colnam.startsWith ( "uc_" ) )
+            {
+                MocaResults res_tmp = moca.executeCommand ( "publish data where column_name = ossi__get_fld_from_list ( ossi__polval ( 'USR-WAVE-PLANNING', 'WAVE-RULE-PARAMETER-TABLE', @rule_nam, @parm_id, 'rtstr2', '----'), 2, '\\.')",
+                                                            [rule_nam:rule_nam, parm_id:colnam] );
+                if ( res_tmp.next() )
+                {
+                    if ( res_tmp.getString("column_name") != "" )
+                        /*colnam = "." + res_tmp.getString("column_name");*/
+                        colnam = res_tmp.getString("column_name");
+
+                }
+            }
+            /* CUSTOM -- if colnam starts with uc get the column */
+            
+            switch(colType)
+            {
+                /* COMTYP_CHAR */
+                case 'S':
+                if (colVal && colVal.length() > 0)
+                {
+                    whereClause =  whereClause + " and " + tableName;
+
+                    if (isList)
+                    {
+                        /* If it's a list, then put quotes around each value */
+                        String[] value_list = colVal.split(",");
+                        int k = 0;
+
+                        whereClause = whereClause + colnam + oper + "(" ;
+
+                        for (k = 0; k < value_list.size(); k++)
+                        {
+                            /* Strip off preceding spaces, if any */
+                            value_list[k] = value_list[k].trim();
+
+                            if (k != value_list.size()-1)
+                            {
+                                whereClause = whereClause + "'" + value_list[k] +"',";
+                            }
+                            else
+                            {
+                                whereClause = whereClause + "'" + value_list[k] +"'";
+                            }
+                        }
+                        whereClause = whereClause + ")";
+                    }
+                    else
+                    {
+                        whereClause = whereClause + colnam + oper + "'" + colVal +"'";
+                    }
+                }
+                else
+                {
+                    whereClause = whereClause + " and 1=1 ";
+                }
+                break;
+                /* COMTYP_DATTIM */
+                case 'D':
+                if (colVal && colVal.length() > 0)
+                {
+                    whereClause =  whereClause + " and " + tableName;
+
+                    if (isList)
+                    {
+                        /* If it's a list, then put quotes around each value */
+                        String[] value_list = colVal.split(",");
+                        int k = 0;
+
+                        whereClause =  whereClause + colnam + oper + "("
+
+                        for (k = 0; k < value_list.size(); k++)
+                        {
+                            /* Strip off preceding spaces, if any */
+                            value_list[k] = value_list[k].trim();
+
+                            if (k != value_list.size()-1)
+                            {
+                                whereClause =  whereClause + "to_date('" + value_list[k] +"'),";
+                            }
+                            else
+                            {
+                                whereClause =  whereClause + "to_date('" + value_list[k] +"')";
+                            }
+                        }
+                        whereClause =  whereClause + ")";
+                    }
+                    else
+                    {
+                        whereClause = whereClause + colnam  + oper + "to_date('" + colVal +"')";
+                    }
+                }
+                else
+                {
+                    whereClause = whereClause + " and 1=1 ";
+                }
+                break;
+                case 'L':
+                case 'I':
+                case 'O':
+                    whereClause = whereClause + " and " + tableName + colnam + oper + "'" + Integer.valueOf(colVal) + "'";
+                break;
+                case 'F':
+                    whereClause = whereClause + " and " + tableName + colnam + oper + "'" + Double.valueOf(colVal) + "'";
+                break;
+            }
+        } /* End of our buildClause() function */
+
+        /*
+         * Unfortunately, in wave rule maintenance, the parameter ID's for
+         * a rule do not include the table name for the columns that are
+         * being used.  We only know that it could be from one of these
+         * four tables only, so we need this table list to search for the
+         * first table that has the column name specified for a wave rule.
+         * some columns of car_move are present In bootstrap so adding that table also.
+         */
+
+        String[] waveTables = ["ord",
+                               "ord_line",
+                               "shipment",
+                               "shipment_line",
+                               "car_move",
+                               "prtmst_view"];
+
+        if (search_tables)
+            waveTables = search_tables.split(',');
+
+        boolean columnFound = false;
+
+        MocaContext currentContext = MocaUtils.currentContext();
+        MocaResults tableList;
+
+        String cmd ="";
+        String fieldName = "";
+        String ctxColVal = "";
+        String ctxColType = "";
+        String tableName = "";
+        String parm_id = "";
+        String parm_typ = "";
+
+        int tableIndex=0;
+
+        /* Now that we have the columns for this rule name, we'll build a
+         * 'where' clause based on the parameters defined for the wave rule.
+         */
+        while(res.hasNext() && res.next())
+        {
+            parm_id = res.getString("parm_id");
+            parm_typ = res.getString("parm_typ");
+              
+
+
+            moca.trace("Paramenter defined is " + parm_id);
+            moca.trace("Parameter type is " + parm_typ);
+
+           /* There is already a "wavesetwhereclause" in every list command for
+            * wave planning that checks for wave_set and handles a null value
+            * correctly. Without this if statement this code will inject
+            * "and wave_set = null" into the where clause, breaking
+            * functionality. Also, we'll check immediately to see if that
+            * parm_id is on the stack so we don't have to make any unnecessary
+            * calls and add extra processing time to a parameter that isn't
+            * available on the stack.
+            */
+
+            if ((parm_id.equals("wave_set") == false) &&
+                (currentContext.isVariableAvailable(parm_id) ||
+                 currentContext.isVariableAvailable("from_" + parm_id) ||
+                 currentContext.isVariableAvailable("to_" + parm_id) ||
+                 currentContext.isVariableAvailable("l_" + parm_id)))
+            {
+                tableIndex = 0;
+                columnFound = false;
+
+                /* For each column listed in the wave rule, we need to find the
+                 * table that this column belongs to, which has to be any one
+                 * of the tables in the waveTables list.  Otherwise it is not a
+                 * valid column to use in wave planning.  We are using the wave
+                 * table in conjunction with this while loop because it offers
+                 * faster performance than simply calling "list tables with
+                 * column" using only the column_name.  While we could have
+                 * simply not bothered with keeping an array of the wave tables
+                 * and instead just made one call to the database for each
+                 * parameter using just the column name, and then cycling
+                 * through the result to see if one of the 5 wave tables is in
+                 * that result set, in practice it would have taken longer to
+                 * go through all rule parameters than it would if were to
+                 * make at most 5 calls to the database for each rule parameter.
+                 */
+                while(tableIndex < waveTables.size() && !columnFound)
+                {
+
+                    cmd = String.format("list tables with column " +
+                                        " where table_name = '%s' " +
+                                        "   and column_name = '%s' catch (-1403)",
+                                          waveTables[tableIndex], parm_id);
+
+                    tableList = moca.executeCommand(cmd);
+
+                    /* Row count will be greater than 0 if there is a matching
+                     * table with this column name
+                     */
+                    if (tableList.getRowCount() > 0)
+                    {
+                        columnFound = true;
+
+                        /* Now that we've found the table name, we need to get
+                         * the type code(S, D, I, etc) for this column name.
+                         * We will need the java method getTypeCode(), but this
+                         * requires that we have the rule parameter name as a
+                         * column in a result set.  So we will do an empty
+                         * select of the column using the table we found.
+                         */
+
+                        cmd = String.format("[select %s from %s " +
+                                             "  where 1=2] catch (-1403)",
+                                             parm_id, waveTables[tableIndex]);
+
+                        def tableColumns = moca.executeInline(cmd);
+
+                        ctxColType = (tableColumns.getColumnType(parm_id)).getTypeCode().toString();
+                        tableName  = waveTables[tableIndex] + ".";
+                        break;
+                    }
+
+                    tableIndex++;
+                }
+
+                /* CUSTOM START */
+                if (!columnFound)
+                {
+                    MocaResults res_tmp = moca.executeCommand ( "publish data where table_name = ossi__get_fld_from_list ( ossi__polval ( 'USR-WAVE-PLANNING', 'WAVE-RULE-PARAMETER-TABLE', @rule_nam, @parm_id, 'rtstr2', '----'), 1, '\\.')",
+                                                  [rule_nam:rule_nam,parm_id:parm_id] );
+                    if ( res_tmp.next() )
+                    {
+                        tableName = res_tmp.getString ( "table_name");
+                        if ( tableName  != "" )
+                        {
+                            ctxColType = "S";
+                            columnFound = true;
+                        }
+                    }
+                }
+                /* CUSTOM END */
+                                                
+                if (!columnFound)
+                {
+                    /*
+                     * CUSTOM PART IS TO IGNORE uc FIELDS
+                     */
+                    if ( !parm_id.startsWith("uc_") )
+                    {
+                        /* The column could be a UDIA or other inventory attribute,
+                         * which would not be listed in any table in waveTables.
+                         * So, let's look in alloc_rule_dtl to see if there are
+                         * records containing these attribute in the 'value' column.
+                         */
+                        cmd = String.format("get rule names for wave allocation " +
+                                            "   where parm_id = '%s' " +
+                                            "     and parm_typ = '%s'",
+                                                 parm_id, parm_typ);
+    
+                        def allocationClause = moca.executeInline(cmd);
+                        allocationClause.next();
+    
+                        if (allocationClause.getBoolean("isValid_flg") == true)
+                        {
+                            invAttrWhereClause = invAttrWhereClause + allocationClause.getString("allocation_clause");
+                        }
+                        else
+                        {
+                            moca.trace("Field '" + parm_id + "' is invalid for where clause");
+                        }
+                    }
+                    continue;
+                }
+
+                /* Now that we've determined the field name from the rule
+                 * parameter, we'll need to use the rule parameter's type
+                 * (is it a List, Range, or just a single value?) to determine
+                 * what operator and whether or not the fieldname need to be
+                 * adjusted with a prefixto process this field in our clause.
+                 */
+
+                 /* PARM_TYP_RANGE */
+                if (parm_typ.equals("R") == true)
+                {
+                    fieldName = "from_" + parm_id.trim();
+
+                    if (currentContext.isVariableAvailable(fieldName))
+                    {
+                        ctxColVal = currentContext.getVariable(fieldName).toString().trim();
+                        buildClause(fieldName, parm_id, " >= ", ctxColType, ctxColVal, 0, tableName);
+                    }
+
+                    fieldName = "to_" + parm_id.trim();
+                    if (currentContext.isVariableAvailable(fieldName))
+                    {
+                        ctxColVal = currentContext.getVariable(fieldName).toString().trim();
+                        buildClause(fieldName, parm_id, " <= ", ctxColType, ctxColVal, 0, tableName);
+                    }
+                }
+                /* PARM_TYP_LIST */
+                /* Changed parm_id to fieldName in the case of list-type
+                 * parameters, for fetching ctxColVal as ctxColVal was being set
+                 * to null when parm_id was used.
+                 */
+                else if (parm_typ.equals("L") == true )
+                {
+                    fieldName = "l_" + parm_id.trim();
+                    ctxColVal = currentContext.getVariable(fieldName).toString().trim();
+                    buildClause(fieldName, parm_id, " in ", ctxColType, ctxColVal, 1, tableName);
+                }
+                /*
+                 * Looks like we're just looking for a single value.
+                 */
+                else
+                {
+                    ctxColVal = currentContext.getVariable(parm_id).toString().trim();
+                    buildClause(parm_id, parm_id, " = ", ctxColType, ctxColVal, 0, tableName);
+                }
+            }
+        }
+
+        /* We are done cycling through the rule parameters. */
+        if (whereClause.trim().length() > 0)
+        {
+            moca.trace("Where Clause is: " + whereClause);
+        }
+        else
+        {
+            moca.trace("Where Clause is null");
+            whereClause = "and 1=1";
+        }
+
+        if (invAttrWhereClause.trim().length() > 0)
+        {
+            moca.trace("Inventory Attribute Where Clause is: " + invAttrWhereClause);
+        }
+        else
+        {
+            moca.trace("Inventory Attribute Where Clause is null");
+            invAttrWhereClause = "and 1=1";
+        }
+    ]]
+    |
+    /*
+     * uc_max_ord is a special filter that will be utilized in the list order lines query to make a rownum clause
+     */
+    filter data
+    where moca_filter_level = 1
+    and uc_outer_q_filter = iif ( int(@uc_max_ord) > 0, "rownum <= " || @uc_max_ord, "1=1" )
+    and uc_outer_q_filter2 = iif ( int(@uc_max_appt) > 0, "rownum <= " || @uc_max_appt, "1=1" )
+    and uc_outer_q_filter3 = iif ( int(@uc_max_shp) > 0, "rownum <= " || @uc_max_shp, "1=1" )
+    and uc_max_ord = nvl(int(@uc_max_ord), 0)
+    and uc_max_appt = nvl(int(@uc_max_appt), 0)
+    and uc_max_shp = nvl(int(@uc_max_shp),0 )
+
+}
+
+
+]]>
+</local-syntax>
+
+<argument name="rule_nam" required="yes" datatype="string"> </argument>
+<argument name="search_tables" required="no" datatype="string"> </argument>
+
+
+<retrows>1</retrows>
+<retcol name="@*" type="COMTYP_CHAR">Whatever is returned by standard</retcol>
+<retcol name="uc_outer_q_filter" type="COMTYP_CHAR">If uc_max_ord is passed in it creates a rownum clause</retcol>
+<retcol name="uc_outer_q_filter2" type="COMTYP_CHAR">If uc_max_appt is passed in it creates a rownum clause</retcol>
+<retcol name="uc_outer_q_filter3" type="COMTYP_CHAR">If uc_max_shp is passed in it creates a rownum clause</retcol>
+<retcol name="uc_max_ord" type="COMTYP_INT">Maximum row count clause</retcol>
+<retcol name="uc_max_appt" type="COMTYP_INT">Maximum appointment count clause</retcol>
+<retcol name="uc_max_shp" type="COMTYP_INT">Maximum shipment count clause</retcol>
+
+
+
+
+<documentation>
+
+<remarks>
+<![CDATA[
+  <p>
+  This command is used to create a where clause for wave planning. This command is
+  used primarily by wave planning to give a list of parameters and their values
+  that are to be used to select orders.  If no parameters are defined, then
+  we return ' and 1=1' for both the "where" clause and for the "inventory attribute
+  where".  If a parameter is defined, but not on the stack, then we
+  will ignore it.  This command will always return a row with two columns.
+
+  CUSTOMIZATION
+  =============
+  1. Whenc column is not found using typical lookup, we look in policy to get table name
+  2. buildClause function also looks up policy to get the proper column name
+  3. Return an additional parameter uc_outer_q_filter, uc_outer_q_filter2, uc_outer_q_filte3 for uc_max_ord, uc_max_appt, uc_max_shp respectively 
+     so that outer queries in those commands can build final clause
+  4. Respect special rule parmeteers named as uc_<date>-relrng.  if on stack then we build a range clause based on these.
+  5. When building attribute clause for inventory - if parm_id is stating with uc then ignore
+  </p>
+]]>
+</remarks>
+
+<policy 
+    polcod="USR-WAVE-PLANNING" 
+    polvar="WAVE-RULE-PARAMETER-TABLE" 
+    polval="@rule_nam"
+    rtstr1="parameter name"
+    rtstr2="table alias.column"
+>
+    This is used to define the table alias that has this column.  rtstr2 defines alias.column
+</policy>
+
+<seealso cref="list order lines available for wave planning"></seealso>
+<seealso cref="list order lines available for wave planning"></seealso>
+<seealso cref="list order lines available for wave planning"></seealso>
+
+
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

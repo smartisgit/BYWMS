@@ -1,0 +1,29 @@
+<command>
+<name>ossi get_srvlvl</name>
+<description> Get the carrier Service Level</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+publish data 
+where carcod = @moca_farg1
+|
+[select srvlvl from cardtl where carcod=@carcod and rownum < 2] catch(-1403)
+
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This is used to get the carrier Service Level
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

@@ -1,0 +1,65 @@
+#use $LESDIR/include
+#use $DCSDIR/include
+#use $MOCADIR/include
+#use $LESDIR/db/ddl/Indexes
+
+#include <dcsddl.h>
+#include <dcscolwid.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+
+mset command on
+[
+CREATE_TABLE (usr_ossi_issue_obj_log)
+(
+  uc_ossi_issue_assign_seq  FIXED_INT_TY(12) not null,
+  uc_ossi_issue_obj_log_seq FIXED_INT_TY(12) not null,
+  uc_ossi_obj_grp           STRING_TY(100),
+  uc_ossi_obj_name          STRING_TY(100)   not null,
+  uc_ossi_obj_typ           STRING_TY(10)    not null,
+  uc_ossi_obj_pk_col        STRING_TY(500)   not null,
+  uc_ossi_obj_pk_data       STRING_TY(1000)  not null,
+  uc_ossi_obj_key_col       STRING_TY(500),
+  uc_ossi_obj_key_data      STRING_TY(1000),
+  uc_ossi_action            STRING_TY(10)    not null,  
+  uc_ossi_ins_dt            DATE_TY,
+  uc_ossi_ins_usr_id        STRING_TY(40),
+  uc_ossi_upd_dt            DATE_TY,
+  uc_ossi_upd_usr_id        STRING_TY(40),
+  uc_ossi_commit_dt         DATE_TY,
+  uc_ossi_fil_cre_dt        DATE_TY,
+  uc_ossi_filepath          STRING_TY(256),
+  uc_ossi_revision          INTEGER_TY
+)
+
+] catch (ERR_TABLE_ALREADY_EXISTS)
+RUN_DDL
+mset command off
+
+#include <usr_ossi_issue_obj_log_pk.idx>
+  
+mset command on
+create db documentation
+where table                     = "usr_ossi_issue_obj_log"
+and table_comment               = "For a given assignment in usr_ossi_issue_assign table, every instance of an object (e.g. speciifc data or integration) is recorded here"
+and uc_ossi_issue_assign_seq    = "To link to the usr_ossi_issue_assign table"
+and uc_ossi_issue_obj_log_seq   = "To form a unique row here for every change - an ascending number"
+and uc_ossi_obj_grp             = "When recording integrator data, this is the integrator table group identifier otherwise it is null"
+and uc_ossi_obj_name            = "The table that is modified"
+and uc_ossi_obj_typ             = "TABLE indicates a table row.  FILE means the source code file"
+and uc_ossi_obj_pk_col          = "For files it is PATHNAME.  Otherwise it is coma-separated list for the primary key columns"
+and uc_ossi_obj_pk_data         = "Relating to the primary key column list, this is the actual PK data.  We use __ (two underscores) to delimit"
+and uc_ossi_obj_key_col         = "When dealing with integrator data, this is the object group key, e.g. for event and event arguments it will be EVT_ID"
+and uc_ossi_obj_key_data        = "This is the actual data for object key.  We use __ (two underscores) to delimit"
+and uc_ossi_action              = "UPDATE means modified, ADD means add, REMOVE means remove"
+and uc_ossi_commit_dt           = "When is it committed to the version control system"
+and uc_ossi_fil_cre_dt          = "When was the file created which was then committed"
+and uc_ossi_filepath            = "File path"
+and uc_ossi_revision            = "Revsion as recorded in the version control system"
+and uc_ossi_ins_dt              = "Add Date/Time"
+and uc_ossi_ins_usr_id          = "Add User"
+and uc_ossi_upd_dt              = "Update Date/Time"
+and uc_ossi_upd_usr_id          = "Update User Id"
+
+RUN_DDL
+mset command off

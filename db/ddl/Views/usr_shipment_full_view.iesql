@@ -1,0 +1,76 @@
+#use $DCSDIR/include
+#include <dcsddl.h>
+#include <dcscolwid.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+#use $SALDIR/include
+
+#include <salcolwid.h>
+
+mset command on
+
+[drop view usr_shipment_full_view] catch(@?)
+;
+get ossi table column list for default logic 
+where table_name = 'adrmst' 
+and uc_output_col_select_clause = 'uc_ctxt_clause_adrmst_rt_sel' 
+and uc_output_col_group_clause = 'uc_ctxt_clause_adrmst_rt_group'
+and column_source_prefix = 'adrmst_rt.'
+and column_name_prefix = 'uc_rt_'
+|
+get ossi table column list for default logic 
+where table_name = 'carhdr' 
+and uc_output_col_select_clause = 'uc_ctxt_clause_carhdr_sel' 
+and uc_output_col_group_clause = 'uc_ctxt_clause_carhdr_group'
+and column_source_prefix = 'carhdr.'
+and column_name_prefix = 'uc_carh_'
+|
+get ossi table column list for default logic 
+where table_name = 'cardtl' 
+and uc_output_col_select_clause = 'uc_ctxt_clause_cardtl_sel' 
+and uc_output_col_group_clause = 'uc_ctxt_clause_cardtl_group'
+and column_source_prefix = 'cardtl.'
+and column_name_prefix = 'uc_card_'
+|
+get ossi table column list for default logic 
+where table_name = 'stop' 
+and uc_output_col_select_clause = 'uc_ctxt_clause_stop_sel' 
+and uc_output_col_group_clause = 'uc_ctxt_clause_stop_group'
+and column_source_prefix = 'stop.'
+and column_name_prefix = 'uc_stp_'
+|
+get ossi table column list for default logic 
+where table_name = 'car_move' 
+and uc_output_col_select_clause = 'uc_ctxt_clause_cm_sel' 
+and uc_output_col_group_clause = 'uc_ctxt_clause_cm_group'
+and column_source_prefix = 'car_move.'
+and column_name_prefix = 'uc_cm_'
+|
+get ossi table column list for default logic 
+where table_name = 'trlr' 
+and uc_output_col_select_clause = 'uc_ctxt_clause_trlr_sel' 
+and uc_output_col_group_clause = 'uc_ctxt_clause_trlr_group'
+and column_source_prefix = 'trlr.'
+and column_name_prefix = 'uc_trlr_'
+|
+[
+create view usr_shipment_full_view
+as
+select shipment.*,
+       @uc_ctxt_clause_adrmst_rt_sel:raw,
+       @uc_ctxt_clause_carhdr_sel:raw,
+       @uc_ctxt_clause_cardtl_sel:raw,
+       @uc_ctxt_clause_stop_sel:raw,
+       @uc_ctxt_clause_cm_sel:raw,
+       @uc_ctxt_clause_trlr_sel:raw
+from shipment
+     join adrmst adrmst_rt on adrmst_rt.adr_id = shipment.rt_adr_id
+     left outer join carhdr on carhdr.carcod = shipment.carcod
+     left outer join cardtl on cardtl.carcod = shipment.carcod and cardtl.srvlvl = shipment.srvlvl
+     left outer join stop on stop.stop_id = shipment.stop_id
+     left outer join car_move on car_move.car_move_id = stop.car_move_id
+     left outer join trlr on trlr.trlr_id = car_move.trlr_id
+]
+RUN_DDL
+
+mset command on

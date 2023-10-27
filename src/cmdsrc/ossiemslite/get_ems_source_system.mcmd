@@ -1,0 +1,39 @@
+<command>
+<name>get ems source system</name>
+<description>Override get ems source system for mini EMS</description>
+
+<argument name="wh_id" required="no" datatype="string">
+</argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20210216 mehreen.saeed - 11805 - ADC-EMSREPLACE-Implement EMS Replacement for ADC
+ */
+
+publish data
+where wh_id = '----'
+|
+[
+select rtnum1 uc_ems_overrride,
+       rtnum2 uc_allow_ems_functionality
+from poldat_view
+where polcod = 'USR-EMSLITE'
+and polvar = 'SETUP'
+and polval = 'OVERRIDE-ENABLED'
+and wh_id = @wh_id
+]
+catch (-1403,510)
+|
+if (@? = 0 and @uc_ems_overrride = 1)
+   noop
+else 
+   ^get ems source system
+    
+]]>
+</local-syntax>
+</command>

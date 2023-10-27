@@ -1,0 +1,7 @@
+<component-level>
+<name>OSSIpickrelease</name>
+<description>OSSI (Smart IS) Integrator Server Functions for Pick Release</description>
+<library>ossiint</library>
+<sort-sequence>8060</sort-sequence>
+<editable>true</editable>
+</component-level>

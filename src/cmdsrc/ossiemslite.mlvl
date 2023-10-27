@@ -1,0 +1,7 @@
+<component-level>
+<name>ossiemslite</name>
+<description>Simplified EMS System</description>
+<sort-sequence>9060</sort-sequence>
+<library>ossiint</library>
+<editable>true</editable>
+</component-level>

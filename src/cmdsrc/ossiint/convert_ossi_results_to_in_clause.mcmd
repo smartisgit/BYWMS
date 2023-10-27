@@ -1,0 +1,31 @@
+<command>
+<name>convert ossi results to in clause</name>
+<description>Convert result to in clause</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+convert column results to string
+  where res = @res
+    and colnam = @colnam
+    and separator = ''','''
+|
+publish data
+  where result_string = '''' || @result_string || ''''
+
+]]>
+</local-syntax>
+<argument name="res" required="yes" datatype="resultset"></argument>
+<argument name="colnam" required="yes" datatype="string"></argument>
+
+<documentation>
+
+<remarks>
+This command convets input resultset to an IN clause for SQL.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

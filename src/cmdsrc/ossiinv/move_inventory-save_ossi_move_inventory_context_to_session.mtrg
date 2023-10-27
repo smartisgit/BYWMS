@@ -1,0 +1,66 @@
+<trigger>
+<name>save ossi move inventory context to session</name>
+<on-command>move inventory</on-command>
+<fire-sequence>10</fire-sequence>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+/*
+ * Idea is to save what we are moving to session variables 
+ */
+save session variable where name = 'uc_move_inventory_var_srcloc' and value = @srcloc
+;
+save session variable where name = 'uc_move_inventory_var_srcare' and value = @srcare
+;
+save session variable where name = 'uc_move_inventory_var_dstloc' and value = @dstloc
+;
+save session variable where name = 'uc_move_inventory_var_dstare' and value = @dstare
+;
+save session variable where name = 'uc_move_inventory_var_dstlod' and value = @dstlod
+;
+save session variable where name = 'uc_move_inventory_var_dstsub' and value = @dstsub
+;
+save session variable where name = 'uc_move_inventory_var_srclod' and value = @srclod
+;
+save session variable where name = 'uc_move_inventory_var_srcsub' and value = @srcsub
+;
+save session variable where name = 'uc_move_inventory_var_srcdtl' and value = @srcdtl
+;
+save session variable where name = 'uc_move_inventory_var_untqty' and value = string(@untqty)
+;
+save session variable where name = 'uc_move_inventory_var_lodnum' and value = @lodnum
+;
+save session variable where name = 'uc_move_inventory_var_subnum' and value = @subnum
+;
+save session variable where name = 'uc_move_inventory_var_dtlnum' and value = @dtlnum
+;
+publish data
+where use_lodnum = nvl( @dstlod, nvl(@srclod, @lodnum) )
+and   use_subnum = nvl( @dstsub, nvl(@srcsub, @subnum) )
+and   use_dtlnum = nvl( @srcdtl, @dtlnum )
+|
+{
+   save session variable where name = 'uc_move_inventory_var_use_lodnum' and value = @use_lodnum
+   ;
+   save session variable where name = 'uc_move_inventory_var_use_subnum' and value = @use_subnum
+   ;
+   save session variable where name = 'uc_move_inventory_var_use_dtlnum' and value = @use_dtlnum
+}
+
+
+]]>
+</local-syntax>
+<documentation>
+<remarks>
+<![CDATA[
+  <p>
+  We often have triggers on move inventory that need to get to the informatin about move inventory but that is not available
+  Because final command was called with inline=false.  We will save such stuff to session space so that such triggers can get at that
+  </p>
+]]>
+</remarks>
+<exception value="eOK">Normal successful completion</exception>
+<seealso cref="publish ossi move inventory session variables"></seealso>
+</documentation>
+</trigger>

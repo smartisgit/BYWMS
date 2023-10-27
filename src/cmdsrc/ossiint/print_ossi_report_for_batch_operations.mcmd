@@ -1,0 +1,327 @@
+<command>
+<name>print ossi report for batch operations</name>
+<description>
+<![CDATA[
+<ul>
+    <li>
+        This is the basic API to print reports or labels from batch operations like pick release, shipment release, order release, etc.  Any printing for our use cases should always be done via this API.
+        If [label_name] is passed in, we call [generate label] to generate the label.  Othewise when rpt_id is passed we call [generate moca report] to generate the report.  The report output is always written to 
+        $LESDIR/reports based on type.  The file names are generated based on sysctl rptnum.
+    </li>
+    <li>
+        We support transactional printing.  That impies that if multiple objects are printed at a triggerring point we can indicate that either all print or none of them print.  To implement this behavior pass in
+        uc_force_print_usr_ossi_doc_store=1.  That will mean that when [print file] is invoked, it will add an entry to deferred_exec.  Then later on job UC_G_DEFFERRED_PRINT_01 will do the actual printing.
+        This job ustilizes asynchronous execution and the async threads are started based on deferred_exec.exec_kv3 which is the final destination:
+        <ul>
+            <li>For FTP it is the ftp host</li>
+            <li>For file, it is the directory</li>
+            <li>For normal printing it is the printer</li>
+        </ul>
+        This will ensure that even with asnchronous printing, stuff would be delivered to the destination (ftp host, directory, or printer) in the order that the request was sent.
+    </li>
+    <li>
+        When specifying specific locations, servers, etc. do not use literal values.  Instead use environment variables.  This will ensure that in case of environment copy, we do not accidently send the data to the wrong environment.
+    </li>
+]]>
+</description>
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+publish data
+where wh_id = nvl(@wh_id, @@WH_ID )
+and uc_print_rpt_dscr = nvl(@uc_print_rpt_dscr, @rpt_id )
+and gen_usr_id = nvl(@gen_usr_id, 'SUPER' )
+and dest_typ = nvl(@dest_typ, 'stream' )
+and uc_rpt_src_rpt_typ = nvl(@uc_rpt_src_rpt_typ, @uc_rpt_dest_typ)
+and format_typ = nvl(@format_typ, 'pdf' )
+and filnam = null
+and locale_id = nvl(nvl(@locale_id , @@LOCALE_ID),'US_ENGLISH')
+|
+/*
+ * If no report or label passed, that means that we will need to simply find it on the OS somewhere
+ */
+if ( @label_name is not null )
+    publish data
+    where uc_is_label = '1'
+|
+{
+    if ( @label_name is not null )
+    {
+        generate label
+        where label_name = @label_name
+        |
+        filter data
+        where moca_filter_level = 1
+        and uc_rpt_output_filnam = @outfile_name
+    } /* have label */
+    else
+    {
+        generate moca report 
+        where rpt_id = @rpt_id 
+        and wh_id = @wh_id 
+        and desc = @uc_print_rpt_dscr
+        and format_typ = @format_typ
+        and dest_typ = @dest_typ
+        and gen_usr_id = @gen_usr_id
+        |
+        if (@page_data is not null )
+        {
+            publish data
+            where path =  @@LESDIR || '/reports'
+            and filename = ossi__next_number ( 'rptnum' ) || '.' || @format_typ
+            |
+            {
+                write output file 
+                where path = @@LESDIR || '/reports'
+                and filename = @filename
+                and data_bin = @page_data 
+                and mode = 'w' 
+                ;
+                publish data
+                where uc_rpt_output_filnam = @path || '/' || @filename
+            }
+        }
+    } /* generate report */
+    |
+    /*
+     * When we are here we have report or label file generated as uc_rpt_output_filnam
+     */
+    {
+        {
+            print ossi file
+            where page_data = null
+            and filnam = @uc_rpt_output_filnam
+        }
+        |
+        filter data
+        where moca_filter_level = 1
+        and uc_rpt_output_filnam = @uc_rpt_output_filnam
+        and wh_id = @wh_id
+        and rpt_id = @rpt_id
+        and label_name = @label_name
+        and gen_usr_id = @gen_usr_id
+        and format_typ = @format_typ
+        and dest_typ = @dest_typ
+        and page_data = @page_data
+        and uc_custom_filename = @uc_custom_filename
+        and uc_src_full_filename = @full_filename
+        and uc_src_full_filename_created = @created
+        and uc_src_full_filename_size = @size
+        /* Just for reference some common elements */
+        and ordnum = @ordnum
+        and ctnnum = @ctnnum
+        and ship_id = @ship_id
+        and schbat = @schbat
+        and client_id = @client_id
+        and subnum = @subnum
+        and lodnum = @lodnum
+        and wrkref = @wrkref
+        and ordtyp = @ordtyp
+        and cponum = @cponum
+        and allow_ship_id_as_prefix = @allow_ship_id_as_prefix
+    } /* scope */
+} /* scope */
+
+]]>
+</local-syntax>
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This can be used from workflows and rules engines to print reports.  It can habdle reports that are prinetd and also those that are sent to us.
+
+</p>
+]]>
+</remarks>
+
+<argument name="@*">Since it is a report - report arguments will be from the stack are available</argument>
+
+<argument name="wh_id">Warehouse id</argument>
+<argument name="rpt_id">
+<![CDATA[
+Report Id (if applicable).  This may be one of the following:
+<ul>
+    <li>A valid report id as defined in rpt_config</li>
+    <li>Literal usr_ossi_doc_store.  This special value indicates that we are printing something from document store which is put there by one of our loading jobs.  Please note
+        <ul>
+            <li>When hoist systems send generated reports to us these are loaded in table called usr_ossi_doc_store by job UC_G_DOC_STORE_nn</li>
+            <li>Refer to input variables named uc_doc_filter_% - these are important to find such reports.  So set them in this call from context to find the report output</li>
+            <li>uc_doc_filter_typ_cd and uc_doc_filter_subtyp_cd are important to find the type of report, e.g. invoice etc.</li>
+            <li>We always find and print the latest entry in this table</li>
+        </ul>
+    </li>
+</ul>
+]]>
+</argument>
+<argument name="label_name">Label Name (if applicable).</argument>
+<argument name="locale_id">If not passed in we get from environment.</argument>
+
+<argument name="uc_doc_filter_typ_cd" required="yes" datatype="string">When rpt_id is usr_ossi_doc_store, this is usr_ossi_doc_store.uc_doc_typ_cd.  For example for invouces we put INV here</argument>
+<argument name="uc_doc_filter_subtyp_cd" required="yes" datatype="string">When rpt_id is usr_ossi_doc_store, this is the usr_ossi_doc_store.uc_doc_subtyp_cd.  For example for invoices we put C or N based on file name.</argument>
+<argument name="uc_doc_filter_wh_id" required="yes" datatype="string">When rpt_id is usr_ossi_doc_store, the warehouse id to use</argument>
+<argument name="uc_doc_filter_ordnum" required="yes" datatype="string">When rpt_id is usr_ossi_doc_store, the order# to use</argument>
+<argument name="uc_doc_filter_ship_id" required="yes" datatype="string">When rpt_id is usr_ossi_doc_store, the ship_id to use</argument>
+<argument name="uc_doc_filter_schbat" required="yes" datatype="string">When rpt_id is usr_ossi_doc_store, the schbat (wave id) to use</argument>
+<argument name="uc_doc_filter_invnum" required="yes" datatype="string">When rpt_id is usr_ossi_doc_store, the invnum to use</argument>
+<argument name="uc_doc_filter_cponum" required="yes" datatype="string">When rpt_id is usr_ossi_doc_store, the cponum to use</argument>
+<argument name="uc_doc_filter_trknum" required="yes" datatype="string">When rpt_id is usr_ossi_doc_store, the trknum to use</argument>
+
+
+
+<argument name="uc_pre_label_list" datatype="string">LABEL ONLY: List of labels to put before this label.  This is for consolidated label functionality</argument>
+<argument name="uc_post_label_list" datatype="string">LABEL ONLY: List of labels to after before this label.  This is for consolidated label functionality</argument>
+<argument name="uc_final_encoding" datatype="string">LABEL ONLY: if passed in, we will change the encoding from standard (UTF-8) to this.  For example some Asian installations require us to change the data to a destination characterset</argument>
+<argument name="uc_change_orientation" datatype="string">LABEL ONLY: 1 will mean that we want to change the orientation</argument>
+
+
+
+<argument name="gen_usr_id">REPORT ONLY: user to generate output.  If not passed in, we assume SUPER</argument>
+<argument name="uc_print_rpt_dscr">REPORT ONLY: Description.  if not passed in we set it to the report name (rpt_id)</argument>
+
+<argument name="format_typ">REPORT ONLY: for example pdf.  Refer to [generate moca report] documentation to see other possible values</argument>
+<argument name="dest_typ">REPORT ONLY: for example pdf.  Refer to [generate moca report] documentation to see other possible values</argument>
+
+<argument name="uc_force_print_rename">For reports or labels - if 1 then we generate filename per custom naming rules.  It needs uc_rpt_dest_typ</argument>
+<argument name="uc_rpt_dest_typ">For renaming: The group to use for rules.  Refer to policy UC-PRINTING / polvar of RPT-DEST-%.  Here we define the file naming rules for a given set of reports</argument>
+
+<argument name="uc_rpt_src_rpt_typ">NO RPT/LABEL PASSED: then this is the policy node that defines how to find the file on OS.  This covers our requirement of printing OS files.  Note that this will rarely be used.</argument>
+
+<argument name="printer" required="no" datatype="string">
+<![CDATA[
+FOR REPORTS AND LABELS: Final printer.  This can have following types of values:
+<ul>
+    <li>Actual printer as defined in prsmst.  Basically any valid printer which can be passed to print file API</li>
+    <li>FILE:  This means that report will be generated as a file and not printed.  Refer to policy UC-PRINTING / polvar of RPT-DEST-% to see how file naming parameters are defined.  These may be overridden by parameters here as well.</li>
+    <li>FTP:  This means that report will be generated as a file and the file will be FTPd.  Refer to policy UC-PRINTING / polvar of RPT-DEST-% to see how FTP parameters are defined.  These may be overridden by parameters here as well.</li>
+    <li>usr_ossi_doc_store:  This means that the generated output will be saved into this table for later retrieval for printing.  Note that [generate moca report] allows for passing in rpt_id of  usr_ossi_doc_store which would fetch such an output</li>   
+    <li>
+        If printer is not provided, then we call [get usr best printer] to determine the printer to use.  It uses following logic.
+        <ul>
+            <li>If we are reciving and rcvtrk has a devcod, then we get the printer (label or report) based in that information</li>
+            <li>If we are reciving but rcvtrk does not have valid devcod but the dock door of receipt does - then that locmst record is used to determine the printer</li>
+            <li>Otherwise get it based on @@DEVCOD</li>
+            <li>if that is not available then we get some default.  For labels it is policy VC-HAZMAT / LABELS / DEFAULT-PRINTER-ADDRESS.  For reports it is any POSTSCRIPT printer for warehouse.</li>
+        </ul>
+    </li>
+</ul>
+]]>
+</argument>
+
+<argument name="allow_ship_id_as_prefix" required="no" datatype="string">
+declaring it as an input parameter for documentation only.  Basically in some rpeorts final name is based on this input.
+In previous versions it was a policy.  Idea now is that it can be passed in by the rules engine if needed.
+  This is used only in a few cases.
+</argument>
+
+
+
+<argument name="uc_doc_filter_wh_id" required="yes" datatype="string">When rpt_id is usr_ossi_doc_store</argument>
+<argument name="uc_doc_filter_typ_cd" required="yes" datatype="string">When rpt_id is usr_ossi_doc_store</argument>
+<argument name="uc_doc_filter_subtyp_cd" required="yes" datatype="string">When rpt_id is usr_ossi_doc_store</argument>
+<argument name="uc_doc_filter_ordnum" required="yes" datatype="string">When rpt_id is usr_ossi_doc_store</argument>
+<argument name="uc_doc_filter_ship_id" required="yes" datatype="string">When rpt_id is usr_ossi_doc_store</argument>
+<argument name="uc_doc_filter_schbat" required="yes" datatype="string">When rpt_id is usr_ossi_doc_store</argument>
+<argument name="uc_doc_filter_invnum" required="yes" datatype="string">When rpt_id is usr_ossi_doc_store</argument>
+<argument name="uc_doc_filter_cponum" required="yes" datatype="string">When rpt_id is usr_ossi_doc_store</argument>
+<argument name="uc_doc_filter_trknum" required="yes" datatype="string">When rpt_id is usr_ossi_doc_store</argument>
+
+
+
+<argument name="copies" required="no" datatype="string"># copies to print</argument>
+
+
+<argument name="uc_force_print_ftp" required="no" datatype="string">Lets say we want to print and ftp.  printer is real printer and this can be passed in 1 to ftp as well</argument>
+<argument name="uc_force_print_rename" required="no" datatype="string">Lets say we want to print and rename.  printer is real printer and this to generate the final file name.</argument>
+<argument name="uc_force_convert_pcl" required="no" datatype="string">Convert the PDF file passed in to PCL always.  By default if prsmst defines a printer to have prttyp of UC_PCL, then we convert to PCL before printing</argument>
+<argument name="uc_force_print_usr_ossi_doc_store" required="no" datatype="string">Lets say we want to print but also push to this table.  This can be passed in as 1.  This should be passed in if we want to do transactional printing.
+That implies that if we want either all printing to be done or no printing (if something fails), then pass this as 1.  In that model, print requests are pushed to deferred execition</argument>
+
+<argument name="uc_print_file_ov_directory" required="no" datatype="string">Rather than policy UC-PRINTING/RPT-DEST-[@uc_rpt_dest_typ]; use explict values.  Applies to ftp or file.</argument>
+<argument name="uc_print_file_ov_filename_expr" required="no" datatype="string">Rather than policy UC-PRINTING/RPT-DEST-[@uc_rpt_dest_typ]; use explict values.  Applies to ftp or file. This is an expression that will evaluate to the filename to use.  Note that this is an expression.</argument>
+
+<argument name="uc_print_file_ov_ftp_host" required="no" datatype="string">Rather than policy UC-PRINTING/RPT-DEST-[@uc_rpt_dest_typ]; Ftp hostname</argument>
+<argument name="uc_print_file_ov_ftp_port" required="no" datatype="string">Rather than policy UC-PRINTING/RPT-DEST-[@uc_rpt_dest_typ]; Ftp Port</argument>
+<argument name="uc_print_file_ov_ftp_destdir" required="no" datatype="string">Rather than policy UC-PRINTING/RPT-DEST-[@uc_rpt_dest_typ]; Directory on FTP server.  If not set we use uc_print_file_ov_directory</argument>
+<argument name="uc_print_file_ov_ftp_destfile" required="no" datatype="string">Rather than policy UC-PRINTING/RPT-DEST-[@uc_rpt_dest_typ]; File on FTP server.  if not set it is the same file as one resolved by expresion uc_print_file_ov_filename_expr</argument>
+<argument name="uc_print_file_ov_ftp_use_sftp" required="no" datatype="string">Rather than policy UC-PRINTING/RPT-DEST-[@uc_rpt_dest_typ]; 1 or 0 to indicate if we should use sftp</argument>
+<argument name="uc_print_file_ov_ftp_mode" required="no" datatype="string">Rather than policy UC-PRINTING/RPT-DEST-[@uc_rpt_dest_typ]; FTP mode.  B for binary otherwise ascii</argument>
+<argument name="uc_print_file_ov_ftp_user_id" required="no" datatype="string">Rather than policy UC-PRINTING/RPT-DEST-[@uc_rpt_dest_typ]; user id to use.</argument>
+<argument name="uc_print_file_ov_ftp_password" required="no" datatype="string">Rather than policy UC-PRINTING/RPT-DEST-[@uc_rpt_dest_typ]; password to use</argument>
+
+
+
+<retrows>1</retrows>
+
+<retcol name="printer" type="string">Destination where we printed</retcol>
+<retcol name="pathname" type="string">This is the file we sent to print file and returned from that API</retcol>
+<retcol name="wh_id" type="string"></retcol>
+<retcol name="rpt_id" type="string">Report Id.  May be null when we read it from a directory</retcol>
+<retcol name="label_name" type="string">Report Id.  May be null when we read it from a directory</retcol>
+<retcol name="gen_usr_id" type="string">REPORT GENERATION ONLY: User Id</retcol>
+<retcol name="format_typ" type="string">REPORT GENERATION ONLY: Report Format Type</retcol>
+<retcol name="dest_typ" type="string">REPORT GENERATION ONLY: Report Destination Type.</retcol>
+<retcol name="page_data" type="string">REPORT GENERATION ONLY: Report output raw binary</retcol>
+<retcol name="uc_rpt_output_filnam" type="string">REPORT GENERATION ONLY: This is the filename after writing report</retcol>
+<retcol name="uc_custom_filename" type="string">1 means that output was renamed per gudelines</retcol>
+
+<retcol name="uc_rpt_dest_typ" type="string">used to dertermine the destination type.  Policy has the settings</retcol>
+<retcol name="uc_rpt_src_rpt_typ" type="string">used to dertermine the source file when report not passed in</retcol>
+
+<retcol name="uc_src_full_filename" type="string">NO REPORT GENERATION: Full filename we found for our context</retcol>
+<retcol name="uc_src_full_filename_created" type="string">NO REPORT GENERATION: Create date/time for file we found</retcol>
+<retcol name="uc_src_full_filename_size" type="string">NO REPORT GENERATION: Size of fil</retcol>
+
+<retcol name="ordnum" type="string">CONTEXT ONLY</retcol>
+<retcol name="cponum" type="string">CONTEXT ONLY</retcol>
+<retcol name="ordtyp" type="string">CONTEXT ONLY</retcol>
+<retcol name="ctnnum" type="string">CONTEXT ONLY</retcol>
+<retcol name="ship_id" type="string">CONTEXT ONLY</retcol>
+<retcol name="schbat" type="string">CONTEXT ONLY</retcol>
+<retcol name="client_id" type="string">CONTEXT ONLY</retcol>
+<retcol name="subnum" type="string">CONTEXT ONLY</retcol>
+<retcol name="lodnum" type="string">CONTEXT ONLY</retcol>
+<retcol name="wrkref" type="string">CONTEXT ONLY</retcol>
+<retcol name="allow_ship_id_as_prefix" type="string">CONTEXT ONLY</retcol>
+
+
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+<seealso cref="print file"></seealso>
+<seealso cref="print ossi file"></seealso>
+<seealso cref="get ossi stored file from doc store"></seealso>
+
+
+<policy 
+    polcod="UC-PRINTING" 
+    polvar="RPT-SRC-[identifier for reports]" 
+    polval="DIRECTORY, FILENAME, SORT-LIST, ADDITIONAL-MOCA-FILTER" 
+    rtstr1="rtstr1 and rtstr2 are concatenated to make expression except for ADDITIONAL-MOCA-FILTER">
+    This API can be called without rpt_id.  Then these are used to find the report on the file system.  The DIRECTORY is used
+    to determine folder.  FILENAME is expression.  Then we sort the list per SORT-LIST.  To handle complex file filtering,
+    we have the ADDITIONAL-MOCA-FILTER to further filter out.  This last one can have several policy rows sorted by srtseq and rtstr1
+    is concatenated to make final expression.
+</policy>
+
+<policy 
+    polcod="UC-PRINTING" 
+    polvar="RPT-DEST-[identifier for reports]" 
+    polval="DIRECTORY or FILENAME" 
+    rtstr1="MOCA Expression to construct directory or filename">
+    After report has been generated (or fetched from file system), this is used to rename it to make a name per requirements
+</policy>
+
+
+
+</documentation>
+
+
+</command>

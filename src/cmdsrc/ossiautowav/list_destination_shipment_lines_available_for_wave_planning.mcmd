@@ -1,0 +1,545 @@
+<command>
+ 
+<name>list destination shipment lines available for wave planning</name>
+
+<description>List Destination Shipment Lines Available For Wave Planning</description>
+
+<type>Local Syntax</type>
+
+<local-syntax>
+
+<![CDATA[
+
+    publish data
+    where uc_auto_wave_order_by = 'wh_id,' || nvl(@uc_auto_wave_order_by, 'prcpri, start_dte' ) || ',appt_id'
+    and  uc_max_appt = nvl(@uc_max_appt,0)
+    and uc_def_max_appt = 1
+    |
+    if (!@wh_id#onstack or @wh_id is null)
+    {
+        /* eAPP_MISSING_ARG */
+        set return status
+             where status = 2005
+               and errnum = '2005'
+               and  argid = 'wh_id'
+               and lookup_argdsc = 'wh_id'
+    }
+    |
+    /* Validate client id for user */
+    get client in clause for user
+        where table_prefix = 'shipment_line'
+          and usr_id = nvl(@usr_id, @@usr_id)
+          and wh_id = @wh_id
+          and prt_client_id_flg = 0
+    |
+    /* We'll create a where clause using the rule name that was passed to
+     * this command.  Since the "create clause..." command will check for
+     * the 'rule_nam' parameter, we won't check for that argument here. A
+     * row is always returned by this create command..."
+     */
+    create clause for wave planning
+        where rule_nam = @rule_nam
+        and search_tables = 'appt,shipment,shipment_line,ord,ord_line,car_move,prtmst_view' >> res
+    |
+    [[
+        String cmd;
+        String whereClause;
+        String invAttrWhereClause;
+        String wavesetwhereClause = " ";
+        String shipidwhereClause = " ";
+        String wh_id = wh_id;
+        String wave_set = wave_set;
+        String shipIdList = ship_id_list;
+        String clientswhereClause = "and " + client_in_clause;
+        Integer sumflg = sumflg;
+
+        res.next();
+        
+        uc_outer_q_filter2 = res.getString ( "uc_outer_q_filter2" ); /*## CUSTOM */
+        if ( uc_max_appt == 0 )
+        {
+            if ( res.containsColumn("uc_max_appt"))
+                uc_max_appt = res.getInt("uc_max_appt");
+        }
+        //
+        if ( uc_max_appt == 0 )
+            uc_max_appt = uc_def_max_appt;
+        //
+
+        whereClause = res.getString("whereClause");
+        // exeucted by auto waving ?
+        whereClause += ((uc_auto_wave_rule_id && uc_auto_wave_rule_id != "") ? " and appt.appt_id is not null " : "");
+        
+        invAttrWhereClause = res.getString("invAttrWhereClause");
+
+        if (wave_set && (wave_set.length() > 0))
+        {
+            wavesetwhereClause = " and shipment.wave_set = '" + wave_set + "' ";
+        }
+        /*
+         * Find all orders matching our criteria
+         * For all orders found, we need to plan them into shipments.
+         * Consider only the orders which are not cancelled.
+         * WMD-163122 Going forward Through our system we will plan orders through waves
+         * only so wavable flag will be obsolete, so removing the check for wavableflag.
+         */
+        if (sumflg && sumflg == 1)
+        {
+            cmd = String.format(
+            " [/*#limit=@offset,@limit,true*/" +
+            " select y.* from ( select x.* from (" +
+            " select distinct shipment.wh_id, shipment.ship_id, " +
+            "                count(distinct ord.ordnum) numord," +
+            "                count(ord_line.ordlin) numsls," +
+            "                ord.rush_flg," +
+            "                shipment.shpsts," +
+            "                shipment.early_dlvdte," +
+            "                shipment.late_dlvdte," +
+            "                shipment.early_shpdte," +
+            "                shipment.late_shpdte," +
+            "                sum(shipment_line.pckqty) pckqty," +
+            "                shipment_line.prcpri," +
+            "                shipment.stop_id, " +
+            "                shipment.carcod, " +
+            "                shipment.srvlvl, " +
+            "                shipment.tms_move_id, " +
+            "                appt.start_dte, " +
+            "                appt.end_dte, " +
+            "                car_move.car_move_id, " +
+            "                trlr.trlr_num, " +
+            "                trlr.yard_loc, " +
+            "                appt.appt_id, " +
+            "                appt.stoloc, " +
+            "                decode(nvl(max(o_note.note_flag), 0), 0, 0, 1) ord_note_flg, " +
+            "                decode(max(appt_note.nottxt), null, 0, 1) appt_note_flg, " +
+            "                decode(max(trlr_note.nottxt), null, 0, 1) trlr_note_flg, " +
+            "                decode(max(car_move_note.nottxt), null, 0, 1) car_move_note_flg, " +
+            "                shipment.host_ext_id, " +
+            "                shipment.host_client_id, " +
+            "                shipment.doc_num, " +
+            "                shipment.book_num, " +
+            "                shipment.track_num, " +
+            "                shipment.aes_acpt_dte, " +
+            "                shipment.aes_typ, " +
+            "                shipment.aesitn, " +
+            "                shipment.ftsrnum, " +
+            "                shipment.rt_adr_id, " +
+            "                shipment.bola_num, " +
+            "                shipment.wave_set " +
+            "           from ord_line " +
+            "                join ord on ord.client_id = ord_line.client_id and ord.wh_id = ord_line.wh_id and ord.ordnum = ord_line.ordnum" +
+            "                join cstmst cstmst_rt on cstmst_rt.cstnum = ord.rtcust and cstmst_rt.client_id = ord.client_id" +
+            "                join adrmst adrmst_st on adrmst_st.adr_id = ord.st_adr_id" +
+            "                join adrmst adrmst_rt on adrmst_rt.adr_id = ord.rt_adr_id" +
+            "                left outer join (select ordnum, client_id, wh_id, 1 note_flag from ord_note " +
+            "                                 union " +
+            "                                 select ordnum, client_id, wh_id, 1 note_flag from ord_line_note) o_note" +
+            "                    on ord.ordnum = o_note.ordnum " +
+            "                    and ord.client_id = o_note.client_id " +
+            "                    and ord.wh_id = o_note.wh_id" +
+            "                join shipment_line " +
+            "                    on shipment_line.client_id = ord_line.client_id" +
+            "                    and shipment_line.wh_id = ord_line.wh_id" +
+            "                    and shipment_line.ordnum = ord_line.ordnum" +
+            "                    and shipment_line.ordlin = ord_line.ordlin" +
+            "                    and shipment_line.ordsln = ord_line.ordsln" +
+            "                join shipment on shipment.ship_id = shipment_line.ship_id" +
+            "                left outer join stop " +
+            "                    on shipment.stop_id     = stop.stop_id " +
+            "                left outer join car_move " +
+            "                    on stop.car_move_id     = car_move.car_move_id " +
+            "                left outer join car_move_note " +
+            "                    on car_move.car_move_id = car_move_note.car_move_id " +
+            "                left outer join trlr " +
+            "                    on trlr.trlr_id         = car_move.trlr_id " +
+            "                left outer join trlr_note " +
+            "                    on trlr.trlr_id = trlr_note.trlr_id " +
+            "                left outer join appt" +
+            "                    on trlr.appt_id         = appt.appt_id " +
+            "                    and trlr.stoloc_wh_id    = appt.wh_id " +
+            "                left outer join appt_note " +
+            "                    on appt.appt_id = appt_note.appt_id " +
+            "          where 1=1 " +
+            "            and ord.wh_id            = '%s' " +
+            "            and ord.uc_regdte is not null" + /* only registerd */
+            "            and shipment_line.pckqty > 0 " +
+            "            and shipment.super_ship_flg = 0 " +
+            "            and shipment.super_ship_id is null " +
+            "            and shipment.shpsts      != 'B' " +
+            "            and shipment_line.schbat is null " +
+            "                %s %s " +
+            "       group by shipment.wh_id, shipment_line.prcpri, shipment.ship_id, " +
+            "                shipment.shpsts, shipment.early_dlvdte, " +
+            "                shipment.late_dlvdte, shipment.early_shpdte, " +
+            "                shipment.late_shpdte, shipment.stop_id, " +
+            "                shipment.carcod, shipment.srvlvl, " +
+            "                shipment.tms_move_id, appt.start_dte, " +
+            "                appt.end_dte, ord.rush_flg," +
+            "                shipment.host_ext_id, " +
+            "                shipment.host_client_id, " +
+            "                shipment.doc_num, " +
+            "                shipment.book_num, " +
+            "                shipment.track_num, " +
+            "                shipment.aes_acpt_dte, " +
+            "                shipment.aes_typ, " +
+            "                shipment.aesitn, " +
+            "                shipment.ftsrnum, " +
+            "                shipment.rt_adr_id, " +
+            "                shipment.bola_num, " +
+            "                shipment.wave_set, " +
+            "                car_move.car_move_id, " +
+            "                trlr.trlr_num, " +
+            "                trlr.yard_loc, " +
+            "                appt.appt_id, " +
+            "                appt.stoloc " +
+            " ) x " +
+            " where rownum < 999999" +
+            " order by "  + uc_auto_wave_order_by + 
+            " ) y where " + uc_outer_q_filter2 + 
+            " ] ",
+            wh_id,
+            clientswhereClause,
+            whereClause);
+
+            try{
+                res = moca.executeInline(cmd);
+            }
+            catch (MocaException ex)
+            {
+                def errorCode = ex.getErrorCode();
+
+                /* eDB_NO_ROWS_AFFECTED || eSRV_NO_ROWS_AFFECTED */
+                if ((errorCode == -1403) || (errorCode ==510))
+                {
+                  /* eNO_SHIPMENT_LINES_MATCHING_CRITERIA */
+                  errorCode = 10572 ;
+                }
+                cmd = String.format("set return status " +
+                                    "   where status = %s" +
+                                    "     and errnum = '%s'",
+                                errorCode,
+                                errorCode);
+                moca.executeCommand(cmd);
+            }
+            res;
+        }
+        else
+        {
+            if (shipIdList && (shipIdList.length() > 0))
+            {
+                /* Here we scan the order number list, and make sure that each
+                 * sql clause "ordnum in (....)" have not more than 10 items,
+                 * since in the Oracle database, when the expression is more
+                 * than 1000, the sql clause would fail. For example, "select
+                 * ordnum from ord where ord_id in (1,2,....,1024) ", at this
+                 * time, in the "in ()", there are 1024 items, so it would
+                 * fail when executing it in Oracle.  Here we make sure that
+                 * each "in()" has not more than 10 items.
+                 */
+
+                String[] shipList = shipIdList.split(",");
+
+                for (i=0;i<shipList.size();i++)
+                {
+                    if (i > 0)
+                    {
+                        if((i % 10) == 0)
+                            shipidwhereClause += ") or shipment_line.ship_id in ( ";
+                        else
+                            shipidwhereClause += ",";
+                    }
+                    else
+                        shipidwhereClause += " and ( shipment_line.ship_id in ( ";
+
+                    shipidwhereClause += shipList[i];
+                }
+                shipidwhereClause += ") )";
+            }
+
+            /*
+             * WMD-163122 Going forward Through our system we will plan orders through waves
+             * only so wavable flag will be obsolete, so removing the check for wavableflag.
+             */
+            cmd =String.format(
+            " [/*#limit=@offset,@limit,true*/" +
+            " select q2.* from (select q1.*, dense_rank() over (partition by wh_id order by " + uc_auto_wave_order_by + ") uc_apptcnt from (" +
+            " select distinct shipment_line.*, " +
+            "                shipment.stop_id, " +
+            "                shipment.carcod, " +
+            "                shipment.srvlvl, " +
+            "                shipment.tms_move_id, " +
+            "                prtdsc.lngdsc, " +
+            "                ord.rush_flg," +
+            "                appt.start_dte, " +
+            "                appt.end_dte, " +
+            "                car_move.car_move_id, " +
+            "                trlr.trlr_num, " +
+            "                trlr.yard_loc, " +
+            "                appt.appt_id, " +
+            "                appt.stoloc, " +
+            "                nvl(o_note.note_flag, 0) ord_note_flg, " +
+            "                nvl(a_note.appt_note_flg, 0) appt_note_flg, " +
+            "                nvl(t_note.trlr_note_flg, 0) trlr_note_flg, " +
+            "                nvl(c_note.car_move_note_flg, 0) car_move_note_flg, " +
+            "                shipment.host_ext_id, " +
+            "                shipment.host_client_id, " +
+            "                shipment.doc_num, " +
+            "                shipment.book_num, " +
+            "                shipment.track_num, " +
+            "                shipment.aes_acpt_dte, " +
+            "                shipment.aes_typ, " +
+            "                shipment.aesitn, " +
+            "                shipment.ftsrnum, " +
+            "                shipment.rt_adr_id, " +
+            "                shipment.bola_num, " +
+            "                shipment.wave_set " +
+            "           from prtmst_view " +
+            "                join prtdsc " +
+            "                    on prtdsc.colnam = 'prtnum|prt_client_id|wh_id_tmpl' " +
+            "                    and prtdsc.colval = /*=varchar(*/prtmst_view.prtnum||'|'||prtmst_view.prt_client_id||'|'||prtmst_view.wh_id_tmpl/*=)*/ " +
+            "                    and prtdsc.locale_id = nvl(@locale_id, @@locale_id)" +
+            "                join ord_line " +
+            "                    on ord_line.prt_client_id = prtmst_view.prt_client_id" +
+            "                    and ord_line.prtnum = prtmst_view.prtnum" +
+            "                    and ord_line.wh_id = prtmst_view.wh_id" +
+            "                join ord on ord.client_id = ord_line.client_id and ord.wh_id = ord_line.wh_id and ord.ordnum = ord_line.ordnum "+
+            "                join cstmst cstmst_rt on cstmst_rt.cstnum = ord.rtcust and cstmst_rt.client_id = ord.client_id" +
+            "                join adrmst adrmst_st on adrmst_st.adr_id = ord.st_adr_id" +
+            "                join adrmst adrmst_rt on adrmst_rt.adr_id = ord.rt_adr_id" +
+            "                left outer join (select ordnum, client_id, wh_id, 1 note_flag from ord_note " +
+            "                                 union " +
+            "                                 select ordnum, client_id, wh_id, 1 note_flag from ord_line_note) o_note "+
+            "                    on ord.ordnum = o_note.ordnum " +
+            "                    and ord.client_id = o_note.client_id " +
+            "                    and ord.wh_id = o_note.wh_id" +
+            "                join shipment_line " +
+            "                    on shipment_line.client_id = ord_line.client_id" +
+            "                    and shipment_line.wh_id = ord_line.wh_id" +
+            "                    and shipment_line.ordnum = ord_line.ordnum" +
+            "                    and shipment_line.ordlin = ord_line.ordlin" +
+            "                    and shipment_line.ordsln = ord_line.ordsln" +
+            "                join shipment on shipment.ship_id = shipment_line.ship_id" +
+            "                left outer join stop " +
+            "                    on shipment.stop_id     = stop.stop_id " +
+            "                left outer join car_move " +
+            "                    on stop.car_move_id     = car_move.car_move_id " +
+            "                left outer join (select distinct car_move_id, 1 car_move_note_flg from car_move_note) c_note " +
+            "                    on car_move.car_move_id = c_note.car_move_id " +
+            "                left outer join trlr " +
+            "                    on trlr.trlr_id         = car_move.trlr_id " +
+            "                left outer join (select distinct trlr_id, 1 trlr_note_flg from trlr_note) t_note " +
+            "                    on trlr.trlr_id = t_note.trlr_id " +
+            "                left outer join appt" +
+            "                    on trlr.appt_id         = appt.appt_id " +
+            "                    and trlr.stoloc_wh_id    = appt.wh_id " +
+            "                left outer join (select distinct appt_id, 1 appt_note_flg from appt_note) a_note" +
+            "                    on appt.appt_id = a_note.appt_id " +
+            "          where 1=1 " +
+            "            and ord.wh_id            = '%s' " +
+            "            and ord.uc_regdte is not null" +  /* only registered */
+            "            and shipment_line.pckqty > 0 " +
+            "            and shipment.super_ship_flg = 0 " +
+            "            and shipment.super_ship_id is null " +
+            "            and shipment.shpsts      != 'B' " +
+            "            and shipment_line.schbat is null " +
+            "                %s %s " +
+            "                %s %s" +
+            "            ) q1 where rownum < 999999 order by " + uc_auto_wave_order_by + " ) q2 where uc_apptcnt <= " + uc_max_appt +
+            "            ] ",
+            wh_id,
+            shipidwhereClause,
+            wavesetwhereClause,
+            clientswhereClause,
+            whereClause);
+
+            currentContext = MocaUtils.currentContext();
+
+            try
+            {
+                res = currentContext.executeInline(cmd);
+            }
+            catch (MocaException ex)
+            {
+                def errorCode = ex.getErrorCode();
+
+                /* eDB_NO_ROWS_AFFECTED || eSRV_NO_ROWS_AFFECTED */
+                if ((errorCode == -1403) || (errorCode == 510))
+                {
+                    errorCode = 10572;   /* eNO_SHIPMENT_LINES_MATCHING_CRITERIA */
+                }
+                cmd = String.format("set return status " +
+                                    "     where status = %s " +
+                                    "       and errnum = '%s'",
+                                errorCode,
+                                errorCode);
+                moca.executeCommand(cmd);
+            }
+
+            /*
+             * If we get a maximum qty in, then we need to make sure we don't
+             * violate that.  Otherwise, we can just send back the results
+             * we selected.
+             */
+            if(currentContext.isVariableAvailable("totpcs"))
+            {
+                /* We do not know if totpcs is specified as a string or an
+                 * integer, so convert whatever format it's in to a string,
+                 * and then trim it to avoid the case where we either have a
+                 * null value or a string whose value is a series of spaces.
+                 * We need to do this to avoid a 'NumberFormatException' from
+                 * using the valueOf() method from the Integer class.
+                 */
+                String  maxQtyValue;
+                int     totalPieces;
+
+                try
+                {
+                    maxQtyValue = currentContext.getVariable("totpcs").toString().trim();
+                    totalPieces = Integer.parseInt(maxQtyValue);
+                }
+                catch (NumberFormatException ex)
+                {
+                    moca.trace("Error: 'total pieces' specified but could not get value");
+                    totalPieces = -1;
+                }
+
+                if (totalPieces > 0)
+                {
+                    moca.trace("Total pieces allowed is " + totalPieces);
+
+                    /*
+                     * What we are going to do here is loop around all the rows
+                     * returned, and find out which rows will not violate the
+                     * total number of pieces allowed.  We will simply just
+                     * grab the first x amount of rows until the total unit
+                     * qty we've accumulated equals the maximum pieces allowed.
+                     */
+                    int totalQty = 0;
+                    int rowCount = 0;
+                    int  pck_qty = 0;
+
+                    boolean maxQuantityNotExceeded = true;
+
+                    while(maxQuantityNotExceeded)
+                    {
+                        if (res.next())
+                        {
+                            pck_qty = res.getInt("pckqty") ;
+                            if (totalQty + pck_qty <= totalPieces)
+                            {
+                                totalQty = totalQty + pck_qty;
+                                rowCount++;
+                            }
+                            else
+                            {
+                                maxQuantityNotExceeded = false;
+                            }
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+
+                    /* We could run into a situation where they entered a total
+                     * pieces quantity that's smaller than the quantity on any
+                     * of the rows. If that's the case, we'll be stripping off
+                     * all of the rows and will end up with an empty recordset.
+                     * Rather than send back 0 rows, we're going to provide
+                     * them with an error.
+                     */
+
+                    if (rowCount == 0)
+                    {
+                        /* eNO_ORDER_LINES_MATCHING_CRITERIA */
+                        moca.trace("Total pieces is less than the quantity of any " +
+                                   "of the order lines. ");
+                        cmd = String.format("set return status " +
+                                            "   where status = 10572" +
+                                            "     and errnum = '10572'");
+                        moca.executeCommand(cmd);
+                    }
+
+                    /*
+                     * If maxQuantityNotExceeded has been set to true, we need
+                     * to strip off any remaining rows in the result set. The
+                     * reason we do it this way rather than just defining our
+                     * result set and adding rows to it is because we are doing
+                     * a select * so we don't have to hard-code the columns we
+                     * are sending back, allowing us to be more flexible.
+                     */
+
+                    /* The current row is the first row that causes the
+                     * maxQuantityNotExceeded flag to be set to false.  So we
+                     * need to remove this current row before advancing to
+                     * the next.
+                     */
+
+                    if (!maxQuantityNotExceeded)
+                    {
+                        //We need to account for the current row that caused
+                        // the max quantity to be exceeded.
+                        res.removeRow();
+
+                        // Now we can loop and delete everything after the last
+                        // qualified row to satisfy the total pieces quantity.
+                        while(res.next())
+                        {
+                            res.removeRow();
+                        }
+                    }
+                    res.reset();
+                }
+            }
+            res;
+        }
+    ]]
+]]>
+</local-syntax>
+
+<argument name="rule_nam" datatype="string"> </argument>
+<argument name="wave_set" datatype="string"> </argument>
+<argument name="sumflg"   datatype="integer"> </argument>
+<argument name="ship_id_list"   datatype="string"> </argument>
+<argument name="wh_id"    datatype="string"> </argument>
+
+<documentation>
+
+<remarks>
+<![CDATA[
+  <p>
+  This command is used to list shipment lines that still
+  have quantity left to be allocated.  The shipments are only for those
+  orders that are marked for wave processing (wave flag = true) and with same destination.
+  This command is used primarily by shipment planning to give a list
+  of shipments based on some destination criteria provided by the user.
+  If the summary flag is set, the command will return a summary of all the
+  shipments that are available for wave planning, but not list individual
+  shipment lines.
+  </p>
+  <p>
+  Note, this command respects restricted client access.  The user will
+  only be able to see shipments for clients that he is authorized to see.
+  </p>
+  <p>
+  CUSTOMIZATION
+  =============
+  1. In the beginning we get the set uc_auto_wave_order_by.  We have a default and also can pass in.  Generally default is used
+  2. Call to [create clause for wave planning] will give us some more outputs - specifically uc_max_appt and uc_outer_q_filter2
+  3. In the two SQLs (sumflg = 1 and sumflg != 1 )
+     a. Changed the SQLs to be SQL 92 ANSI join.  
+     b. In order to respect the uc_max_appt we build them into an inline view and then have rownum < uc_max_appt.  Trace will show this clearly
+  4. We only consider those orders valid that have ord.uc_regdte of not null.  So order registration job must be running.
+  </p>
+
+]]>
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+<seealso cref="plan shipment wave by destination selection"> </seealso>
+<seealso cref="create clause for wave planning"> </seealso>
+
+</documentation>
+
+</command>

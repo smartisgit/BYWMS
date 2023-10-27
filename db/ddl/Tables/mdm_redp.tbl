@@ -1,0 +1,62 @@
+#use$LESDIR/include
+#use$DCSDIR/include
+#use$MOCADIR/include
+#use$LESDIR/db/ddl/Indexes
+
+#include<dcsddl.h>
+#include<dcscolwid.h>
+#include<dcstbldef.h>
+#include<sqlDataTypes.h>
+
+mset command on
+[
+CREATE_TABLE(mdm_redp)
+(
+source_system            STRING_TY(14),
+item_key                  STRING_TY(14),
+item_key_legacy            STRING_TY(255),
+axis                        STRING_TY(10),
+base_curve                  STRING_TY(10),
+blister_type            STRING_TY(50),
+brand_type                  STRING_TY(50),
+cli_description            STRING_TY(50),
+commodity_code            STRING_TY(50),
+cylinder                  STRING_TY(10),
+description                  STRING_TY(100),
+diameter                  STRING_TY(10),
+ean_cd                        STRING_TY(50),
+glbl_forcast_item       STRING_TY(100),
+height                        STRING_TY(10),
+hub_state_ind            FIXED_INT_TY(20),
+inv_uom                        STRING_TY(50),
+length                        STRING_TY(10),
+lens_color                  STRING_TY(50),
+lens_power                  STRING_TY(10),
+material_cd                  STRING_TY(50),
+mfg_type                  STRING_TY(50),
+mf_add_power            STRING_TY(10),
+mf_opt_zone                  STRING_TY(10),
+mktg_material_type      STRING_TY(50),
+modality                  STRING_TY(100),
+packaging                  STRING_TY(50),
+pack_size                  STRING_TY(30),
+pkg_config                  STRING_TY(50),
+product_cd                  STRING_TY(50),
+rowid_object            STRING_TY(14),
+short_desc                  STRING_TY(50),
+sphere_power_cd            STRING_TY(50),
+status_cd                  STRING_TY(50),
+surface_type            STRING_TY(50),
+upc_cd                        STRING_TY(20),
+vendor_item_num            STRING_TY(50),
+water_content            STRING_TY(50),
+weight                        STRING_TY(10),
+l_code                        STRING_TY(10),
+product_line            STRING_TY(50),
+item_group                  STRING_TY(50),
+price_group                  STRING_TY(50),
+product_class            STRING_TY(50)
+)
+]catch(ERR_TABLE_ALREADY_EXISTS)
+RUN_DDL
+mset command off

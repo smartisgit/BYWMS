@@ -1,0 +1,64 @@
+<command>
+<name>get ossi context for host mapping for integrations</name>
+<description>We have functions to get host location and status.  Since these are functions we need to pass in integration context
+</description>
+
+<argument name="evt_sys_id" required="yes" datatype="string"></argument>
+<argument name="dest_sys_id" required="yes" datatype="string"></argument>
+<argument name="ifd_id" required="yes" datatype="string"></argument>
+<argument name="ifd_ver" required="yes" datatype="string"></argument>
+<argument name="ifd_seg_id" required="yes" datatype="string"></argument>
+<argument name="ifd_fld_id" required="yes" datatype="string"></argument>
+<argument name="ifd_fld_misc_data" required="yes" datatype="string"></argument>
+<argument name="ifd_fld_data" required="yes" datatype="string"></argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+/*
+ * Revision Log
+ * 2021-11-30 saad.ahmad 12608 - Initial
+ */
+
+publish data
+where uc_my_delim = '||'
+|
+publish data
+where uc_int_context = @evt_sys_id
+                    || @uc_my_delim || @dest_sys_id
+                    || @uc_my_delim || @ifd_id
+                    || @uc_my_delim || @ifd_ver
+                    || @uc_my_delim || @ifd_seg_id
+                    || @uc_my_delim || @ifd_fld_id
+                    || @uc_my_delim || @ifd_fld_misc_data
+                    || @uc_my_delim || @ifd_fld_data
+
+]]>
+</local-syntax>
+<documentation>
+<remarks>
+<![CDATA[
+    <p>
+    We have MOCA functions ossi__get_host_stoloc and ossi__get_host_invsts to detremine mapped status and location.
+    Functions do not have access to context.  So when called form integrations this command will take a bunch of stuff and stuff
+    into a single value that is then passed to those functions.  See algorithms UC_GET_HOST_STOLOC and UC_GET_HOST_INVSTS
+    </p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+<retcol name="uc_int_context" type="string"></retcol>
+
+<example>
+</example>
+
+<exception value="eOK">Normal successful completion</exception>
+
+<seealso cref="ossi get_host_stoloc"></seealso>
+<seealso cref="ossi get_host_invsts"></seealso>
+<seealso cref="decompose ossi context for host mapping for integrations"></seealso>
+
+</documentation>
+</command>

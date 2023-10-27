@@ -1,0 +1,45 @@
+<command>
+<name>list ossi reason codes for group</name>
+<description>List reason codes for group</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+{
+  [select reacod
+     from reacod_reagrp
+    where reagrp = @reagrp
+  ]
+  |
+  list reason codes
+    where reacod = @reacod
+}
+>> res
+|
+sort result set
+  where result_set = @res
+    and sort_list = 'lngdsc'
+
+]]>
+</local-syntax>
+<argument name="reagrp" required="yes" datatype="string"></argument>
+
+<documentation>
+
+<remarks>
+This command is used to get reason codes.
+</remarks>
+
+<retcol name="reacod" type="String">Reason Code</retcol>
+
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

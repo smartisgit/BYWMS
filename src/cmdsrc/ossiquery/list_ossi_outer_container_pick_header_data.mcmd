@@ -1,0 +1,500 @@
+<command>
+<name>list ossi outer container pick header data</name>
+<description>
+This can be called by various input parameters to then get the pckwrk_hdr row for them. 
+</description> 
+<type>Local Syntax</type>
+
+<argument name="wh_id" default-value="" required="No" datatype="string"></argument>
+<argument name="uc_pw_hdr_wrkref" default-value="" required="No" datatype="string"></argument>
+<argument name="uc_pw_hdr_subucc" default-value="" required="No" datatype="string"></argument>
+<argument name="uc_pw_dtl_subnum" default-value="" required="No" datatype="string"></argument>
+<argument name="uc_pw_hdr_ship_id" default-value="" required="No" datatype="string"></argument>
+<argument name="uc_pw_hdr_any_case_id" default-value="" required="No" datatype="string">If this is passed in then it means we should do an or to see subucc or subnum match</argument>
+<argument name="uc_get_sens_ctn_data" default-value="1" required="No" datatype="string">If we pass in 1 then return inside sensitive carton summary data as well</argument>
+<argument name="uc_get_manfst_data" default-value="1" required="No" datatype="string">If we pass in 1 then return data from manfst table as well</argument>
+<argument name="uc_get_add_data_rule_grp_id" default-value="" required="No" datatype="string">e.g. pass in OUTPUT-SET-LABEL-INV-CONTAINER.  If passed in then we will add columns to result from this rule</argument>
+<argument name="uc_get_contents_sum" default-value="1" required="No" datatype="string">If we pass in 1 then return data from contents as a summary</argument>
+
+<argument name="uc_max_output_rows" default-value="" required="No" datatype="string">How many rows to return</argument>
+<argument name="locale_id" default-value="" required="No" datatype="string">If not passed in default to @@LOCALE_ID</argument>
+
+<argument name="uc_only_show_outer_ctn" default-value="1" required="No" datatype="string">If we pass in 1 then we restrict query to outer cartons only.  for insyance if we run by ship_id</argument>
+
+<argument name="uc_pw_hdr_select_clause" default-value="" required="No" datatype="string">If passed in, then we only return this data</argument>
+<argument name="locale_id" default-value="" required="No" datatype="string">Locale</argument>
+
+
+
+<local-syntax>
+<![CDATA[
+
+
+publish data
+where uc_get_sens_ctn_data = nvl(@uc_get_sens_ctn_data, 1 )
+and uc_get_manfst_data = nvl(@uc_get_manfst_data, 1 )
+and locale_id = nvl(nvl(@locale_id, @@LOCALE_ID), 'US_ENGLISH')
+and uc_max_output_rows = nvl(@uc_max_output_rows,1) + 1 /* adding 1 because rownum < this number */
+and uc_get_contents_sum = nvl(@uc_get_contents_sum, 1 )
+and uc_only_show_outer_ctn = nvl(@uc_only_show_outer_ctn, 1 )
+and uc_pw_hdr_select_clause = nvl(@uc_pw_hdr_select_clause, '*' )
+|
+/*
+ * If we are calling by shipment then we want to get the manfst data by shipment as well
+ * and we can assume that other filters at lower level are not needed
+ */
+if ( @uc_pw_hdr_ship_id is not null ) 
+    publish data
+    where uc_manfst_ship_id = @uc_pw_hdr_ship_id
+    and uc_pw_hdr_wrkref = null
+    and uc_pw_hdr_subucc = null
+    and uc_pw_dtl_subnum = null
+    and uc_pw_hdr_any_case_id = null
+    and uc_get_sens_ctn_data = 0
+    and uc_get_contents_sum = 0
+    and uc_get_add_data_rule_grp_id = null
+    and uc_get_manfst_data = 1
+    and uc_max_output_rows = 999999
+|
+if ( @wh_id is null ) hide stack variable where name = 'wh_id'
+|
+if ( @uc_pw_hdr_wrkref is null ) hide stack variable where name = 'uc_pw_hdr_wrkref'
+|
+if ( @uc_pw_hdr_subucc is null ) hide stack variable where name = 'uc_pw_hdr_subucc'
+|
+if ( @uc_pw_dtl_subnum is null ) hide stack variable where name = 'uc_pw_dtl_subnum'
+|
+if ( @uc_pw_hdr_ship_id is null ) hide stack variable where name = 'uc_pw_hdr_ship_id'
+|
+if ( @uc_pw_hdr_any_case_id is not null )
+    publish data
+    where uc_any_case_id_clause = "(uc_pw_dtl_subnum = " || qq(@uc_pw_hdr_any_case_id) || " or uc_pw_dtl_subucc = " || qq(@uc_pw_hdr_any_case_id) || ")"
+else
+    publish data
+    where uc_any_case_id_clause = "1=1"
+|
+{
+    execute ossi les_cmd
+    where les_cmd_id = 'uc_query_list_ossi_outer_container_pick_hdr_base'
+    and uc_les_cmd_inline = 1
+    and exec_uc_les_cmd_cust_lvl = null
+    and uc_inhibit_return_extra_columns = 1
+    |
+    {
+        if ( @uc_manfst_ship_id is null )
+            calculate ossi carton weight 
+            where wrkref = @uc_pw_hdr_wrkref 
+        >> res1
+        |
+        filter data 
+        where moca_filter_level = 3
+        >> res2
+        |
+        if ( @uc_get_sens_ctn_data = 1 )
+            list ossi pick detail data
+            where wrkref = @uc_pw_hdr_wrkref
+            and uc_select_clause = "count(*) uc_sens_cnt, min(ctncod) uc_sens_ctncod, count(distinct ctnnum) uc_sens_ctn_cnt "
+            and uc_filter_uc_record_typ_cd = "SUB_CTN"
+            and uc_order_by_clause = "1,2"
+            and uc_outer_subnum = null
+            catch (-1403,510)
+            >> res3
+        else
+            noop >> res3 /* so that we get a good res even in else as it is later used in publish data combine and result set combine */
+        |
+        if ( @uc_get_manfst_data = 1 )
+        {
+            {
+                if ( @uc_manfst_ship_id is not null )
+                {
+                    [
+                    select sum(weight) uc_pw_hdr_man_weight,
+                           count(*) uc_pw_hdr_uc_cnt_manfst
+                    from manfst
+                    where ship_id = @uc_manfst_ship_id
+                    ]
+                }
+                else
+                {
+                    find ossi manfst record
+                    where crtnid = nvl(@uc_pw_hdr_subnum, @uc_pw_hdr_subucc )  /* For K pick, subnum will be there.  For normal S pick that will be null so pass in subucc */
+                    and invtid = null
+                    catch (-1403,510)
+                    |
+                    if ( @? = 0 and @crtnid is not null )
+                    {
+                        [
+                        select traknm                uc_pw_hdr_traknum,
+                               weight                uc_pw_hdr_man_weight,
+                               mstdte                uc_pw_hdr_mstdte,
+                               mfstid                uc_pw_hdr_mfstid,
+                               mancls                uc_pw_hdr_mancls
+                        from manfst
+                        where crtnid = @crtnid
+                        ]
+                        catch (-1403,510)
+                        
+                    }
+                }
+            }
+            >> res4
+        }
+        else
+            noop >> res4 /* so that we get a good res even in else as it is later used in publish data combine and result set combine */
+        |
+        /*
+         * Some labels want to see data specific to some contents of the cartons
+         */
+        if ( @uc_get_contents_sum = 1 )
+        {
+            list ossi pick detail data
+            where wrkref = @uc_pw_hdr_wrkref
+            and uc_select_clause =  "max(prtnum) uc_pw_hdr_any_prtnum, "
+                                 || "max(lngdsc) uc_pw_hdr_any_prt_lngdsc,"
+                                 || "max(short_dsc) uc_pw_hdr_any_prt_short,"
+                                 || "max(prtfam) uc_pw_hdr_any_prtfam,"
+                                 || "max(hazmat_flg) uc_pw_hdr_has_hazmat_flg,"
+                                 || "count(*) uc_pw_hdr_cnt_pck, sum(pckqty) uc_pw_hdr_tot_pckqty,"
+                                 || "count(distinct prtnum) uc_pw_hdr_cnt_prtnum,"
+                                 || "sum(appqty) uc_pw_hdr_tot_appqty,"
+                                 || "sum(uc_prtftp_dtl_ea_vol) uc_pw_hdr_uc_ea_vol,"
+                                 || "sum(uc_prtftp_dtl_ca_vol) uc_pw_hdr_uc_ca_vol," 
+                                 || "max(uc_pck_untcas)        uc_pw_hdr_uc_pck_untcas," 
+                                 || "sum(uc_pck_wgt)           uc_pw_hdr_uc_pck_wgt,"
+                                 || "sum(uc_ca_len)            uc_pw_hdr_uc_ca_len,"  
+                                 || "sum(uc_ca_wid)            uc_pw_hdr_uc_ca_wid," 
+                                 || "sum(uc_ca_hgt)            uc_pw_hdr_uc_ca_hgt," 
+                                 || "sum(untcst)               uc_pw_hdr_uc_untcst" 
+            and uc_filter_uc_record_typ_cd = null
+            and uc_order_by_clause = "1,2"
+            and uc_outer_subnum = null
+            catch (-1403,510)
+            >> res_contents
+        }
+        else
+            noop >> res_contents
+        |        
+        if ( @uc_get_add_data_rule_grp_id is not null )
+        {
+            /*
+             * We collapsed all results above - but our rule engine needs to see them as values
+             */
+            publish data combination where res = @res1
+            |
+            publish data combination where res = @res2
+            |
+            publish data combination where res = @res3
+            |
+            publish data combination where res = @res4
+            |
+            publish data combination where res = @res_contents
+            |
+            publish ossi fields from rules engine
+            where uc_rule_grp_id = @uc_get_add_data_rule_grp_id
+            and uc_table_name = 'PCKWRK_HDR'
+            and uc_set_default_mode = 'LBL'
+            and uc_ignore_field_errors = 1
+            and uc_publish_error_fields_with_error_info = 1
+            catch(@?) /* since user could mistype something */
+            >> res5
+        }
+        else
+            noop >> res5 /* so that we get a good res even in else as it is later used in combine */
+        |
+        /* 
+         * I have res2 and res1 in opposite order below to see the ouput such that main select columns are listed firsr
+         */
+        combine ossi columns from multiple results
+        where uc_cmb_res1 = @res2
+        and uc_cmb_res2 = @res1
+        and uc_cmb_res3 = @res3
+        and uc_cmb_res4 = @res4
+        and uc_cmb_res5 = @res5
+        and uc_cmb_res6 = @res_contents
+        and uc_cmb_res_cnt = 6
+    }
+}
+
+
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+this is supposed to return carton header level data.  Primarily for reports etc. where we want to return header data
+</remarks>
+
+<retrows>1</retrows>
+
+
+<retcol name="wh_id" type="string"></retcol>
+<retcol name="uc_pw_hdr_wh_ctry_iso2" type="string"></retcol>
+<retcol name="uc_pw_hdr_wh_ctry_iso3" type="string"></retcol>
+<retcol name="uc_pw_hdr_locale_id" type="string">Locale of the warehouse</retcol>
+
+
+
+
+<retcol name="uc_pw_hdr_lodlvl" type="string"></retcol>
+<retcol name="uc_pw_hdr_wrktyp" type="string"></retcol>
+<retcol name="uc_pw_hdr_wrkref" type="string"></retcol>
+<retcol name="uc_pw_hdr_subucc" type="string"></retcol>
+<retcol name="uc_pw_hdr_subnum" type="string"></retcol>
+<retcol name="uc_pw_hdr_prtnum" type="string"></retcol>
+<retcol name="uc_pw_hdr_prt_client_id" type="string"></retcol>
+<retcol name="uc_pw_hdr_ftpcod" type="string"></retcol>
+<retcol name="uc_pw_hdr_cmbcod" type="string"></retcol>
+<retcol name="uc_pw_hdr_pck_uom" type="string"></retcol>
+<retcol name="uc_pw_hdr_pckqty" type="string"></retcol>
+<retcol name="uc_pw_hdr_appqty" type="string"></retcol> uc_pw_hdr_lotnum
+<retcol name="uc_pw_hdr_lotnum" type="string"></retcol>
+
+
+<retcol name="uc_pw_hdr_cur_cas" type="string"></retcol>
+<retcol name="uc_pw_hdr_tot_cas_cnt" type="string"></retcol>
+<retcol name="uc_pw_hdr_ship_id" type="string"></retcol>
+<retcol name="uc_pw_hdr_client_id" type="string"></retcol>
+<retcol name="uc_pw_hdr_ordnum" type="string"></retcol>
+<retcol name="uc_pw_hdr_ordtyp" type="string"></retcol>
+<retcol name="uc_pw_hdr_vc_init_sys" type="string"></retcol>
+<retcol name="uc_pw_hdr_uc_ord_srvlvl" type="string"></retcol> 
+<retcol name="uc_pw_hdr_vc_capnum" type="string"></retcol>
+<retcol name="uc_pw_hdr_vc_rtcode" type="string"></retcol>
+<retcol name="uc_pw_hdr_cponum" type="string"></retcol>
+<retcol name="uc_pw_hdr_vc_ordtyp" type="string"></retcol>
+<retcol name="uc_pw_hdr_uc_ord_frtrte" type="string"></retcol>
+<retcol name="uc_pw_hdr_uc_reffld_1" type="string"></retcol>
+<retcol name="uc_pw_hdr_uc_reffld_2" type="string"></retcol>
+<retcol name="uc_pw_hdr_uc_reffld_3" type="string"></retcol>
+<retcol name="uc_pw_hdr_uc_reffld_4" type="string"></retcol>
+<retcol name="uc_pw_hdr_uc_reffld_5" type="string"></retcol>
+<retcol name="uc_pw_hdr_uc_rtcust" type="string"></retcol>
+<retcol name="uc_pw_hdr_uc_stcust" type="string"></retcol>
+<retcol name="uc_pw_hdr_uc_adddte" type="string"></retcol> 
+<retcol name="uc_pw_hdr_uc_cpotyp" type="string"></retcol> 
+<retcol name="uc_pw_hdr_adddte" type="string"></retcol>
+
+
+<retcol name="uc_pw_hdr_ctncod" type="string"></retcol>
+<retcol name="uc_pw_hdr_ctn_lngdsc" type="string"></retcol>
+<retcol name="uc_pw_hdr_ctn_short_dsc" type="string"></retcol>
+<retcol name="uc_pw_hdr_ctnlen" type="string"></retcol>
+<retcol name="uc_pw_hdr_ctnwid" type="string"></retcol>
+<retcol name="uc_pw_hdr_ctnhgt" type="string"></retcol>
+<retcol name="uc_pw_hdr_ctnvol" type="string"></retcol>
+
+<retcol name="uc_pw_hdr_prtftp_len" type="string"></retcol>
+<retcol name="uc_pw_hdr_prtftp_wid" type="string"></retcol>
+<retcol name="uc_pw_hdr_prtftp_hgt" type="string"></retcol>
+<retcol name="uc_pw_hdr_prtftp_vol" type="string"></retcol>
+
+<retcol name="uc_pw_hdr_ship_line_id" type="string"></retcol>
+<retcol name="uc_pw_hdr_vc_drpcde" type="string"></retcol>
+<retcol name="uc_pw_hdr_alc_search_path" type="string"></retcol> 
+<retcol name="uc_pw_hdr_intl_flg" type="string"></retcol>
+<retcol name="uc_pw_print_ord_invoice" type="string"></retcol>
+<retcol name="uc_pw_hdr_dckdor" type="string"></retcol> 
+                   
+<retcol name="uc_pw_hdr_cons_batch" type="string"></retcol>
+<retcol name="uc_pw_hdr_carcod" type="string"></retcol>
+<retcol name="uc_pw_hdr_srvlvl" type="string"></retcol> 
+<retcol name="uc_pw_hdr_track_num" type="string"></retcol> 
+<retcol name="uc_pw_hdr_schbat" type="string"></retcol>
+<retcol name="uc_pw_hdr_schbat_adddte" type="string"></retcol>
+
+<retcol name="uc_pw_hdr_srcloc" type="string"></retcol>
+<retcol name="uc_pw_hdr_aisle_id" type="string"></retcol>
+<retcol name="uc_pw_hdr_uc_alt_stoloc" type="string"></retcol> 
+<retcol name="uc_pw_hdr_loc_typ" type="string"></retcol>
+<retcol name="uc_pw_hdr_src_pck_zone_cod" type="string"></retcol>
+<retcol name="uc_pw_hdr_src_sto_zone_cod" type="string"></retcol>
+<retcol name="uc_pw_hdr_src_mov_zone_cod" type="string"></retcol>  
+<retcol name="uc_pw_hdr_sfr_host_ext_id" type="string"></retcol>
+<retcol name="uc_pw_hdr_sfr_adrln3" type="string"></retcol>
+<retcol name="uc_pw_hdr_sfr_adrcty" type="string"></retcol>
+<retcol name="uc_pw_hdr_sfr_adrstc" type="string"></retcol>
+<retcol name="uc_pw_hdr_sfr_adrpsz" type="string"></retcol>
+<retcol name="uc_pw_hdr_sto_ctry_name" type="string"></retcol> 
+                 
+<retcol name="uc_pw_hdr_uc_area_proc_cd" type="string"></retcol>
+<retcol name="uc_pw_hdr_rt_ctry_name" type="string"></retcol>
+<retcol name="uc_pw_hdr_rt_ctry_iso2" type="string"></retcol>
+<retcol name="uc_pw_hdr_rt_ctry_iso3" type="string"></retcol>
+<retcol name="uc_pw_hdr_rt_adr_id" type="string"></retcol>
+<retcol name="uc_pw_hdr_rt_adrnam" type="string"></retcol>
+<retcol name="uc_pw_hdr_rt_adrstc" type="string"></retcol>
+<retcol name="uc_pw_hdr_rt_adrpsz" type="string"></retcol>
+<retcol name="uc_pw_hdr_rt_adrcty" type="string"></retcol>
+<retcol name="uc_pw_hdr_rt_adrln1" type="string"></retcol>
+<retcol name="uc_pw_hdr_rt_adrln2" type="string"></retcol>
+<retcol name="uc_pw_hdr_rt_adrln3" type="string"></retcol> 
+<retcol name="uc_pw_hdr_rt_attn_tel" type="string"></retcol>
+<retcol name="uc_pw_hdr_rt_phnnum" type="string"></retcol>
+<retcol name="uc_pw_hdr_rt_cont_name" type="string"></retcol>
+<retcol name="uc_pw_hdr_rt_first_name" type="string"></retcol>
+<retcol name="uc_pw_hdr_rt_last_name" type="string"></retcol>
+<retcol name="uc_pw_hdr_rt_faxnum" type="string"></retcol> 
+<retcol name="uc_pw_hdr_rt_district" type="string"></retcol> 
+<retcol name="uc_pw_hdr_rt_rgncod" type="string"></retcol> 
+
+<retcol name="uc_pw_hdr_py_typ" type="string"></retcol>
+<retcol name="uc_pw_hdr_uc_crtn_itm_num" type="string"></retcol>
+<retcol name="uc_pw_hdr_st_adr_id" type="string"></retcol>
+<retcol name="uc_pw_hdr_st_adrnam" type="string"></retcol>
+<retcol name="uc_pw_hdr_st_adrln1" type="string"></retcol>
+<retcol name="uc_pw_hdr_st_adrln2" type="string"></retcol>
+<retcol name="uc_pw_hdr_st_adrln3" type="string"></retcol>
+<retcol name="uc_pw_hdr_st_adrcty" type="string"></retcol>
+<retcol name="uc_pw_hdr_st_adrstc" type="string"></retcol>
+<retcol name="uc_pw_hdr_st_adrpsz" type="string"></retcol>
+ 
+<retcol name="uc_pw_hdr_uc_dlv_trn_cd" type="string"></retcol>
+<retcol name="uc_pw_hdr_uc_dlv_trn_name" type="string"></retcol> 
+<retcol name="uc_pw_hdr_uc_dlv_unit_nam" type="string"></retcol>
+
+<retcol name="uc_pw_hdr_st_phnnum" type="string"></retcol>
+<retcol name="uc_pw_hdr_st_attn_tel" type="string"></retcol>
+<retcol name="uc_pw_hdr_traknum" type="string"></retcol>
+<retcol name="uc_pw_hdr_man_weight" type="string"></retcol>
+<retcol name="uc_pw_hdr_uc_cnt_manfst" type="string"></retcol> 
+
+<retcol name="uc_pw_hdr_mstdte" type="string"></retcol>
+<retcol name="uc_pw_hdr_mfstid" type="string"></retcol>
+<retcol name="uc_pw_hdr_mancls" type="string"></retcol>
+<retcol name="uc_pw_hdr_uc_prcl_pkg_id" type="string"></retcol>
+<retcol name="uc_pw_hdr_prcl_cnsgnmnt_id" type="string"></retcol>
+
+
+<retcol name="uc_pw_hdr_weight" type="string"></retcol>
+<retcol name="uc_pw_hdr_carnam" type="string"></retcol>
+<retcol name="uc_pw_hdr_scacod" type="string"></retcol>
+<retcol name="uc_pw_hdr_accnum" type="string"></retcol>
+<retcol name="uc_pw_hdr_car_hazmat_code" type="string"></retcol>
+<retcol name="uc_pw_hdr_car_dimwgt_expr" type="string"></retcol>
+
+
+
+<retcol name="uc_pw_hdr_ret_adrcty" type="string"></retcol>
+<retcol name="uc_pw_hdr_ret_adrpsz" type="string"></retcol>
+<retcol name="uc_pw_hdr_ret_phnnum" type="string"></retcol>
+<retcol name="uc_pw_hdr_stoloc" type="string"></retcol> 
+<retcol name="uc_pw_hdr_ol_deptno" type="string"></retcol>
+<retcol name="uc_pw_hdr_ol_early_dlvdte" type="string"></retcol>
+<retcol name="uc_pw_hdr_ol_early_shpdte" type="string"></retcol>
+<retcol name="uc_pw_hdr_ol_late_dlvdte" type="string"></retcol>
+<retcol name="uc_pw_hdr_ol_late_shpdte" type="string"></retcol>
+
+<retcol name="uc_pw_hdr_sh_early_dlvdte" type="string"></retcol>
+<retcol name="uc_pw_hdr_sh_early_shpdte" type="string"></retcol>
+<retcol name="uc_pw_hdr_sh_late_dlvdte" type="string"></retcol>
+<retcol name="uc_pw_hdr_sh_late_shpdte" type="string"></retcol>
+
+
+<retcol name="uc_pw_hdr_st_attn_name" type="string"></retcol>
+<retcol name="uc_pw_hdr_st_first_name" type="string"></retcol>
+<retcol name="uc_pw_hdr_st_last_name" type="string"></retcol>
+<retcol name="uc_pw_hdr_st_honorific" type="string"></retcol>
+<retcol name="uc_pw_hdr_st_ctry_name" type="string"></retcol>
+<retcol name="uc_pw_hdr_stg_stoloc" type="string"></retcol>
+<retcol name="uc_pw_hdr_dst_mov_zone_cod" type="string"></retcol>
+<retcol name="uc_pw_hdr_alcdte" type="string"></retcol>
+<retcol name="uc_pw_hdr_sh_doc_num" type="string"></retcol>
+<retcol name="uc_pw_hdr_sh_track_num" type="string"></retcol>
+<retcol name="uc_pw_hdr_cm_doc_num" type="string"></retcol>
+<retcol name="uc_pw_hdr_cm_track_num" type="string"></retcol>
+<retcol name="uc_pw_hdr_stop_doc_num" type="string"></retcol>
+<retcol name="uc_pw_hdr_stop_track_num" type="string"></retcol>
+
+<retcol name="uc_pw_hdr_hazmat_flg" type="string"></retcol>
+<retcol name="uc_pw_hdr_wh_adrnam" type="string"></retcol>
+<retcol name="uc_pw_hdr_ytc_case_ctncod" type="string"></retcol>
+<retcol name="uc_pw_hdr_grswgt" type="string"></retcol>
+<retcol name="uc_pw_hdr_netwgt" type="string"></retcol>
+<retcol name="uc_pw_hdr_cas_flg" type="string"></retcol> 
+<retcol name="uc_use_ctncod" type="string">If pckwrk_hdr.ctncod is there use it else uc_pw_hdr_ytc_case_ctncod </retcol>
+
+
+<retcol name="uc_pw_hdr_wh_adrln1" type="string"></retcol>
+<retcol name="uc_pw_hdr_wh_adrln2" type="string"></retcol>
+<retcol name="uc_pw_hdr_wh_adrln3" type="string"></retcol>
+<retcol name="uc_pw_hdr_wh_adrcty" type="string"></retcol>
+<retcol name="uc_pw_hdr_wh_adrstc" type="string"></retcol>
+<retcol name="uc_pw_hdr_wh_adrpsz" type="string"></retcol>
+<retcol name="uc_pw_hdr_wh_ctry_name" type="string"></retcol>
+<retcol name="uc_pw_hdr_wh_first_name" type="string"></retcol>
+<retcol name="uc_pw_hdr_wh_last_name" type="string"></retcol>
+<retcol name="uc_pw_hdr_wh_phnnum" type="string"></retcol>
+<retcol name="uc_pw_hdr_wh_faxnum" type="string"></retcol>
+<retcol name="uc_pw_hdr_wh_attn_tel" type="string"></retcol>
+<retcol name="uc_pw_hdr_wh_email_adr" type="string"></retcol>
+<retcol name="uc_pw_hdr_wh_rgncod" type="string"></retcol> 
+
+<retcol name="uc_pw_hdr_ret_adrnam" type="string"></retcol>
+<retcol name="uc_pw_hdr_ret_adrln1" type="string"></retcol>
+
+<retcol name="uc_pw_hdr_ret_adrln2" type="string"></retcol>
+<retcol name="uc_pw_hdr_ret_adrln3" type="string"></retcol>
+<retcol name="uc_pw_hdr_ret_adrstc" type="string"></retcol>
+<retcol name="uc_pw_hdr_ret_ctry_name" type="string"></retcol>
+<retcol name="uc_pw_hdr_ret_ship_phnnum" type="string"></retcol> 
+<retcol name="uc_pw_hdr_uc_group_code" type="string"></retcol>
+<retcol name="uc_pw_hdr_vc_prtinv_flg" type="string"></retcol>
+<retcol name="uc_pw_hdr_uc_gov_assign_id" type="string"></retcol> 
+
+<retcol name="uc_pw_hdr_uc_ea_vol" type="string"></retcol>
+<retcol name="uc_pw_hdr_uc_ca_vol" type="string"></retcol>
+<retcol name="uc_pw_hdr_uc_pck_untcas" type="string"></retcol>
+<retcol name="uc_pw_hdr_uc_pck_wgt" type="string"></retcol>
+<retcol name="uc_pw_hdr_uc_ca_len" type="string"></retcol> 
+<retcol name="uc_pw_hdr_uc_ca_wid" type="string"></retcol>
+<retcol name="uc_pw_hdr_uc_ca_hgt" type="string"></retcol>
+<retcol name="uc_pw_hdr_uc_untcst" type="string"></retcol>
+ 
+
+<retcol name="uc_pw_hdr_vc_sens_ctncod" type="string">If we have a sensitive box inside, its ctncod</retcol>
+<retcol name="uc_pw_hdr_sens_pck_cnt" type="string">How many sensitive picks do we have</retcol>
+<retcol name="uc_pw_hdr_sens_ctn_cnt" type="string">How many sensitive cartons we have inside</retcol>
+
+
+<retcol name="uc_pw_hdr_single_item_k" type="string">Per call to usr__check_if_single_split_case function.  1 means it is a single item split case</retcol>
+
+
+<retcol name="uc_pw_hdr_any_prtnum" type="string">Within carton, any value</retcol>
+<retcol name="uc_pw_hdr_any_prt_lngdsc" type="string">Within carton, any value</retcol>
+<retcol name="uc_pw_hdr_any_prt_short" type="string">Within carton, any value</retcol>
+<retcol name="uc_pw_hdr_any_prtfam" type="string">Within carton, any value</retcol>
+<retcol name="uc_pw_hdr_has_hazmat_flg" type="string">Within carton, max value.  So if any hazard in carton it will be 1</retcol>
+<retcol name="uc_pw_hdr_cnt_pck" type="string">Within carton, sum value</retcol>
+<retcol name="uc_pw_hdr_cnt_prtnum" type="string">Within carton, distinct count of parts.  The any_prt columns make sense only when this is 1</retcol>
+<retcol name="uc_pw_hdr_tot_pckqty" type="string">Within carton, sum value</retcol>
+<retcol name="uc_pw_hdr_tot_appqty" type="string">Within carton, sum value</retcol>
+
+<retcol name="uc_pw_hdr_haz_un_id" type="string">Within carton, max or sum for hazard</retcol>
+<retcol name="uc_pw_hdr_haz_pg" type="string">Within carton, max or sum for hazard</retcol>
+<retcol name="uc_pw_hdr_haz_hazarddiv1" type="string">Within carton, max or sum for hazard</retcol>
+<retcol name="uc_pw_hdr_haz_hazarddiv2" type="string">Within carton, max or sum for hazard</retcol>
+<retcol name="uc_pw_hdr_haz_hazarddiv3" type="string">Within carton, max or sum for hazard</retcol>
+<retcol name="uc_pw_hdr_haz_hazard_code" type="string">Within carton, max or sum for hazard</retcol>
+<retcol name="uc_pw_hdr_haz_pck_wgt" type="string">Within carton sum of weight of hazard items</retcol>
+<retcol name="uc_pw_hdr_pm_ctncod" type="string">Within carton.  This is ctncod stored at prtmst for YTC</retcol>
+
+
+<retcol name="drop code columns" type="string">Per call to get_drop_code_select_list_for_rules(0).  These have uc_drpcde_ prefix</retcol>
+
+
+get_drop_code_select_list_for_rules
+<retcol name="flex output" type="string">Based on rule passed in, e.g. OUTPUT-SET-LABEL-INV-CONTAINER.  We will show additional columns.  This is when uc_get_add_data_rule_grp_id is passed in with the rule id </retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+
+<seealso cref="list usr pick data"></seealso>
+<seealso cref="list usr pick detail data"></seealso>
+<seealso cref="list usr outer container pick header data"></seealso>
+<seealso cref="list usr pick with outer pick data"></seealso>
+
+</documentation>
+
+
+</command>
+

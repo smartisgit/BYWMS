@@ -1,0 +1,97 @@
+<command>
+<name>ossi html_data_row</name>
+<description>Function to put value in HTML as a row</description>
+
+<argument name="moca_farg1" required="yes" datatype="string">row tag</argument>
+<argument name="moca_farg2" required="no" datatype="string">td attribute to be used for all</argument>
+
+<argument name="moca_farg3" required="no" datatype="string">First value</argument>
+<argument name="moca_farg4" required="no" datatype="string">First value Type</argument>
+<argument name="moca_farg5" required="no" datatype="string">First value TD Attributes</argument>
+
+<argument name="moca_farg6" required="no" datatype="string">First value</argument>
+<argument name="moca_farg7" required="no" datatype="string">First value Type</argument>
+<argument name="moca_farg8" required="no" datatype="string">First value TD Attributes</argument>
+
+
+
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161208 saad.ahmad - 10330 - Generate docymentaion
+ */
+publish data
+where uc_row_tag = @moca_farg1
+and uc_td_attr = @moca_farg2
+/**/
+and val1_val = @moca_farg3
+and val1_typ = @moca_farg4
+and val1_attr = @moca_farg5
+/**/
+and val2_val = @moca_farg6
+and val2_typ = @moca_farg7
+and val2_attr = @moca_farg8
+|
+{
+    {
+        if ( @val1_val is not null )
+        {
+            publish data
+            where show_val = iif ( @val1_typ = 'F', decode ( @val1_val, 1, 'Yes', 'No'), @val1_val )
+            |
+            publish data
+            where val1_str = '<td ' || @val1_attr || '>' || @show_val || '</td>'
+        }
+        |
+        if ( @val2_val is not null )
+        {
+            if ( @val2_typ = 'U' )
+                publish data
+                where show_val = '<a href="' || @val2_val || '" target="_blank">Link</a>'
+            else if ( @val2_typ = 'CODE' )
+                publish data
+                where show_val = '<code>' || @val2_val || '</code>'
+            else
+                publish data
+                where show_val = iif ( @val2_typ = 'F', decode ( @val2_val, 1, 'Yes', 'No'), @val2_val )
+            |
+            publish data
+            where val2_str = '<td ' || @val2_attr || '>' || @show_val || '</td>'
+        }
+        |
+        publish data
+        where ret = @uc_row_tag
+                 || @val1_str
+                 || @val2_str
+                 || '</tr>'
+    }
+}
+    
+]]>
+</local-syntax>
+
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+To put a row of data in HTML
+</p>
+]]>
+</remarks>
+
+<retrows>MOCA Function - So one row is returned</retrows>
+
+<exception value="eOK">The command completed successfully.</exception>
+<exception value="510">If variable was not passed and no default was passed.</exception>
+
+<seealso cref="get session variable"></seealso>
+</documentation>
+
+</command>

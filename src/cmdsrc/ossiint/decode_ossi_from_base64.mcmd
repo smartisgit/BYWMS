@@ -1,0 +1,49 @@
+<command>
+<name>decode ossi from base64</name>
+<description>deocdes the content in base64 format to an interprettable format</description>
+<type>Local Syntax</type>
+
+<argument name="uc_string" required="yes" datatype="base64"></argument>
+<argument name="char_set" required="yes" datatype="string"></argument>
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+publish data 
+where char_set = nvl(@char_set, 'UTF-8')
+|
+[[
+def decoded = uc_string.decodeBase64();
+ret = new String(decoded, char_set);
+[ret:ret]
+]]
+|
+publish data 
+where uc_decoded_string = @ret
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This command converts or rather decodes given base64 content. 
+</p>
+]]>
+</remarks>
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+</documentation>
+
+
+
+</command>

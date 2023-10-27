@@ -1,0 +1,59 @@
+<command>
+<name>get ossi document in base64</name>
+<description>Download the document if needed, then return it in Base64</description>
+<type>Local Syntax</type>
+
+<argument name="uc_doc_download_path" required="no" datatype="string">This is the identifier for upload queue</argument>
+<argument name="uc_doc_upload_q_id" required="yes" datatype="string">This is the identifier for upload queue</argument>
+
+<local-syntax>
+<![CDATA[
+
+/* .jrprint.gz and .jrprint will be converted to .pdf */
+publish data
+  where uc_upload_id = nvl(@uc_upload_id, @uc_doc_upload_q_id)
+    and uc_doc_download_path = nvl(@uc_doc_download_path, @@UC_DOC_Q_DOWNLOAD_PATH )
+    and filename = ossi__replace(@uc_upload_id, '.jrprint.gz', '.pdf')
+|
+/* Convert .rdf to .pdf */
+publish data
+  where filename = ossi__replace(@uc_upload_id, '.rdf', '.pdf')
+|
+publish data
+  where filename = ossi__replace(@filename, '.jrprint', '.pdf')
+|
+publish data
+  where filepath = @uc_doc_download_path || '/' || @filename
+|
+{
+   /* If the user is not forcing a refresh (uc_download_flg), only download if the file does not exist */
+   if (@uc_download_flg is null)
+   {
+      get file info
+        where pathname = @filepath
+      |
+      publish data
+        where uc_download_flg = iif(@size <= 0, 1, 0)
+   }
+   |
+   /* If downloading, the filepath may change due to unzipping a .gz file, so return the new filepath */
+   if (@uc_download_flg = 1)
+   {
+      download ossi document from store
+        where uc_upload_id = @uc_upload_id
+      |
+      publish data
+        where filepath = nvl(@uc_doc_download_pdf_filepath, @uc_doc_download_full_filepath)
+   }
+   |
+   read file
+     where filnam = @filepath
+       and mode = 'B'
+   |
+   encode to base64
+     where bin_data = @data
+}
+
+]]>
+</local-syntax>
+</command>

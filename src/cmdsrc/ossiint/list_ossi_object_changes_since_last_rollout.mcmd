@@ -1,0 +1,103 @@
+<command>
+<name>list ossi object changes since last rollout</name>
+<description>List the buggs in bugzilla</description>
+
+<argument name="uc_this_rollout_name" required="yes" datatype="string"></argument>
+<argument name="uc_compare_to_rollout_name" required="yes" datatype="string">Environment</argument>
+
+<type>Local Syntax</type>
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+{
+   execute ossi bugzilla select
+   where uc_select_stmt = "select * from ossi_rollout where rollout_name = @uc_this_rollout_name"
+   catch(@?)
+   |
+   publish data
+   where uc_this_rollout_name = @uc_this_rollout_name
+   and uc_this_rollout_id = @id
+   and uc_this_rollout_descr = @rollout_description
+   and uc_this_rollout_dt =  to_char(@time_changed,'YYYY-MM-DD HH24:MI:SS')
+   and uc_this_rollout_repository = @repository_name
+   |
+   execute ossi bugzilla select
+   where uc_select_stmt = "select * from ossi_rollout where rollout_name = @uc_compare_to_rollout_name"
+   |
+   filter data 
+   where moca_filter_level = '2'
+   and uc_compare_to_rollout_id = @id
+   and uc_compare_to_rollout_descr = @rollout_description
+   and uc_compare_to_rollout_dt = to_char(@time_changed,'YYYY-MM-DD HH24:MI:SS')
+   and uc_compare_to_rollout_repository = @repository_name
+   |
+   {
+      if ( @uc_this_rollout_name is not null )
+         publish data
+         where uc_where_this = " and ossi_bugs_in_rollout.rollout_name = '" || @uc_this_rollout_name || "'"
+         and uc_from_clause = "ossi_bugs_in_rollout join ossi_bug_ckin_data on ossi_bug_ckin_data.bug_id = ossi_bugs_in_rollout.bug_id"
+      else
+         publish data
+         where uc_where_this = ""
+         and uc_from_clause = "ossi_bug_ckin_data"
+      |
+      execute ossi bugzilla select
+      where uc_select_stmt = " select ossi_bug_ckin_data.ossi_file_path,"
+                          || "        ossi_bug_ckin_data.ossi_seqnum,"
+                          || "        ossi_bug_ckin_data.ossi_rev,"
+                          || "        ossi_bug_ckin_data.ossi_action,"
+                          || "        ossi_bug_ckin_data.ossi_author,"
+                          || "        ossi_bug_ckin_data.ossi_ckin_dt"
+                          || " from " || @uc_from_clause
+                          || " where 1=1"
+                          || @uc_where_this
+                          || " and ossi_bug_ckin_data.ossi_ckin_dt > @uc_compare_to_rollout_dt"
+                          || " order by 1,2,3,4,5"
+      |
+      {
+         /* Add code here to do SVN query and get comment */
+         publish data
+         where uc_vc_comment = ''
+      }
+      |
+      publish data
+      where ossi_file_path = @ossi_file_path
+      and ossi_seqnum = @ossi_seqnum
+      and ossi_rev = @ossi_rev
+      and ossi_action = @ossi_action
+      and ossi_author = @ossi_author
+      and ossi_ckin_dt = @ossi_ckin_dt
+      and uc_vc_comment  = @uc_vc_comment 
+      and uc_this_rollout_name = @uc_this_rollout_name
+      and uc_this_rollout_dt  = @uc_this_rollout_dt 
+      and uc_compare_to_rollout_name = @uc_compare_to_rollout_name
+      and uc_compare_to_rollout_dt  = @uc_compare_to_rollout_dt 
+   }
+}
+
+
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+Get all rollouts
+</remarks>
+
+<retcol name="@*" type="String">See code</retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

@@ -1,0 +1,39 @@
+<command>
+<name>get ossi clause from adhoc filter file</name>
+<description>Get clause from adhoc filter file</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+{
+  read usr csv file 
+    where filename = @@UC_ADHOC_UPLOAD_PATH || '\' || @uc_adhoc_filter_file
+  |
+  execute server command where cmd = 'publish data where ' || @column || ' = @' || @column
+} >> res
+|
+convert column results to string 
+  where res = @res 
+    and colnam = @column
+    and separator = ','
+|
+publish data 
+  where clause = ossi__get_sql_in_from_string(@result_string, @column)
+
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This command is used to get clause from adhoc filter file.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

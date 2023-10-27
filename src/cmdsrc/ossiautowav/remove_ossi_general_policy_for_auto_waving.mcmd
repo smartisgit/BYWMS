@@ -1,0 +1,53 @@
+<command>
+<name>remove ossi general policy for auto waving</name>
+<description>This command will remove the auto wave rule detail</description>
+ 
+<argument name="uc_auto_wave_setting_cd" required="yes"   datatype="string">Autowave setting code</argument>
+<argument name="uc_auto_wave_rule_id" required="yes"   datatype="string">Wave Rule</argument>
+<argument name="srtseq"   required="yes" datatype="integer">Policy Sort Sequence</argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+  remove policy
+   where polcod = 'USR-WAVE-PLANNING'
+     and polvar = decode(@uc_auto_wave_setting_cd, 'CTXT', 'AUTO-WAVE', 'WAVE-RULE-PARAMETER-TABLE')
+     and polval = @uc_auto_wave_rule_id
+     and wh_id_tmpl = '----'
+     and srtseq = @srtseq
+ 
+   
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This will remove the general policy for auto waving.
+</p>
+]]>
+</remarks>
+
+<retrows>0</retrows>
+
+<example>
+<![CDATA[
+<p>
+</p>
+]]>
+
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+<seealso cref="list ossi general policies for auto waving"></seealso>
+<seealso cref="create ossi general policy for auto waving"></seealso>
+<seealso cref="change ossi general policy for auto waving"></seealso>
+
+</documentation>
+
+
+</command>

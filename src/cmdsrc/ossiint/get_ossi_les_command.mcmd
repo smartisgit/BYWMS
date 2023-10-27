@@ -1,0 +1,31 @@
+<command>
+<name>get ossi les command</name>
+<description>Get Les Commands</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+[select cust_lvl,
+        syntax
+   from les_cmd
+  where les_cmd_id = @les_cmd_id
+    and cust_lvl = (select max(cust_lvl) from les_cmd c2 where c2.les_cmd_id = les_cmd.les_cmd_id)
+]
+
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+Find the les_cmd for a given name with highest customization level.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

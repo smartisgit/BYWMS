@@ -1,0 +1,115 @@
+<command>
+<name>release ossi pick for create process</name>
+<description>use the rules to see what needs to be executed to do release.
+HAS TO BE NAMED THIS WAY BECAUSE PICK RELEASE LOOKS FOR CREATE, PRODUCE, OR PROCESS.  Dont include PRODUCE because then CREATE WORK
+parameters in release rule are not passed</description>
+
+ 
+<argument name="wh_id" required="yes" datatype="string">As passed in from pick release process</argument>
+<argument name="wrkref" required="yes" datatype="string">As passed in from pick release process</argument>
+<argument name="lodlvl" required="yes" datatype="string">As passed in from pick release process</argument>
+<argument name="oprcod" required="yes" datatype="string">As passed in from pick release process</argument>
+<argument name="srcloc" required="yes" datatype="string">As passed in from pick release process</argument>
+
+<argument name="list_id" required="yes" datatype="string">As passed in from pick release process</argument>
+
+<argument name="schbat" required="yes" datatype="string">As passed in from pick release process</argument>
+<argument name="uniqby" required="yes" datatype="string">As passed in from pick release process: This is in the argument section of release rule assignment</argument>
+<argument name="wrkpri" required="yes" datatype="string">As passed in from pick release process</argument>
+<argument name="dstloc" required="yes" datatype="string">As passed in from pick release process</argument>
+
+<argument name="uc_lodlvl_list" required="yes" datatype="string">As passed in from pick release process</argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+
+/*
+ * Change Log
+ * Initial Check In
+ * 20200417 mustafa.ahmed - 11104
+ */
+
+publish data
+where uc_i_list_id = @list_id
+and uc_i_wrkref = @wrkref
+and uc_i_oprcod = @oprcod
+and uc_lodlvl_list = ',' || nvl(@uc_lodlvl_list, ossi__polval ( 'USR-PICK-RELEASE', 'RELEASE OSSI PICK FOR CREATE PROCESS',  'LODLVL-LIST', '', 'rtstr1', @wh_id )) || ','
+|
+if ( instr( @uc_lodlvl_list, ','||@lodlvl||',') > 0 )
+{
+   if ( @list_id is null and @wrkref is null )
+      set return status where status = '507' and message = 'One of list_id or wrkref must be passed'
+   ;
+   list ossi pick data
+   catch (-1403,510)
+   |
+   if ( @? = 0 )
+   {
+      /*
+       * This is a special value.  This means oprcod is per rules
+       */
+      if ( @uc_i_oprcod = 'UC_RULE' )
+      {
+          get ossi result by evaluating policy
+          where polcod = 'OSSI-PICK-RELEASE'
+          and polvar = 'RULE-BASED-OPRCOD'
+          catch (-1403,510)
+          |
+          publish data
+          where oprcod = nvl(@r_polval, @uc_i_oprcod )
+      } /* our passed in oprcod is rule - so invoke rules engine */
+      |
+      execute ossi all conditional rules
+      where uc_rule_grp_id = 'OSSI-PICK-RELEASE'
+      and uc_rule_subgrp_id = 'PCK_MTHD-SRCZON-RELEASE_RULE-MAP'
+      and uc_pck_mthd_nam = upper(@pck_mthd_nam )
+      and uc_src_pck_zone_cod = @pck_zone_cod
+      and uc_cache_key = null
+      catch (-1403,510)
+      |
+      filter data
+      where moca_filter_level = 1
+      and oprcod = @oprcod
+   } /* found pick */
+}
+   
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This command can serve as a general purpose release command at area level.  
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+
+
+<retcol name="uc_used_rule_id" type="COMTYP_CHAR">Which rule was actually used</retcol>
+<retcol name="uc_used_main_ord" type="COMTYP_CHAR">Sort sequence of used</retcol>
+<retcol name="uc_executed_cmds" type="COMTYP_CHAR">Commands that were executed</retcol>
+<retcol name="oprcod" type="COMTYP_CHAR">Operation code</retcol>
+
+
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+<seealso cref="get ossi commands for release rule"></seealso>
+
+
+</documentation>
+
+
+</command>

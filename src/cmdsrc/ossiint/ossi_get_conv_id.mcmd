@@ -1,0 +1,36 @@
+<command>
+<name>ossi get_conv_id</name>
+<description>get converted id</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="moca_farg1">id variable name</argument>
+<argument datatype="int" name="moca_farg2">id value</argument>
+
+
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - JWC-2804
+*/
+    [ 
+     select nvl(max(inv_attr_int1), @moca_farg2) conv_id
+       from dlytrn
+      where actcod = 'UC_ID_MAP'
+        and var_nam = @moca_farg1
+        and inv_attr_int2 = @moca_farg2
+    ]
+    |
+    publish data where conv_id = @conv_id
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+</documentation>
+
+</command>

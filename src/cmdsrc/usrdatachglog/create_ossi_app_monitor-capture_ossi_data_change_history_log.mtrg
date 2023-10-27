@@ -1,0 +1,18 @@
+<trigger>
+<name>capture ossi data change history log</name>
+<on-command>create ossi app monitor</on-command>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20200417 mustafa.ahmed - 11105
+ */
+capture ossi data change history log
+where uc_log_table_name  = 'usr_ossi_mon'
+    
+]]>
+</local-syntax>
+<fire-sequence>10000</fire-sequence>
+<enable>yes</enable>
+</trigger>

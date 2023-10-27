@@ -1,0 +1,168 @@
+<command>
+<name>move ossi policy logic value</name>
+<description>Moves this policy up or down by switching places 
+with the nearest policy above or below it</description>
+
+<argument name="up" required="no" datatype="integer">1 means up else down</argument>
+<argument name="uc_rule_grp_id" required="yes" datatype="string"></argument>
+<argument name="uc_rule_subgrp_id" required="yes" datatype="string"></argument>
+<argument name="seqnum" required="yes" datatype="string"></argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+
+publish data
+where to_seqnum = null
+and to_srtseq = null
+|
+[
+select srtseq this_srtseq
+from usr_rule_engine_expr
+where uc_rule_grp_id = @uc_rule_grp_id
+and uc_rule_subgrp_id = @uc_rule_subgrp_id
+and seqnum = @seqnum
+]
+catch (-1403,510)
+|
+if ( @? = 0 )
+{
+    /*
+     * If moving up find the previous row by srtseq
+     */
+    if ( @up = '1' )
+        publish data
+        where srtseq_clause = "srtseq < " || @this_srtseq
+        and order_by_clause = "srtseq desc"
+    else
+        publish data
+        where srtseq_clause = "srtseq > " || @this_srtseq
+        and order_by_clause = "srtseq"
+    |
+    [
+    select x.*
+    from
+    (
+        select seqnum to_seqnum, srtseq to_srtseq
+        from usr_rule_engine_expr
+        where uc_rule_grp_id = @uc_rule_grp_id
+        and uc_rule_subgrp_id = @uc_rule_subgrp_id
+        and @srtseq_clause:raw
+        /*#nobind*/ 
+        and rownum < 999999
+        order by @order_by_clause:raw
+    ) x
+    where rownum < 2
+    ]
+    catch (-1403,510)
+    |
+    if ( @? = 0 )
+    {
+        /*
+         * We are going to change both rows.  the passed in seqnum gets to_srtseq
+         * and to_seqnum gets passed in srtseq
+         */
+        [[
+        moca.executeCommand ( " change ossi rule engine expression" +
+                              " where uc_rule_grp_id = @uc_rule_grp_id" +
+                              " and uc_rule_subgrp_id = @uc_rule_subgrp_id" +
+                              " and seqnum = @seqnum" +
+                              " and srtseq = @to_srtseq" +
+                              " and uc_verify_srtseq = 0",
+                              [uc_rule_grp_id:uc_rule_grp_id,
+                               uc_rule_subgrp_id:uc_rule_subgrp_id,
+                               seqnum:seqnum,
+                               to_srtseq:to_srtseq]
+                             );
+        moca.executeCommand ( " change ossi rule engine expression" +
+                              " where uc_rule_grp_id = @uc_rule_grp_id" +
+                              " and uc_rule_subgrp_id = @uc_rule_subgrp_id" +
+                              " and seqnum = @seqnum" +
+                              " and srtseq = @to_srtseq" +
+                              " and uc_verify_srtseq = 0",
+                              [uc_rule_grp_id:uc_rule_grp_id,
+                               uc_rule_subgrp_id:uc_rule_subgrp_id,
+                               seqnum:to_seqnum,
+                               to_srtseq:this_srtseq]
+                             );
+    
+        ]]
+        ;
+        publish data
+        where uc_move_dir = iif ( @up = '1', 'UP', 'DOWN' )
+    }
+    else
+    {
+        publish data
+        where uc_move_dir = ''
+    }
+    |
+    publish data
+    where uc_rule_grp_id = @uc_rule_grp_id
+    and uc_rule_subgrp_id = @uc_rule_subgrp_id
+    and seqnum = @seqnum
+    and old_srtseq = @this_srtseq
+    and new_srtseq = @to_srtseq
+    and to_seqnum = @to_seqnum
+    and uc_move_dir = @uc_move_dir
+    and srtseq_clause = @srtseq_clause
+    and order_by_clause = @order_by_clause
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This is used to move a row in grid up or down
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+<retcol name="uc_rule_grp_id" type="string"></retcol>
+<retcol name="uc_rule_subgrp_id" type="string"></retcol>
+<retcol name="seqnum" type="integer"></retcol>
+<retcol name="old_srtseq" type="integer">the sort sequence of the row originally</retcol>
+<retcol name="new_srtseq" type="integer">New sort sequence of the row</retcol>
+<retcol name="to_seqnum" type="integer">The seqnum of the row from where we swapped the srtseq</retcol>
+<retcol name="uc_move_dir" type="string">move direction.  UP, DOWN or null.  Null means no move done</retcol>
+
+<retcol name="srtseq_clause" type="string"></retcol>
+<retcol name="order_by_clause" type="string"></retcol>
+
+
+<exception value="eOK">The command completed successfully.</exception>
+
+<seealso cref="change ossi rule engine expression"></seealso>
+
+<example>
+move ossi policy logic value 
+where uc_rule_grp_id = 'USR-ORDER-DESTINATION' 
+and uc_rule_subgrp_id = 'RULE-BASED-SELECTION' 
+and uc_rule_value = 'MZSSTG' 
+and srtseq = '10000' 
+and seqnum = '3' 
+and uc_rule_expr = '1=1' 
+and uc_rule_comment = 'This is global default - but not intended to be used in real environments' 
+and up = '1'
+
+or to move down
+
+move ossi policy logic value 
+where uc_rule_grp_id = '' 
+and uc_rule_subgrp_id = 'USR-ORDER-DESTINATION' 
+and uc_rule_value = '@uc_drpcde_dst_mov_zone_id' 
+and srtseq = '1010' 
+and seqnum = '2' 
+and uc_rule_expr = '@uc_drpcde_dst_mov_zone_id is not null' 
+and uc_rule_comment = 'Set destination move zone id to the value provided by drop code.  That is default'
+</example>
+</documentation>
+
+
+</command>

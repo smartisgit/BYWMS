@@ -1,0 +1,144 @@
+<command>
+<name>list ossi job executions</name>
+<description>list the job executions</description>
+
+<argument name="uc_ossi_job_id" required="no" datatype="String"></argument>
+<argument name="uc_max_rows" required="no" datatype="String"></argument>
+<argument name="uc_ord_dir" required="no" datatype="String"></argument>
+<argument name="uc_src_table" required="no" datatype="String"></argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ * Muhammad.Haris - 11125
+ */
+ 
+publish data
+where uc_max_rows = int(nvl(@uc_max_rows, '500'))
+  and uc_ossi_job_id = @-uc_ossi_job_id
+  and uc_src_table = nvl(@uc_src_table, 'usr_ossi_job_log' ) 
+|
+{
+   if ( @uc_ossi_job_id like 'JOB-EXEC-MANAGER-%' )
+      publish data
+      where uc_job_where = "uc_ossi_job_id = 'JOB-EXEC-MANAGER' and uc_ossi_data = '" || substr(@uc_ossi_job_id,18) || "'"
+   else if ( @uc_ossi_job_id is null )
+      publish data
+      where uc_job_where = "1=1"
+   else
+      publish data
+      where uc_job_where = "uc_ossi_job_id = '" || @uc_ossi_job_id || "'"
+   |
+   if ( @uc_ossi_job_id is null )
+      hide stack variable where name = 'uc_ossi_job_id'
+   |
+   [
+   select x.*
+   from
+   (
+      select y.*
+      from
+      (
+         /*#nobind*/
+         select ltrim(to_char(uc_ossi_job_seq)) uc_ossi_job_seq,
+                uc_ossi_job_id,
+                uc_ossi_data,
+                uc_ossi_who,
+                uc_ossi_start_dt,
+                uc_ossi_end_dt,
+                (uc_ossi_end_ts - uc_ossi_start_ts)/1000 uc_ossi_dur,
+                (
+                    select count(*)
+                    from usr_ossi_job_log jl2
+                    where jl2.uc_ossi_job_seq = usr_ossi_job_log.uc_ossi_job_seq
+                ) uc_cnt_job_exec,
+                uc_ossi_err_code,
+                uc_ossi_err_descr,
+                nvl(@uc_ord_dir, 'A' ) uc_ord_dir,
+                to_char(uc_ossi_start_dt,'YYYY-MM-DD HH24:MI:SS') uc_ossi_start_dt_str,
+                @uc_src_table uc_src_table             
+         /*#bind*/
+         from usr_ossi_job_log
+         where 1=1
+           and @uc_job_where:raw
+           and uc_ossi_module_seq = 0
+           and uc_ossi_action_seq = 0
+           and @uc_src_table = 'usr_ossi_job_log'
+         union all
+         /*#nobind*/
+         select ltrim(to_char(job_definition_exec.start_dte,'YYYYMMDDHH24MISS')) uc_ossi_job_seq,
+                job_id uc_ossi_job_id,
+                null uc_ossi_data,
+                node_url uc_ossi_who,
+                start_dte uc_ossi_start_dt,
+                end_dte uc_ossi_end_dt,
+                moca_util.date_diff_days(start_dte,end_dte)*24*3600 uc_ossi_dur,
+                null,
+                status uc_ossi_err_code,
+                message uc_ossi_err_descr,
+                '' uc_ord_dir,
+                to_char(start_dte,'YYYY-MM-DD HH24:MI:SS') uc_ossi_start_dt_str,
+                @uc_src_table uc_src_table
+         /*#bind*/
+         from job_definition_exec
+         where 1=1
+           and not exists (
+                             select 1
+                             from usr_ossi_job_log
+                             where usr_ossi_job_log.uc_ossi_job_id =job_definition_exec.job_id
+                          )
+           and @+job_id^uc_ossi_job_id
+           and @uc_src_table = 'job_definition_exec'
+      ) y
+      order by to_number(uc_ossi_job_seq) desc
+      OFFSET 0 ROWS FETCH NEXT 1000000 ROWS ONLY
+   ) x
+   where @*
+     and (rownum < @uc_max_rows or @uc_max_rows <= 0 )
+   ]
+}
+
+
+]]>
+</local-syntax>
+
+
+<documentation>
+
+<remarks>
+	<![CDATA[
+	<p>
+	This command reports all executions of a job
+	job first.
+	</p>
+	]]>
+</remarks>
+
+<retrows>n</retrows>
+
+<retcol name="uc_ossi_job_seq" type="COMTYP_INT"></retcol>
+<retcol name="uc_ossi_job_id" type="COMTYP_STRING"></retcol>
+<retcol name="uc_ossi_data" type="COMTYP_STRING"></retcol>
+<retcol name="uc_ossi_who" type="COMTYP_STRING"></retcol>
+<retcol name="uc_ossi_start_dt" type="COMTYP_STRING"></retcol>
+<retcol name="uc_ossi_end_dt" type="COMTYP_STRING"></retcol>
+<retcol name="uc_ossi_dur" type="COMTYP_FLOAT">Duration in seconds</retcol>
+<retcol name="uc_ossi_err_code" type="COMTYP_INT">Error Code, 0 means success </retcol>
+<retcol name="uc_ossi_err_descr" type="COMTYP_INT">Error Code, 0 means success </retcol>
+<retcol name="uc_src_table" type="COMTYP_INT">Error Code, 0 means success </retcol>
+
+
+<exception value="eOK">The command completed successfully.</exception>
+<exception value="510">If variable was not passed and no default was passed.</exception>
+
+<seealso cref="list usr job log"></seealso>
+<seealso cref="list ossi job repository"></seealso>
+
+
+</documentation>
+
+</command>

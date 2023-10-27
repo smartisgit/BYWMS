@@ -1,0 +1,89 @@
+<trigger>
+<name>execute usr conditional commands</name>
+<on-command>register usr shipment fully released</on-command>
+<fire-sequence>19000</fire-sequence>
+ 
+<local-syntax>
+<![CDATA[
+
+if ( @ship_id is not null and @wh_id is not null and @uc_reldte is not null )
+{
+    list usr shipment data for rule engine
+    catch (-1403,510)
+    | 
+    if ( @? = 0 )
+    {
+        execute ossi all conditional rules
+        where uc_rule_grp_id = 'OSSI-SHIPMENT-RELEASE'
+        and uc_rule_subgrp_id = 'CARCOD-DSTZON-RELEASE_RULE-MAP'
+        and uc_cache_key= null
+        catch (-1403,510)
+        ;
+       /*
+        * Also execute the rules for orders within this shipment
+        */
+        list usr orders in set
+        where schbat = null
+        and ship_id = @ship_id
+        and ordnum = @ordnum
+        and client_id = @client_id
+        catch (-1403,510)
+        |
+        if ( @? = 0 )
+        {
+            list usr elements for batch printing
+            where uc_data_typ_cd = 'ORD'
+            and schbat = null
+            catch (-1403,510)
+            |
+            {
+                /* 
+                 * This is firing for all orders in the releaed shipment BEFORE doing the cases
+                 */
+                execute ossi all conditional rules
+                where uc_rule_grp_id = 'OSSI-SHPORD-RELEASE'
+                and uc_rule_subgrp_id = 'ORDTYP-DSTZON-RELEASE_RULE-MAP' 
+                and uc_cache_key= null
+                catch (-1403,510)
+                ;
+                /*
+                 * This is going to list all case picks for that shipment and that order
+                 */
+                list usr elements for batch printing
+                where uc_data_typ_cd = 'CASPCK'
+                and ship_id = @ship_id
+                and ordnum = @ordnum
+                catch (-1403,510)
+                |
+                if ( @? = 0 )
+                {
+                    execute ossi all conditional rules
+                    where uc_rule_grp_id = 'OSSI-SHPORDCAS-RELEASE'
+                    and uc_rule_subgrp_id = 'ORDTYP-DSTZON-RELEASE_RULE-MAP'
+                    and uc_cache_key= null
+                    catch (-1403,510)
+                }
+                ;
+                /*
+                 * Some order level paperwork may need to print AFTER case pick level paperwork
+                 */
+                execute ossi all conditional rules
+                where uc_rule_grp_id = 'OSSI-SHPORDAFTCAS-RELEASE'
+                and uc_rule_subgrp_id = 'ORDTYP-DSTZON-RELEASE_RULE-MAP'
+                and uc_cache_key= null
+                catch (-1403,510)
+            }
+        } /* orders in set */
+    } /* shipments */
+} /* block */
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<seealso cref="register usr shipment fully released"></seealso>
+
+</documentation>
+
+</trigger>

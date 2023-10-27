@@ -1,0 +1,186 @@
+<command>
+<name>perform usr inline pick release</name>
+<description>Perform an inline pick release - so that no commit is done</description>
+ 
+<argument name="wh_id" required="yes" datatype="string"></argument>
+<argument name="schbat" required="yes" datatype="string"></argument>
+<argument name="ship_id" required="yes" datatype="string"></argument>
+
+<argument name="uc_do_order_release" required="yes" datatype="string"></argument>
+<argument name="uc_do_shipment_release" required="yes" datatype="string"></argument>
+<argument name="uc_do_wave_release" required="yes" datatype="string"></argument>
+<argument name="uc_reset_oprcod_on_picks" required="yes" datatype="string"></argument>
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+publish data
+where comflg = 0
+and uc_do_order_release = nvl(@uc_do_order_release, 1 )
+and uc_do_shipment_release = nvl(@uc_do_shipment_release, 1 )
+and uc_do_wave_release = nvl(@uc_do_wave_release, 1 )
+and uc_reset_oprcod_on_picks = nvl(@uc_reset_oprcod_on_picks, 1 )
+and uc_complete_tran_on_complete = 0
+|
+if ( @ship_id is null ) hide stack variable where name = 'ship_id'
+|
+if ( @schbat is null ) hide stack variable where name = 'schbat'
+|
+{
+    if ( @ship_id is null and @schbat is not null )
+        [
+        select distinct wh_id, ship_id
+        from pckwrk_view
+        where schbat = @schbat
+        order by 1,2
+        ]
+        catch (-1403,510)
+    |
+    if (@? = 0  and @ship_id is not null )
+    {
+        [[
+        moca.executeCommand ( "process pick release where wh_id = @wh_id and ship_id = @ship_id and comflg = 0 catch (-1403,510)",
+                              [wh_id:wh_id, ship_id:ship_id] );
+        ]]
+        ;
+        if ( @uc_reset_oprcod_on_picks = 1 )
+            reset usr oprcod on picks
+            catch (-1403,510)
+    }
+    ;
+    {
+        [
+        select distinct list_id
+        from pckwrk_view
+        where @+schbat
+        and @+ship_id
+        and @+wh_id
+        and list_id is not null
+        ]
+        catch (-1403,510)
+        |
+        if ( @? = 0 and @list_id )
+        {
+            process pick list release
+            where comflg = 0
+            catch (-1403,510)
+        }
+    }
+    ;
+    if ( @uc_do_order_release = 1 )
+    {
+        [
+        select distinct client_id, wh_id, ordnum
+        from shipment_line
+        where @+schbat
+        and @+ship_id
+        and linsts not in ( 'B', 'C' )
+        order by 1,2,3
+        ]
+        catch (-1403,510)
+        |
+        if ( @? = 0 )
+        {
+            list usr orders for full release registration
+            where uc_show_all_data = 0
+            catch (-1403,510)
+            |
+            if ( @? = 0 and @uc_reg_oper_cd = 'R' )
+            {
+                register usr one order as released fully
+            }
+        }
+    } /* do order release */
+    ;
+    if ( @uc_do_shipment_release = 1 )
+    {
+        [
+        select distinct ship_id, wh_id
+        from shipment_line
+        where @+schbat
+        and @+ship_id
+        and linsts not in ( 'B', 'C' )
+        order by 1,2
+        ]
+        catch (-1403,510)
+        |
+        if ( @? = 0 )
+        {
+            list usr shipments for full release registration
+            where uc_show_all_data = 0
+            catch (-1403,510)
+            |
+            if ( @? = 0 and @uc_reg_oper_cd = 'R' )
+            {
+                register usr one shipment as released fully
+            }
+        }
+    }
+    ;
+    if ( @uc_do_wave_release = 1 )
+    {
+        list usr waves for full release registration
+        where uc_show_all_data  = 0
+        catch (-1403,510)
+        |
+        if ( @? = 0 and @uc_reg_oper_cd = 'R' )
+        {
+            register usr wave fully released
+        }
+    }
+    ;
+    publish data
+    where wh_id = @wh_id
+    and schbat = @schbat
+    and ship_id = @ship_id
+    and uc_do_order_release = @uc_do_order_release 
+    and uc_do_shipment_release = @uc_do_shipment_release
+    and uc_do_wave_release = @uc_do_wave_release
+}
+
+   
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This component is designed to be called from within a transaction to do pick release for a wave of a shipment
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+<retcol name="wh_id" type="COMTYP_CHAR"></retcol>
+<retcol name="schbat" type="COMTYP_CHAR"></retcol>
+<retcol name="ship_id" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_do_order_release" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_do_shipment_release" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_do_wave_release" type="COMTYP_CHAR"></retcol>
+
+
+<example>
+<![CDATA[
+<p>
+process usr inline pick release
+where schbat = <>
+</p>
+]]>
+
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+
+<seealso cref="perform ossi all pick release tasks"></seealso>
+
+</documentation>
+
+
+</command>

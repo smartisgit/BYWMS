@@ -1,0 +1,71 @@
+<command>
+<name>change stop</name>
+<description>Override core to pass in registeration status of P</description>
+
+<argument name="@*" required="yes" datatype="string">Data from list command is assumed to be on stack</argument>
+
+<argument name="uc_inhibit_change_hook" required="yes" datatype="string">if we pass this as '1' then all change hook logic is bypassed
+useful in testing and assessing overhead</argument>
+
+
+
+
+<type>Local Syntax</type>
+
+<local-syntax>
+<![CDATA[
+
+if ( @uc_inhibit_change_hook = '1' )
+    ^change stop where @*
+else
+{
+    process ossi pre tasks for crud action using rules
+    where uc_transaction_action = 'C'
+    and table_name = 'stop'
+    and uc_smart_reghook_data_set = ''
+    and uc_rule_grp_id = null
+    and uc_rule_subgrp_id = null
+    and uc_rule_grp_id_set= null
+    and uc_set_default_mode = null
+    and uc_column_prefix_old = null
+    |
+    ^change stop where @*
+    >> res_chg
+    |
+    combine ossi columns from multiple results
+    where uc_cmb_res_cnt = 2
+    and uc_cmb_res1 = @uc_res_old
+    and uc_cmb_res2 = @res_chg
+    |
+    filter data
+    where moca_filter_level = 1
+    and uc_transaction_action = @uc_transaction_action
+}
+
+  
+]]>
+
+</local-syntax>
+
+<documentation>
+
+<remarks>
+<![CDATA[
+  <p>
+   This component calls the change and publishes old values that we are interested in
+  </p>
+]]>
+</remarks>
+
+<retcol name="@*" type="(varies according to field type)">All order columns</retcol>
+<retcol name="uc_old_@*" type="(varies according to field type)">All old values</retcol>
+<retcol name="uc_transaction_action*" type="String">Action done</retcol>
+
+
+<exception value="eOK">Normal successful completion</exception>
+
+
+<seealso cref="process ossi pre tasks for crud action using rules"></seealso>
+
+</documentation>
+</command>

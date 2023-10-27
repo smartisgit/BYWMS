@@ -1,0 +1,36 @@
+<command>
+<name>remove policy</name>
+<description>Removes policy</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ */
+{
+  {
+    check usr poldat exclusion 
+      catch (-1403,510)
+    |
+    if (@? = 0)
+    process usr issue
+      where uc_table_name = 'POLDAT'
+        and uc_action = 'REMOVE'
+  }      
+  ;
+  ^remove policy
+}
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This command remove policies.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

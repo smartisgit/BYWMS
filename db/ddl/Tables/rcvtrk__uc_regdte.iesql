@@ -1,0 +1,26 @@
+#use $DCSDIR/include
+#include <dcsddl.h>
+#include <dcscolwid.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+
+#use $SALDIR/include
+#include <salcolwid.h>
+
+mset command on
+[
+ALTER_TABLE_TABLE_INFO(rcvtrk)
+ALTER_TABLE_ADD_COLUMN_START(uc_regdte)
+      DATE_TY
+ALTER_TABLE_ADD_COLUMN_END
+] catch (-2705,-1430 )
+RUN_DDL
+
+create db column comment
+where table_name   = 'rcvtrk'
+and column_name    = 'uc_regdte'
+and column_comment = 'When data is created, it is null.  The a job registers as created and calls hooks for it'
+RUN_DDL
+
+
+mset command off

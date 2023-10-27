@@ -1,0 +1,20 @@
+<trigger>
+<name>process usr issue</name>
+<on-command>create rf terminal</on-command>
+<local-syntax>
+<![CDATA[
+process usr issue
+  where uc_table_name = 'RF_TERM_MST'
+    and uc_action = 'ADD'
+]]></local-syntax>
+<fire-sequence>10000</fire-sequence>
+<documentation>
+
+<remarks>
+This trigger process issue for creating rf terminal.
+</remarks>
+
+<seealso cref="process usr issue"></seealso>
+
+</documentation>
+</trigger>

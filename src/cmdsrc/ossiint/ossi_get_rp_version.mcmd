@@ -1,0 +1,73 @@
+<command>
+<name>ossi get_rp_version</name>
+<description>
+FUNCTION:  Get the RP version
+</description>
+
+<argument name="moca_farg1" required="no" datatype="string">List of name-value pairs</argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+publish data
+where uc_normalize = nvl(@moca_farg1,'0')
+|
+{
+   {
+      list library versions
+      |
+      if ( @product = 'moca' ) 
+         filter data where moca_filter_level = 1
+   }
+   >> res
+   |
+   publish top rows 
+   where res = @res
+   and rows = 1
+   |
+   if ( @uc_normalize = '0' )
+      publish data where version = @version
+   else
+   {
+      publish data
+      where n_version = ossi__get_fld_from_list ( @version, 1, '\.' )
+                     || '.'
+                     || ossi__get_fld_from_list ( @version, 2, '\.' )
+                     || '.'
+                     || to_char ( ossi__get_fld_from_list ( @version, 3, '\.' ), '0999')
+   }
+}
+
+
+]]>
+</local-syntax>
+
+
+<documentation>
+
+
+<remarks>
+This will return the RP version so that we can easily write code when we need to compare versions.
+</remarks>
+
+<retcol name="ret" type="string">Value of the parameter</retcol>
+
+<retrows>One or zero rows are returned</retrows>
+
+<example>
+publish data where x=ossi_value_from_list('name1=val1;name2=val2','name2')
+
+</example>
+<exception value="eOK">Normal successful completion</exception>
+
+<seealso cref="ossi parse name value list"></seealso>
+
+</documentation>
+</command>

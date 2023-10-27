@@ -1,0 +1,85 @@
+<command>
+<name>ossi value_in_other_mu</name>
+<description>
+Convert the value to another MU
+</description>
+<type>Local Syntax</type>
+
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+publish data
+where value        = @moca_farg1
+and   mu           = @moca_farg2
+and   host_uom_cod = @moca_farg3
+and   round_at     = iif ( @moca_farg4#onstack and @moca_farg4 is not null,@moca_farg4, -1)
+|
+if (@value < 0)
+{
+  publish data where ret = null
+}
+else
+{
+   if ( @mu is null )
+      hide stack variable where name = 'mu'
+   |
+   if ( @host_uom_cod is null )
+      hide stack variable where name = 'host_uom_cod'
+   |
+   [
+   select cf_numerator, cf_denominator
+   from   mu_mst
+   where  ena_flg = 1
+   and    @+mu
+   and    @+host_uom_cod
+   ]
+   catch (-1403,510)
+   |
+   if (@? != 0 )
+      set return status
+      where status       = ossi__e ( 'eUSR_MU_NOT_PASSED_FOR_CONV' )
+      and   mu           = nvl ( @mu, '*Not Passed*' )
+      and   host_uom_cod = nvl ( @host_uom_cod, '*Not Passed*' )
+   else
+   {
+      publish data
+      where val = @value * (@cf_denominator / @cf_numerator)
+      |
+      if ( @round_at >= 0 )
+      {
+         publish data
+         where ret = ossi__round ( @val, @round_at )
+      }
+      else
+         publish data where ret = @val
+   }
+}
+
+]]>
+
+</local-syntax>
+
+<documentation>
+
+
+<remarks>
+<![CDATA[
+Convert value to DB unit of measure
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+<example>
+??
+</example>
+
+<retcol name="ret" type="float">Number of miliseconds since midnight</retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+</documentation>
+</command>

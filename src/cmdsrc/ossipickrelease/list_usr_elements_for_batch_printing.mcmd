@@ -1,0 +1,457 @@
+<command>
+<name>list usr elements for batch printing</name>
+<description>This component will return the elenements within a set for batch printing.  Our present use case is to see what we want to print from a wave</description>
+ 
+
+<argument name="wh_id" required="yes" datatype="string"></argument>
+<argument name="schbat" required="yes" datatype="string"></argument>
+<argument name="ship_id" required="yes" datatype="string"></argument>
+<argument name="ordnum" required="yes" datatype="string"></argument>
+<argument name="uc_data_typ_cd" required="yes" datatype="string">ORD means we get order level stuff.  CASPCK for S level picks</argument>
+<argument name="uc_area_lbl_prtadr" required="yes" datatype="string">Pass in ---- to look for null values</argument>
+<argument name="uc_area_prtadr" required="yes" datatype="string">Pass in ---- to look for null values</argument>
+
+
+<argument name="uc_ord_lodlvl_list" required="yes" datatype="string">First part of query: What load levels to filter.  Default is 'S'</argument>
+<argument name="uc_ord_wrktyp_list" required="yes" datatype="string">First part of query: What work types to filter for.  Default is 'K'</argument>
+
+<argument name="uc_ord_first_wrkref_mthd" required="yes" datatype="string">
+What determines the first pckwrk to show in first part of query.  Can pass in
+min_wrkref.  That means whateevrr is the first wrkref.  This is default
+cur_cas.  That means cur_cas of 1
+</argument>
+
+<argument name="uc_caspck_first_wrkref_mthd" required="yes" datatype="string">
+How do we detremine that the particular wrkref being returned in the second part of the query is the first wrkref.
+min_wrkref.  If it is the first in terms of simply getting min from ord
+cur_cas.  That means that if cur_cas is 1
+</argument>
+
+<argument name="uc_caspck_lodlvl_list" required="yes" datatype="string">Second part of query: What load levels to filter.  Default is 'S'</argument>
+<argument name="uc_caspck_wrktyp_list" required="yes" datatype="string">Second part of query: What work types to filter for.  Default is 'K','P'</argument>
+
+<argument name="uc_filter_pcksts_list" required="yes" datatype="string">Filter for this pcksts_list.  Default 'R'</argument>
+
+
+<argument name="select_column_list" required="yes" datatype="string"></argument>
+<argument name="order_by_list" required="yes" datatype="string"></argument>
+
+
+<argument name="uc_use_rpt_printer" required="yes" datatype="string">Return what is passed in</argument>
+<argument name="uc_use_label_printer" required="yes" datatype="string">Return what is passed in</argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+
+publish data
+where uc_drpcde_clause = usr__get_drop_code_select_list_for_rules(1)
+|
+publish data
+where uc_default_select_column_list = "ss.*, ord.ordtyp, cardtl.cartyp,carhdr.*"
+                                   || ",loc_typ.loc_typ, loc_typ.uc_area_proc_cd, loc_typ.uc_enable_area_for_rpt_flg, loc_typ.uc_force_status_change_trx_flg,loc_typ.uc_inhibit_rf_attach_flg, "
+                                   || @uc_drpcde_clause
+|                                                                      
+publish data
+where select_column_list  = nvl(@select_column_list, @uc_default_select_column_list )
+and uc_ord_lodlvl_list    = nvl(@uc_ord_lodlvl_list, "'S'")
+and uc_ord_wrktyp_list    = nvl(@uc_ord_wrktyp_list, "'K'" )
+and uc_caspck_lodlvl_list = nvl(@uc_caspck_lodlvl_list, "'S'")
+and uc_caspck_wrktyp_list = nvl(@uc_caspck_wrktyp_list, "'K','P'")
+and uc_ord_first_wrkref_mthd = nvl(@uc_ord_first_wrkref_mthd, 'min_wrkref' )
+and uc_caspck_first_wrkref_mthd = nvl(@uc_caspck_first_wrkref_mthd, 'min_wrkref')
+and uc_filter_pcksts_list = nvl(@uc_filter_pcksts_list, "'R'")
+|
+/*
+ * Setup a reasonable order by in all cases for defaulting.  if distinct is passed in, then just a dummy order by
+ * Ideally the caller should pass in a suitable order by in that case
+ */
+if ( @select_column_list like '%distinct%' )
+    publish data
+    where order_by_list = nvl(@order_by_list, "1" )
+else
+{ 
+    /*
+     * In both cases, default order by should show our first case first in the result set
+     */
+    if ( @uc_caspck_first_wrkref_mthd = 'cur_cas' )
+        publish data
+        where order_by_list = nvl(@order_by_list, "uc_data_typ_cd desc, ship_id, ord.ordnum, cur_cas, wrkref" )
+    else
+        publish data
+        where order_by_list = nvl(@order_by_list, "uc_data_typ_cd desc, ship_id, ord.ordnum, wrkref" )
+}
+|
+publish data
+where uc_my_rownum_sess_var = 'list_usr_elements_for_batch_printing_rownum'
+|
+/* 
+ * Setup the column that will indicate that it is the first in set so that we can easily utilize that output in rules engine
+ * It is significant only when it is CASPCK resultset.
+ * based on the method we are setting the case statement.
+ */
+if ( @select_column_list like '%distinct%' )
+    publish data
+    where uc_is_first_wrkref_expr = "null"
+else if ( @uc_caspck_first_wrkref_mthd = 'min_wrkref' )
+    publish data
+    where uc_is_first_wrkref_expr = "case when uc_data_typ_cd='CASPCK' and wrkref = uc_min_ord_wrkref then 1 else 0 end"
+else 
+    publish data
+    where uc_is_first_wrkref_expr = "case when uc_data_typ_cd='CASPCK' and cur_cas = 1 then 1 else 0 end"
+|
+if ( @schbat is null ) hide stack variable where name = 'schbat'
+|
+if ( @ship_id is null ) hide stack variable where name = 'ship_id'
+|
+if ( @ordnum is null ) hide stack variable where name = 'ordnum'
+|
+if ( @uc_data_typ_cd is null ) hide stack variable where name = 'uc_data_typ_cd'
+|
+if ( @uc_area_lbl_prtadr is null ) hide stack variable where name = 'uc_area_lbl_prtadr'
+|
+if ( @uc_area_prtadr is null ) hide stack variable where name = 'uc_area_prtadr'
+|
+{
+    save session variable where name = @uc_my_rownum_sess_var and value = '0'
+    ;
+    [
+    select @select_column_list:raw,
+           @uc_is_first_wrkref_expr:raw uc_first_pick_flg
+    from
+    (
+        select 'ORD' uc_data_typ_cd,
+               shipment_line.wh_id,
+               pckbat.schbat,
+               shipment_line.ship_id,
+               shipment_line.client_id,
+               shipment_line.ordnum, 
+               shipment.carcod uc_shp_carcod,
+               shipment.srvlvl uc_shp_srvlvl,
+               pckwrk_hdr.wrkref,
+               pckwrk_hdr.wrktyp,
+               pckwrk_hdr.lodlvl,
+               pckwrk_hdr.srcloc,
+               locmst.loc_typ_id uc_src_loc_typ_id,
+               pckwrk_hdr.srcare,
+               pckwrk_hdr.ctncod,
+               pckwrk_hdr.vc_capnum,
+               pckwrk_dtl.cur_cas,
+               pckwrk_dtl.tot_cas_cnt,
+               pck_zone.pck_zone_cod,
+               nvl(pck_zone.uc_area_lbl_prtadr,'----') uc_area_lbl_prtadr,
+               nvl(pck_zone.uc_area_prtadr,'----') uc_area_prtadr,
+               pckwrk_hdr.list_id,
+               pckwrk_hdr.list_seqnum,
+               nvl(pckwrk_hdr.ctnnum,pckwrk_dtl.subnum) ctnnum ,
+               pckwrk_dtl.subucc,
+               pckwrk_hdr.wrkref uc_min_ord_wrkref,
+               pckwrk_hdr.pcksts,
+               sum(pckwrk_dtl.pckqty) pckqty,
+               max(pckwrk_dtl.dst_mov_zone_id) uc_dst_mov_zone_id,
+               max(mov_zone_dst.mov_zone_cod) uc_dst_mov_zone_cod,
+               max(pckwrk_dtl.dstloc) dstloc,
+               manfst.crtnid uc_manfst_crtnid
+        from pckbat
+             /*#nobind*/
+             join shipment_line 
+                 on shipment_line.schbat = pckbat.schbat 
+                 and shipment_line.linsts not in ( 'B', 'C' )
+                 and (shipment_line.inpqty+shipment_line.stgqty) > 0 /* Only find allocated lines */
+             join shipment on shipment.ship_id = shipment_line.ship_id
+             /*
+              * This subquery finds the first wrkref to use for above join
+              */
+             left outer join
+             (
+                 select pckwrk_dtl.wh_id,
+                        pckwrk_dtl.client_id,
+                        pckwrk_dtl.ordnum,
+                        min
+                        (
+                            case
+                                when @uc_ord_first_wrkref_mthd = 'min_wrkref' then pckwrk_dtl.wrkref
+                                else decode ( pckwrk_dtl.cur_cas, 1, pckwrk_dtl.wrkref, null )
+                            end
+                        ) wrkref
+                 from pckwrk_dtl
+                      join pckwrk_hdr on pckwrk_hdr.wrkref = pckwrk_dtl.wrkref
+                 where 1=1
+                 and pckwrk_hdr.lodlvl in ( @uc_ord_lodlvl_list:raw )
+                 and pckwrk_hdr.wrktyp in ( @uc_ord_wrktyp_list:raw )
+                 and pckwrk_hdr.pcksts in ( @uc_filter_pcksts_list:raw )
+                 and ( pckwrk_hdr.ctnnum is null or pckwrk_hdr.wrktyp = 'K' )
+                 group by pckwrk_dtl.wh_id,
+                          pckwrk_dtl.client_id,
+                          pckwrk_dtl.ordnum
+             ) first_pckwrk
+                 on first_pckwrk.client_id = shipment_line.client_id
+                 and first_pckwrk.wh_id= shipment_line.wh_id
+                 and first_pckwrk.ordnum = shipment_line.ordnum
+             /*#bind*/
+             left outer join pckwrk_hdr on pckwrk_hdr.wrkref = first_pckwrk.wrkref
+             left outer join pckwrk_dtl on pckwrk_dtl.wrkref = pckwrk_hdr.wrkref
+             left outer join mov_zone mov_zone_dst on mov_zone_dst.mov_zone_id = pckwrk_dtl.dst_mov_zone_id
+             left outer join locmst on locmst.wh_id = pckwrk_hdr.wh_id and locmst.stoloc = pckwrk_hdr.srcloc
+             left outer join pck_zone on pck_zone.wh_id = locmst.wh_id and pck_zone.pck_zone_id = locmst.pck_zone_id
+             left outer join manfst on pckwrk_dtl.subucc = manfst.subnum and pckwrk_dtl.wh_id = manfst.wh_id
+        where @+pckbat.schbat
+        and @+shipment_line.ship_id
+        and @+shipment_line.ordnum
+        and shipment_line.linsts != 'B'
+        group by
+               shipment_line.wh_id,
+               pckbat.schbat,
+               shipment_line.ship_id,
+               shipment_line.client_id,
+               shipment_line.ordnum,
+               shipment.carcod,
+               shipment.srvlvl,
+               pckwrk_hdr.wrkref,
+               pckwrk_hdr.wrktyp,
+               pckwrk_hdr.lodlvl,
+               pckwrk_hdr.srcloc,
+               locmst.loc_typ_id,
+               pckwrk_hdr.srcare,
+               pckwrk_hdr.ctncod,
+               pckwrk_hdr.vc_capnum,
+               pckwrk_dtl.cur_cas,
+               pckwrk_dtl.tot_cas_cnt,
+               pck_zone.pck_zone_cod,
+               pck_zone.uc_area_lbl_prtadr,
+               pck_zone.uc_area_prtadr,
+               pckwrk_hdr.list_id,
+               pckwrk_hdr.list_seqnum,
+               nvl(pckwrk_hdr.ctnnum,pckwrk_dtl.subnum),
+               pckwrk_dtl.subucc,
+               pckwrk_hdr.pcksts,
+               manfst.crtnid
+        union all
+        select 'CASPCK' uc_data_typ_cd,
+               shipment_line.wh_id,
+               pckbat.schbat,
+               shipment_line.ship_id,
+               shipment_line.client_id,
+               shipment_line.ordnum, 
+               shipment.carcod,
+               shipment.srvlvl,
+               pckwrk_hdr.wrkref,
+               pckwrk_hdr.wrktyp,
+               pckwrk_hdr.lodlvl,
+               pckwrk_hdr.srcloc,
+               locmst.loc_typ_id,
+               pckwrk_hdr.srcare,
+               pckwrk_hdr.ctncod,
+               pckwrk_hdr.vc_capnum,
+               pckwrk_dtl.cur_cas,
+               pckwrk_dtl.tot_cas_cnt,
+               pck_zone.pck_zone_cod,
+               nvl(pck_zone.uc_area_lbl_prtadr,'----'),
+               nvl(pck_zone.uc_area_prtadr,'----'),
+               pckwrk_hdr.list_id,
+               pckwrk_hdr.list_seqnum,
+               nvl(pckwrk_hdr.ctnnum,pckwrk_dtl.subnum) ctnnum,
+               pckwrk_dtl.subucc,
+               /*
+                * This is to support an alternate way of determining if this is the first for the order
+                */
+               (
+                   select min(ph.wrkref)
+                   from pckwrk_dtl pd
+                        join pckwrk_hdr ph on ph.wrkref = pd.wrkref
+                   where pd.wh_id = shipment_line.wh_id
+                   and pd.client_id = shipment_line.client_id
+                   and pd.ordnum = shipment_line.ordnum
+                   /*#nobind*/
+                   and ph.lodlvl in ( @uc_caspck_lodlvl_list:raw )
+                   and ph.wrktyp in ( @uc_caspck_wrktyp_list:raw )
+                   and ph.pcksts in ( @uc_filter_pcksts_list:raw )
+                   /*
+                    * 1st clause below is to make sure we dont include what is part of a carton
+                    * 2nd is to filter out bad K records that are orphan
+                    */
+                   and ( ph.ctnnum is null or ph.wrktyp = 'K' )
+                   /*#bind*/
+               ) uc_min_ord_wrkref,
+               pckwrk_hdr.pcksts,
+               sum(pckwrk_dtl.pckqty) pckqty, 
+               max(pckwrk_dtl.dst_mov_zone_id) uc_dst_mov_zone_id,
+               max(mov_zone_dst.mov_zone_cod) uc_dst_mov_zone_cod,
+               max(pckwrk_dtl.dstloc) dstloc,
+               manfst.crtnid uc_manfst_crtnid
+        from pckbat
+             join shipment_line on shipment_line.schbat = pckbat.schbat
+             join shipment on shipment.ship_id = shipment_line.ship_id
+             join pckwrk_dtl on pckwrk_dtl.ship_line_id = shipment_line.ship_line_id
+             left outer join mov_zone mov_zone_dst on mov_zone_dst.mov_zone_id = pckwrk_dtl.dst_mov_zone_id
+             join pckwrk_hdr on pckwrk_hdr.wrkref = pckwrk_dtl.wrkref
+             join locmst on locmst.wh_id = pckwrk_hdr.wh_id and locmst.stoloc = pckwrk_hdr.srcloc
+             join pck_zone on pck_zone.wh_id = locmst.wh_id and pck_zone.pck_zone_id = locmst.pck_zone_id
+             left outer join manfst on pckwrk_dtl.subucc = manfst.subnum and pckwrk_dtl.wh_id = manfst.wh_id
+        where @+pckbat.schbat
+        and @+shipment_line.ship_id
+        and @+shipment_line.ordnum
+        and shipment_line.linsts != 'B'
+        /*#nobind*/
+        and pckwrk_hdr.lodlvl in ( @uc_caspck_lodlvl_list:raw )
+        and pckwrk_hdr.wrktyp in ( @uc_caspck_wrktyp_list:raw )
+        and pckwrk_hdr.pcksts in ( @uc_filter_pcksts_list:raw )
+        /* 
+         * We dont want to include what is part of a carton
+         */
+        and ( pckwrk_hdr.ctnnum is null or pckwrk_hdr.wrktyp = 'K' )
+        /*#bind*/
+        group by
+               shipment_line.wh_id,
+               pckbat.schbat,
+               shipment_line.ship_id,
+               shipment_line.client_id,
+               shipment_line.ordnum,
+               shipment.carcod,
+               shipment.srvlvl,
+               pckwrk_hdr.wrkref,
+               pckwrk_hdr.wrktyp,
+               pckwrk_hdr.lodlvl,
+               pckwrk_hdr.srcloc,
+               locmst.loc_typ_id,
+               pckwrk_hdr.srcare,
+               pckwrk_hdr.ctncod,
+               pckwrk_hdr.vc_capnum,
+               pckwrk_dtl.cur_cas,
+               pckwrk_dtl.tot_cas_cnt,
+               pck_zone.pck_zone_cod,
+               pck_zone.uc_area_lbl_prtadr,
+               pck_zone.uc_area_prtadr,
+               pckwrk_hdr.list_id,
+               pckwrk_hdr.list_seqnum,
+               nvl(pckwrk_hdr.ctnnum,pckwrk_dtl.subnum),
+               pckwrk_dtl.subucc,
+               pckwrk_hdr.pcksts,
+               manfst.crtnid
+    ) ss
+    left outer join loc_typ on loc_typ.loc_typ_id = ss.uc_src_loc_typ_id
+    left outer join cardtl
+    on cardtl.carcod = ss.uc_shp_carcod
+    and cardtl.srvlvl = ss.uc_shp_srvlvl
+    left outer join carhdr
+    on carhdr.carcod = ss.uc_shp_carcod
+    join ord
+    on ord.client_id = ss.client_id
+    and ord.wh_id = ss.wh_id
+    and ord.ordnum = ss.ordnum
+    left outer join vc_drp_cde_mst
+    on vc_drp_cde_mst.wh_id = ord.wh_id
+    and vc_drp_cde_mst.vc_drpcde = ord.ordtyp
+    where @+uc_data_typ_cd
+    /*
+     * Note that these two will be influenced by having these values as null pushed on the stack.  That is by design
+     * to suppprt filterng of is null
+     */
+    and @+uc_area_prtadr
+    and @+uc_area_lbl_prtadr
+    order by @order_by_list:raw
+    ]
+    |
+    {
+        save session variable
+        where name = @uc_my_rownum_sess_var
+        and value = string( int(ossi__sess_var(@uc_my_rownum_sess_var)) + 1 )
+        ;
+        filter data 
+        where moca_filter_level = 2
+        and uc_rownum = int(ossi__sess_var ( @uc_my_rownum_sess_var ))
+        and uc_caspck_first_wrkref_mthd = @uc_caspck_first_wrkref_mthd
+        and uc_ord_first_wrkref_mthd = @uc_ord_first_wrkref_mthd
+        and uc_use_rpt_printer = @uc_use_rpt_printer
+        and uc_use_label_printer = @uc_use_label_printer
+    }
+}   
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+We have to print all paperwork for the wave.  This command returns the units of the paperwork, i.e. orders and then the K pick stuff.  This is needed because paperwork will be at these levels.
+Labels will be printed at CASPCK level and paperwork will be printed at ORD level.
+
+Typically we will first call it to:
+<ul>
+    <li>get the printers and uc_data_typ_cd for a given wave by passing in distinct class</li>
+    <li>Then call it again for that printer and uc_data_typ_cd as filter. Note that if printer is null it is returned as ----</li>
+</ul>
+And then it knows that all outputs thus generated will go into one set.
+At ord level, the pick data is for the first pick per the passed in parameters
+</p>
+]]>
+</remarks>
+
+<retrows>n</retrows>
+
+<retcol name="uc_rownum" type="COMTYP_CHAR">Ascending number starting with 1 for each row returned</retcol>
+<retcol name="vc_drp_cde_mst.*" type="COMTYP_CHAR">All columns from vc_drp_cd_mst table</retcol>
+
+
+<retcol name="uc_data_typ_cd" type="COMTYP_CHAR">ORD or CASPCK</retcol>
+<retcol name="wh_id" type="COMTYP_CHAR"></retcol>
+<retcol name="schbat" type="COMTYP_CHAR"></retcol>
+<retcol name="ship_id" type="COMTYP_CHAR"></retcol>
+<retcol name="client_id" type="COMTYP_CHAR"></retcol>
+<retcol name="ordnum" type="COMTYP_CHAR"></retcol>
+<retcol name="wrkref" type="COMTYP_CHAR">
+When ORD, it is the first wrkref for order.  To get first, it is the one with cur_cas = 1.  if no cur_cas set then it is the first wrkref of order#
+CASPCK, it is every wrkref.
+</retcol>
+<retcol name="wrktyp" type="COMTYP_CHAR">ORD - First in order, CASPCK - every wrkref</retcol>
+<retcol name="lodlvl" type="COMTYP_CHAR">ORD - First in order, CASPCK - every wrkref</retcol>
+<retcol name="cur_cas" type="COMTYP_CHAR">ORD - First in order, CASPCK - every wrkref</retcol>
+<retcol name="tot_cas_cnt" type="COMTYP_CHAR">ORD - First in order, CASPCK - every wrkref</retcol>
+<retcol name="pck_zone_cod" type="COMTYP_CHAR">ORD - First in order, CASPCK - every wrkref</retcol>
+<retcol name="uc_area_lbl_prtadr" type="COMTYP_CHAR">ORD - First in order, CASPCK - every wrkref.  If null return ----</retcol>
+<retcol name="uc_area_prtadr" type="COMTYP_CHAR">ORD - First in order, CASPCK - every wrkref.  If null return ----</retcol>
+<retcol name="list_id" type="COMTYP_CHAR">ORD - First in order, CASPCK - every wrkref</retcol>
+<retcol name="list_seqnum" type="COMTYP_CHAR">ORD - First in order, CASPCK - every wrkref</retcol>
+<retcol name="ctnnum" type="COMTYP_CHAR">ORD - First in order, CASPCK - every wrkref</retcol>
+<retcol name="uc_min_ord_wrkref" type="COMTYP_CHAR">ORD - First in order, CASPCK - every wrkref</retcol>
+<retcol name="pcksts" type="COMTYP_CHAR">ORD - First in order, CASPCK - every wrkref</retcol>
+<retcol name="pckqty" type="COMTYP_CHAR">For grouped data, pckqty</retcol>
+<retcol name="uc_first_pick_flg" type="COMTYP_CHAR">Important for CASPCK.  1 if this is the first pick for the order - in case it is important for any paperwork</retcol>
+
+<retcol name="cartyp" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_area_proc_cd" type="COMTYP_CHAR">for source loc_typ</retcol>
+<retcol name="uc_enable_area_for_rpt_flg" type="COMTYP_CHAR">for source loc_typ</retcol>
+<retcol name="uc_force_status_change_trx_flg" type="COMTYP_CHAR">for source loc_typ</retcol>
+<retcol name="uc_inhibit_rf_attach_flg" type="COMTYP_CHAR">for source loc_typ</retcol>
+
+
+<retcol name="uc_caspck_first_wrkref_mthd" type="COMTYP_CHAR">Input value displayed here to show defaulting</retcol>
+<retcol name="uc_ord_first_wrkref_mthd" type="COMTYP_CHAR">Input value displayed here to show defaulting</retcol>
+
+
+
+
+<retcol name="uc_is_first_wrkref_expr" type="COMTYP_CHAR">What expression was used to return that it was the first wrkref for the order</retcol>
+
+<retcol name="uc_use_rpt_printer" type="COMTYP_CHAR">\</retcol>
+<retcol name="uc_use_label_printer" type="COMTYP_CHAR">\</retcol>
+
+
+
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+
+<seealso cref="get ossi commands for release rule"></seealso>
+
+</documentation>
+
+
+</command>

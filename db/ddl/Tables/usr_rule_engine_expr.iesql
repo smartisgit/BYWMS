@@ -1,0 +1,61 @@
+#use $LESDIR/include
+#use $DCSDIR/include
+#use $MOCADIR/include
+#use $LESDIR/db/ddl/Indexes
+
+
+#include <dcsddl.h>
+#include <dcscolwid.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+
+
+mset command on
+[
+CREATE_TABLE(usr_rule_engine_expr)
+(
+    uc_rule_grp_id      STRING_TY(500) NOT NULL,
+    uc_rule_subgrp_id   STRING_TY(500) NOT NULL,
+    seqnum              INTEGER_TY NOT NULL,
+    uc_rule_value       STRING_TY(4000) NOT NULL,
+    srtseq              INTEGER_TY,
+    ena_flg             FLAG_TY,
+    uc_rule_expr        STRING_TY(4000),
+    uc_rule_parm_01     STRING_TY(500),
+    uc_rule_parm_02     STRING_TY(500),
+    uc_rule_comment     STRING_TY(4000),
+    uc_rule_catg_cd     STRING_TY(10),
+    uc_cust_flg         FLAG_TY,
+    ins_dt		DATE_TY,
+    ins_user_id		STRING_TY(40),
+    last_upd_dt		DATE_TY,
+    last_upd_user_id    STRING_TY(40)
+)
+] catch (ERR_TABLE_ALREADY_EXISTS)
+RUN_DDL
+
+#include <usr_rule_engine_expr_pk.idx>
+
+mset command on
+create db documentation
+where table             = "usr_rule_engine_expr"
+and table_comment       = "This table contains the rules.  We will execute and determine uc_rule_value"
+and uc_rule_grp_id      = "Like polcod defines main categor.  e.g. USR-PICK-RELEASE"
+and uc_rule_subgrp_id   = "Like polvar defines a subgrouping"
+and seqnum              = "To serve as PK when we have to add multiple rows within a rule"
+and uc_rule_value       = "Value that is determined"
+and srtseq              = "Since PK cannot change, this is to change sorting"
+and ena_flg             = "To enable or disable a row"
+and uc_rule_expr        = "This is the condition expression"
+and uc_rule_parm_01     = "An arbitrary value associated with the rule value.  e.g. for DEFAULT rules, this is the table name to update"
+and uc_rule_parm_02     = "An arbitrary value associated with the rule value"
+and uc_rule_catg_cd     = "To categorize rules.  RPT For reports, LBL for Labels, MHE for MHE systems, WRK for work queue.  Can be left null"
+and uc_rule_comment     = "Free form comment for this row.  Could refernce documentation as well"
+and uc_cust_flg         = "This flag will be set if row is modified in a non-development enviornment"
+and ins_dt              = "Add Date/time"
+and last_upd_dt	        = "Update Date/Time"
+and ins_user_id         = "Add User Id"
+and last_upd_user_id    = "Update user Id"
+
+RUN_DDL
+mset command off

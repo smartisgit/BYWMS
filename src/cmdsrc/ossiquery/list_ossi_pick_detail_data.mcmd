@@ -1,0 +1,624 @@
+<command>
+<name>list ossi pick detail data</name>
+<description>
+Given a wrkref we list all picks that are inside it.  For example it may be a straight pick an outer K pick etc.
+When outer K there may be inner Ks as well.  So this will list all details
+</description> 
+<type>Local Syntax</type>
+
+<argument name="wh_id" default-value="" required="No" datatype="string"></argument>
+<argument name="wrkref" default-value="" required="No" datatype="string"></argument>
+<argument name="uc_outer_subnum" default-value="" required="No" datatype="string">Optionally pass in outer subnum</argument>
+<argument name="uc_filter_srcloc" default-value="" required="No" datatype="string"></argument>
+<argument name="uc_filter_srcare" default-value="" required="No" datatype="string"></argument>
+<argument name="uc_filter_src_pck_zone_cod" default-value="" required="No" datatype="string"></argument>
+<argument name="uc_filter_src_pck_zone_cod_list" default-value="" required="No" datatype="string">Specify as a list suitable to be used directly as in clause</argument>
+<argument name="uc_filter_src_loc_typ" default-value="" required="No" datatype="string"></argument>
+<argument name="uc_filter_prtnum" default-value="" required="No" datatype="string"></argument>
+<argument name="uc_filter_ship_id" default-value="" required="No" datatype="string"></argument>
+<argument name="uc_filter_open_pckqty" default-value="" required="No" datatype="string">
+If passed in as 1 then only show picks that are open, i.e. remqty > 0
+</argument>
+<argument name="uc_filter_cmpl_pckqty" default-value="" required="No" datatype="string">
+If passed in as 1 then only show picks that are closed, i.e. remqty = 0
+</argument>
+<argument name="uc_filter_uc_record_typ_cd" default-value="" required="No" datatype="string">
+If passed in we filter by that record type only
+</argument>
+
+
+<argument name="uc_select_clause" default-value="" required="No" datatype="string"></argument>
+<argument name="uc_group_by_clause" default-value="" required="No" datatype="string"></argument>
+<argument name="uc_order_by_clause" default-value="" required="No" datatype="string"></argument>
+<argument name="uc_result_use_case" default-value="" required="No" datatype="string">
+What is the use case for it.  This can default other parameters.  Currently allowed are:
+pckwrk_hdr_only
+</argument>
+<argument name="locale_id" default-value="" required="No" datatype="string"></argument>
+
+
+<local-syntax>
+<![CDATA[
+
+publish data
+where wh_id = nvl(@wh_id, @@WH_ID )
+and uc_use_group_by_clause = null
+|
+if ( @uc_result_use_case = 'pckwrk_hdr_only' )
+{
+    publish data
+    where main_select_clause = 'uc_record_typ_cd,wh_id,uc_child_wrkref,uc_child_wrktyp,prt_client_id,prtnum,ftpcod,srcloc,srcare'
+                            || ',ctnnum,lodlvl,pck_uom,ctncod,uc_pckwrk_untcas,uc_pckwrk_untpak,lotflg,revflg,invsts'
+                            || ',uc_pckwrk_lotnum,uc_pckwrk_orgcod,uc_pckwrk_revlvl,uc_pckwrk_rule_nam'
+                            || ',trvseq,uc_src_loc_typ,uc_src_uc_area_proc,uc_src_pck_zone_cod,uc_src_sto_zone_cod'
+                            || ',uc_ca_grswgt,uc_ca_netwgt,ctnwgt,stkuom,uc_pck_wgt,lngdsc,short_dsc'
+                            || ',pckqty,appqty,remqty'
+    and grouped_select_list = 'max(ordtyp) ordtyp, sum(dtl_pckqty) dtl_pckqty, sum(dtl_appqty) dtl_appqty, sum(dtl_remqty) dtl_remqty'
+                            ||',max(schbat) schbat, max(ship_id) ship_id, count(*) uc_cnt_pckwrk_dtl'
+                            ||',count(distinct ordnum) uc_cnt_ord, count(distinct ship_line_id) uc_cnt_sl'
+    |
+    publish data
+    where uc_select_clause = @main_select_clause || ',' || @grouped_select_list
+    and uc_group_by_clause = @main_select_clause
+}
+|
+publish data
+where uc_select_clause = nvl(@uc_select_clause, '*' )
+and uc_order_by_clause = nvl(@uc_order_by_clause, '1,2,3,4' )
+|
+if ( @uc_group_by_clause is not null )
+    publish data
+    where uc_use_group_by_clause = 'group by ' || @uc_group_by_clause
+|
+if ( @uc_filter_srcloc is null ) hide stack variable where name = 'uc_filter_srcloc'
+|
+if ( @uc_filter_src_pck_zone_cod is null ) hide stack variable where name = 'uc_filter_src_pck_zone_cod'
+|
+if ( @uc_filter_src_loc_typ is null ) hide stack variable where name = 'uc_filter_src_loc_typ'
+|
+if ( @uc_filter_prtnum is null ) hide stack variable where name = 'uc_filter_prtnum'
+|
+if ( @uc_filter_ship_id is null ) hide stack variable where name = 'uc_filter_ship_id'
+|
+if ( @uc_filter_uc_record_typ_cd is null ) hide stack variable where name  = 'uc_filter_uc_record_typ_cd'
+|
+if ( @uc_filter_src_pck_zone_cod_list is not null )
+    publish data
+    where uc_filter_src_pck_zone_cod_list_clause = "pck_zone.pck_zone_cod in (" || @uc_filter_src_pck_zone_cod_list || ")"
+else
+    publish data
+    where uc_filter_src_pck_zone_cod_list_clause = "1=1"
+|    
+publish data
+where uc_filter_open_pckqty = nvl(@uc_filter_open_pckqty, 0 )
+and uc_filter_cmpl_pckqty = nvl(@uc_filter_cmpl_pckqty, 0 )
+|
+{
+    if ( @uc_outer_subnum is null ) 
+        list ossi pick data
+        where wrkref = @wrkref
+        and list_id = null
+    |
+    /*
+     * We may get a locale by above command.  If that is null we want to defsult it
+     */
+    publish data
+    where locale_id = nvl(nvl(@locale_id, @@LOCALE_ID), 'US_ENGLISH')
+    |
+    {
+        [
+        select @uc_select_clause:raw
+        from
+        (
+            select pw.*,
+                   locmst.trvseq,
+                   locmst.aisle_id,
+                   loc_typ.loc_typ uc_src_loc_typ,
+                   loc_typ.uc_area_proc_cd uc_src_uc_area_proc,
+                   pck_zone.pck_zone_cod uc_src_pck_zone_cod,
+                   sto_zone.sto_zone_cod uc_src_sto_zone_cod,
+                   prtmst.prtfam,
+                   prtmst.untcst,
+                   prtftp_dtl_ca.grswgt uc_ca_grswgt,
+                   prtftp_dtl_ca.netwgt uc_ca_netwgt,
+                   prtftp_dtl_ca.untqty uc_pck_untcas,
+                   case
+                       when pw.lodlvl != 'D' then prtftp_dtl_ca.grswgt* (pw.pckqty/(cast(prtftp_dtl_ca.untqty as float)))
+                       else (prtftp_dtl_ca.netwgt/(cast(prtftp_dtl_ca.untqty as float)))*pw.pckqty 
+                   end uc_pck_wgt,
+                   prtftp_dtl_ea.len * prtftp_dtl_ea.wid * prtftp_dtl_ea.hgt * pw.pckqty uc_prtftp_dtl_ea_vol,
+                   (prtftp_dtl_ca.len * prtftp_dtl_ca.wid * prtftp_dtl_ca.hgt) * (pw.pckqty/(cast(prtftp_dtl_ca.untqty as float))) uc_prtftp_dtl_ca_vol,
+                   prtftp_dtl_ca.len uc_ca_len,
+                   prtftp_dtl_ca.wid uc_ca_wid,
+                   prtftp_dtl_ca.hgt uc_ca_hgt,
+                   ctnmst.ctnwgt,
+                   ord.ordtyp,
+                   ord.stcust,
+                   ord.cponum, 
+                   adrmst_st.host_ext_id uc_st_host_ext_id,
+                   adrmst_st.adrnam      uc_st_adrnam,
+                   adrmst_st.attn_name   uc_st_attn_name,
+                   adrmst_st.adrln1      uc_st_adrln1,
+                   adrmst_st.adrln2      uc_st_adrln2,
+                   adrmst_st.adrln3      uc_st_adrln3,
+                   adrmst_st.adrcty      uc_st_adrcty,
+                   adrmst_st.adrstc      uc_st_adrstc,
+                   adrmst_st.adrpsz      uc_st_adrpsz,
+                   adrmst_st.phnnum      uc_st_phnnum,
+                   adrmst_st.ctry_name   uc_st_ctry_name,
+                   prtftp_dtl_ea.uomcod  stkuom,
+                   prtdsc.lngdsc,
+                   prtdsc.short_dsc,
+                   ord_line.early_dlvdte uc_ol_early_dlvdte,
+                   ord_line.late_dlvdte  uc_ol_late_dlvdte,
+                   ord_line.early_shpdte uc_ol_early_shpdte,
+                   ord_line.late_shpdte  uc_ol_late_shpdte,
+                   shipment.carcod       uc_sh_carcod,
+                   shipment.srvlvl       uc_sh_srvlvl,
+                   cardtl.cartyp         uc_sh_cartyp,
+                   prtmst.hazmat_flg,
+                   case
+                       when prtmst.hazmat_flg = 1 then 
+                           case
+                               when pw.lodlvl != 'D' then prtftp_dtl_ca.grswgt* (pw.pckqty/(cast(prtftp_dtl_ca.untqty as float)))
+                               else (prtftp_dtl_ca.netwgt/(cast(prtftp_dtl_ca.untqty as float)))*pw.pckqty
+                           end
+                       else null
+                   end uc_haz_pck_wgt
+            from
+            (
+                select 'MAIN_CTN' uc_record_typ_cd,
+                       pw_hdr.wh_id,
+                       pw_hdr.wrkref uc_child_wrkref,
+                       pw_hdr.wrktyp uc_child_wrktyp,
+                       pw_hdr.prt_client_id,
+                       pw_hdr.prtnum,
+                       pw_hdr.ftpcod,
+                       pw_hdr.srcloc,
+                       pw_hdr.srcare,
+                       pw_hdr.ctnnum,
+                       pw_hdr.lodlvl,
+                       pw_hdr.pck_uom,
+                       pw_hdr_k.ctncod,
+                       pw_dtl.ship_id,
+                       pw_dtl.schbat,
+                       pw_dtl.client_id,
+                       pw_dtl.ordnum,
+                       pw_dtl.ordlin,
+                       pw_dtl.ordsln,
+                       pw_dtl.ship_line_id,
+                       pw_hdr.untcas  uc_pckwrk_untcas,
+                       pw_hdr.untpak  uc_pckwrk_untpak,
+                       pw_hdr.lotflg,
+                       pw_hdr.revflg,
+                       pw_hdr.invsts,
+                       pw_hdr.lotnum   uc_pckwrk_lotnum,
+                       pw_hdr.orgcod   uc_pckwrk_orgcod,
+                       pw_hdr.revlvl   uc_pckwrk_revlvl,
+                       pw_hdr.rule_nam uc_pckwrk_rule_nam,
+                       sum(pw_hdr.pckqty) pckqty,
+                       sum(pw_hdr.appqty) appqty,
+                       sum(pw_hdr.pckqty-pw_hdr.appqty) remqty,
+                       sum(pw_dtl.pckqty) dtl_pckqty,
+                       sum(pw_dtl.appqty) dtl_appqty,
+                       sum(pw_dtl.pckqty-pw_dtl.appqty) dtl_remqty
+                from pckwrk_hdr pw_hdr
+                     join pckwrk_dtl pw_dtl on pw_dtl.wrkref = pw_hdr.wrkref
+                     join pckwrk_dtl pw_dtl_k on pw_dtl_k.subnum = pw_hdr.ctnnum
+                     join pckwrk_hdr pw_hdr_k on pw_hdr_k.wrkref = pw_dtl_k.wrkref and pw_hdr_k.wrktyp = 'K'
+                where pw_hdr.ctnnum = @uc_outer_subnum
+                and pw_hdr.prtnum != 'KITPART'
+                group by
+                       pw_hdr.wh_id,
+                       pw_hdr.wrkref,
+                       pw_hdr.wrktyp,
+                       pw_hdr.prt_client_id,
+                       pw_hdr.prtnum,
+                       pw_hdr.ftpcod,
+                       pw_hdr.srcloc,
+                       pw_hdr.srcare,
+                       pw_hdr.ctnnum,
+                       pw_hdr.lodlvl,
+                       pw_hdr.pck_uom,
+                       pw_hdr_k.ctncod,
+                       pw_dtl.ship_id,
+                       pw_dtl.schbat,
+                       pw_dtl.client_id,
+                       pw_dtl.ordnum,
+                       pw_dtl.ordlin,
+                       pw_dtl.ordsln,
+                       pw_dtl.ship_line_id,
+                       pw_hdr.untcas,
+                       pw_hdr.untpak,
+                       pw_hdr.lotflg,
+                       pw_hdr.revflg,
+                       pw_hdr.invsts,
+                       pw_hdr.lotnum,
+                       pw_hdr.orgcod,
+                       pw_hdr.revlvl,
+                       pw_hdr.rule_nam
+                union all
+                select 'SUB_CTN',
+                       pw_hdr.wh_id,
+                       pw_hdr.wrkref,
+                       pw_hdr.wrktyp,
+                       pw_hdr.prt_client_id,
+                       pw_hdr.prtnum,
+                       pw_hdr.ftpcod,
+                       pw_hdr.srcloc,
+                       pw_hdr.srcare,
+                       pw_hdr.ctnnum,
+                       pw_hdr.lodlvl,
+                       pw_hdr.pck_uom,
+                       pw_hdr_k.ctncod,
+                       pw_dtl.ship_id,
+                       pw_dtl.schbat,
+                       pw_dtl.client_id,
+                       pw_dtl.ordnum,
+                       pw_dtl.ordlin,
+                       pw_dtl.ordsln,
+                       pw_dtl.ship_line_id,
+                       pw_hdr.untcas,
+                       pw_hdr.untpak,
+                       pw_hdr.lotflg,
+                       pw_hdr.revflg,
+                       pw_hdr.invsts,
+                       pw_hdr.lotnum,
+                       pw_hdr.orgcod,
+                       pw_hdr.revlvl,
+                       pw_hdr.rule_nam,
+                       sum(pw_hdr.pckqty) pckqty,
+                       sum(pw_hdr.appqty) appqty,
+                       sum(pw_hdr.pckqty-pw_hdr.appqty) remqty,
+                       sum(pw_dtl.pckqty) dtl_pckqty,
+                       sum(pw_dtl.appqty) dtl_appqty,
+                       sum(pw_dtl.pckqty-pw_dtl.appqty) dtl_remqty
+                from pckwrk_hdr
+                     join pckwrk_dtl on pckwrk_dtl.wrkref = pckwrk_hdr.wrkref
+                     join pckwrk_hdr pw_hdr on pw_hdr.ctnnum = pckwrk_dtl.subnum and pw_hdr.prtnum != 'KITPART' 
+                     join pckwrk_dtl pw_dtl on pw_dtl.wrkref = pw_hdr.wrkref
+                     join pckwrk_dtl pw_dtl_k on pw_dtl_k.subnum = pw_hdr.ctnnum
+                     join pckwrk_hdr pw_hdr_k on pw_hdr_k.wrkref = pw_dtl_k.wrkref and pw_hdr_k.wrktyp = 'K'
+                where pckwrk_hdr.ctnnum = @uc_outer_subnum
+                and pckwrk_hdr.prtnum = 'KITPART'
+                group by
+                       pw_hdr.wh_id,
+                       pw_hdr.wrkref,
+                       pw_hdr.wrktyp,
+                       pw_hdr.prt_client_id,
+                       pw_hdr.prtnum,
+                       pw_hdr.ftpcod,
+                       pw_hdr.srcloc,
+                       pw_hdr.srcare,
+                       pw_hdr.ctnnum,
+                       pw_hdr.lodlvl,
+                       pw_hdr.pck_uom,
+                       pw_hdr_k.ctncod,
+                       pw_dtl.ship_id,
+                       pw_dtl.schbat,
+                       pw_dtl.client_id,
+                       pw_dtl.ordnum,
+                       pw_dtl.ordlin,
+                       pw_dtl.ordsln,
+                       pw_dtl.ship_line_id,
+                       pw_hdr.untcas,
+                       pw_hdr.untpak,
+                       pw_hdr.lotflg,
+                       pw_hdr.revflg,
+                       pw_hdr.invsts,
+                       pw_hdr.lotnum,
+                       pw_hdr.orgcod,
+                       pw_hdr.revlvl,
+                       pw_hdr.rule_nam
+                union all
+                select 'DIRECT',
+                       pw_hdr.wh_id,
+                       pw_hdr.wrkref,
+                       pw_hdr.wrktyp,
+                       pw_hdr.prt_client_id,
+                       pw_hdr.prtnum,
+                       pw_hdr.ftpcod,
+                       pw_hdr.srcloc,
+                       pw_hdr.srcare,
+                       pw_hdr.ctnnum,
+                       pw_hdr.lodlvl,
+                       pw_hdr.pck_uom,
+                       null,
+                       pw_dtl.ship_id,
+                       pw_dtl.schbat,
+                       pw_dtl.client_id,
+                       pw_dtl.ordnum,
+                       pw_dtl.ordlin,
+                       pw_dtl.ordsln,
+                       pw_dtl.ship_line_id,
+                       pw_hdr.untcas,
+                       pw_hdr.untpak,
+                       pw_hdr.lotflg,
+                       pw_hdr.revflg,
+                       pw_hdr.invsts,
+                       pw_hdr.lotnum,
+                       pw_hdr.orgcod,
+                       pw_hdr.revlvl,
+                       pw_hdr.rule_nam,
+                       sum(pw_hdr.pckqty) pckqty,
+                       sum(pw_hdr.appqty) appqty,
+                       sum(pw_hdr.pckqty-pw_hdr.appqty) remqty,
+                       sum(pw_dtl.pckqty) dtl_pckqty,
+                       sum(pw_dtl.appqty) dtl_appqty,
+                       sum(pw_dtl.pckqty-pw_dtl.appqty) dtl_remqty
+                from pckwrk_hdr pw_hdr
+                     join pckwrk_dtl pw_dtl on pw_dtl.wrkref = pw_hdr.wrkref
+                where pw_hdr.wrkref = @wrkref
+                and pw_hdr.ctnnum is null
+                group by
+                       pw_hdr.wh_id,
+                       pw_hdr.wrkref,
+                       pw_hdr.wrktyp,
+                       pw_hdr.prt_client_id,
+                       pw_hdr.prtnum,
+                       pw_hdr.ftpcod,
+                       pw_hdr.srcloc,
+                       pw_hdr.srcare,
+                       pw_hdr.ctnnum,
+                       pw_hdr.lodlvl,
+                       pw_hdr.pck_uom,
+                       pw_dtl.ship_id,
+                       pw_dtl.schbat,
+                       pw_dtl.client_id,
+                       pw_dtl.ordnum,
+                       pw_dtl.ordlin,
+                       pw_dtl.ordsln,
+                       pw_dtl.ship_line_id,
+                       pw_hdr.untcas,
+                       pw_hdr.untpak,
+                       pw_hdr.lotflg,
+                       pw_hdr.revflg,
+                       pw_hdr.invsts,
+                       pw_hdr.lotnum,
+                       pw_hdr.orgcod,
+                       pw_hdr.revlvl,
+                       pw_hdr.rule_nam
+            ) pw
+            join prtmst_view prtmst
+                on prtmst.prt_client_id = pw.prt_client_id
+                and prtmst.prtnum = pw.prtnum
+                and prtmst.wh_id = pw.wh_id
+            join prtdsc
+                on prtdsc.colnam = 'prtnum|prt_client_id|wh_id_tmpl'
+                and prtdsc.colval = pw.prtnum || '|' || pw.prt_client_id || '|' || pw.wh_id
+                and prtdsc.locale_id = @locale_id
+            join prtftp_dtl prtftp_dtl_ca
+                on prtftp_dtl_ca.prt_client_id = pw.prt_client_id
+                and prtftp_dtl_ca.prtnum = pw.prtnum
+                and prtftp_dtl_ca.ftpcod = pw.ftpcod
+                and prtftp_dtl_ca.wh_id = pw.wh_id
+                and prtftp_dtl_ca.cas_flg = 1
+            join prtftp_dtl prtftp_dtl_ea
+                on prtftp_dtl_ea.prt_client_id = pw.prt_client_id
+                and prtftp_dtl_ea.prtnum = pw.prtnum
+                and prtftp_dtl_ea.ftpcod = pw.ftpcod
+                and prtftp_dtl_ea.wh_id = pw.wh_id
+                and prtftp_dtl_ea.stk_flg = 1
+            join locmst
+                on locmst.wh_id = pw.wh_id
+                and locmst.stoloc= pw.srcloc
+            join loc_typ on loc_typ.loc_typ_id = locmst.loc_typ_id
+            join pck_zone on pck_zone.wh_id = locmst.wh_id and pck_zone.pck_zone_id = locmst.pck_zone_id
+            join sto_zone on sto_zone.wh_id = locmst.wh_id and sto_zone.sto_zone_id = locmst.sto_zone_id
+            left outer join ctnmst on ctnmst.ctncod = pw.ctncod and ctnmst.wh_id = pw.wh_id
+            left outer join ord
+                on ord.client_id = pw.client_id
+                and ord.ordnum = pw.ordnum
+                and ord.wh_id = pw.wh_id
+            left outer join shipment on shipment.ship_id = pw.ship_id
+            left outer join carhdr on carhdr.carcod = shipment.carcod
+            left outer join cardtl on cardtl.carcod = shipment.carcod and cardtl.srvlvl = shipment.srvlvl
+            left outer join adrmst adrmst_st on adrmst_st.adr_id = ord.st_adr_id
+            left outer join ord_line
+                on ord_line.client_id = pw.client_id
+                and ord_line.wh_id = pw.wh_id
+                and ord_line.ordnum = pw.ordnum
+                and ord_line.ordlin = pw.ordlin
+                and ord_line.ordsln = pw.ordsln
+            where @+pw.srcloc^uc_filter_srcloc
+            and @+pw.ship_id^uc_filter_ship_id
+            and @+pw.prtnum^uc_filter_prtnum
+            and @+pck_zone.pck_zone_cod^uc_filter_src_pck_zone_cod
+            and @uc_filter_src_pck_zone_cod_list_clause:raw
+            and @+loc_typ.loc_typ^uc_filter_src_loc_typ
+            and ( @uc_filter_open_pckqty = 0 or pw.dtl_remqty > 0 )
+            and ( @uc_filter_cmpl_pckqty = 0 or pw.dtl_remqty = 0 )
+        ) pw
+        where @+pw.uc_record_typ_cd^uc_filter_uc_record_typ_cd
+        @uc_use_group_by_clause:raw
+        order by @uc_order_by_clause:raw
+        ]
+        catch (-1403,510)
+        |
+        [
+        select max(prt_ser_typ.ser_num_typ_id) ser_num_typ_id,
+               max(ser_num_typ.ser_msk) ser_msk
+        from prt_ser_typ
+             left outer join ser_num_typ on ser_num_typ.ser_num_typ_id = prt_ser_typ.ser_num_typ_id
+        where prt_ser_typ.prt_client_id = @prt_client_id
+        and prt_ser_typ.prtnum = @prtnum
+        ]
+        |
+        if ( @uc_pckwrk_rule_nam is not null )
+        {
+            [
+            select  alloc_rule_dtl.value uc_rule_revlvl
+            from alloc_rule_dtl
+            where alloc_rule_dtl.rule_nam = @uc_pckwrk_rule_nam
+            and alloc_rule_dtl.wh_id = @wh_id
+            and alloc_rule_dtl.field_name = 'revlvl'
+            and rownum < 2
+            ]
+            catch (-1403,510)
+            |
+            [
+            select  alloc_rule_dtl.value uc_rule_expire_dte
+            from alloc_rule_dtl
+            where alloc_rule_dtl.rule_nam = @uc_pckwrk_rule_nam
+            and alloc_rule_dtl.wh_id = @wh_id
+            and alloc_rule_dtl.field_name = 'expire_dte'
+            and rownum < 2
+            ]
+            |
+            publish data
+            where uc_rule_revlvl = @uc_rule_revlvl
+            and uc_rule_expire_dte = @uc_rule_expire_dte
+        }
+        |
+        filter data 
+        where moca_filter_level = 3
+        and ser_num_typ_id = @ser_num_typ_id
+        and ser_msk = @ser_msk
+        and uc_outer_subnum = @uc_outer_subnum
+        and uc_rule_revlvl = @uc_rule_revlvl
+        and uc_rule_expire_dte = @uc_rule_expire_dte
+        and uc_use_revlvl = nvl(@uc_rule_revlvl, @uc_pckwrk_revlvl)
+    }
+}
+
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+This command can be used to get detailed data of picks.
+</remarks>
+
+<retrows>n</retrows>
+
+
+
+<retcol name="trvseq" type="string"></retcol>
+<retcol name="aisle_id" type="string"></retcol>
+
+<retcol name="uc_src_loc_typ" type="string"></retcol>
+<retcol name="uc_src_uc_alt_stoloc_01" type="string"></retcol>
+<retcol name="uc_src_uc_area_proc" type="string"></retcol>
+<retcol name="uc_src_pck_zone_cod" type="string"></retcol>
+<retcol name="uc_src_sto_zone_cod" type="string"></retcol> 
+<retcol name="uc_ca_grswgt" type="string"></retcol>
+<retcol name="uc_ca_netwgt" type="string"></retcol>
+<retcol name="uc_pck_wgt" type="string"></retcol>
+<retcol name="uc_prtftp_dtl_ea_vol" type="string"></retcol>
+<retcol name="uc_prtftp_dtl_ca_vol" type="string"></retcol>
+<retcol name="ctnwgt" type="string"></retcol>
+<retcol name="uc_ship_vol" type="string"></retcol>
+
+<retcol name="ordtyp" type="string"></retcol>
+<retcol name="vc_init_sys" type="string"></retcol>
+<retcol name="vc_rtcode" type="string"></retcol>
+<retcol name="uc_pck_untcas" type="string"></retcol> 
+
+<retcol name="uc_ol_early_dlvdte" type="string"></retcol>
+<retcol name="uc_ol_late_dlvdte" type="string"></retcol>
+<retcol name="uc_ol_early_shpdte" type="string"></retcol>
+<retcol name="uc_ol_late_shpdte" type="string"></retcol>
+
+<retcol name="stcust" type="string"></retcol>
+<retcol name="cponum" type="string"></retcol> 
+<retcol name="uc_host_invnum" type="string"></retcol>
+<retcol name="uc_st_host_ext_id" type="string"></retcol>
+<retcol name="uc_st_adrnam" type="string"></retcol>
+<retcol name="uc_st_adrln1" type="string"></retcol>
+<retcol name="uc_st_adrln2" type="string"></retcol>
+<retcol name="uc_st_adrln3" type="string"></retcol>
+<retcol name="uc_st_adrcty" type="string"></retcol>
+<retcol name="uc_st_adrstc" type="string"></retcol>
+<retcol name="uc_st_adrpsz" type="string"></retcol>
+<retcol name="uc_st_phnnum" type="string"></retcol> 
+<retcol name="uc_st_ctry_name" type="string"></retcol>
+
+<retcol name="uc_group_code" type="string"></retcol>
+<retcol name="stkuom" type="string"></retcol>
+<retcol name="lngdsc" type="string"></retcol>
+<retcol name="short_dsc" type="string"></retcol>
+
+
+<retcol name="uc_record_typ_cd" type="string">What type of contents
+a. MAIN_CTN means inside the main carton
+b. SUB_CTN.  means inside a sub-carton.  Child K pick
+c. DIRECT.  Directly in this pick</retcol>
+<retcol name="wh_id" type="string"></retcol>
+<retcol name="uc_child_wrkref" type="string"></retcol>
+<retcol name="uc_child_wrktyp" type="string"></retcol>
+<retcol name="prt_client_id" type="string"></retcol>
+<retcol name="prtnum" type="string"></retcol>
+<retcol name="prtfam" type="string"></retcol>
+<retcol name="uc_ytc_case_ctncod" type="string"></retcol>
+<retcol name="untcst" type="string"></retcol>
+
+<retcol name="ftpcod" type="string"></retcol>
+<retcol name="srcloc" type="string"></retcol>
+<retcol name="srcare" type="string"></retcol>
+<retcol name="ctnnum" type="string"></retcol>
+<retcol name="lodlvl" type="string"></retcol>
+<retcol name="pck_uom" type="string"></retcol>
+<retcol name="ctncod" type="string"></retcol>
+<retcol name="ship_id" type="string"></retcol>
+<retcol name="schbat" type="string"></retcol>
+<retcol name="client_id" type="string"></retcol>
+<retcol name="ordnum" type="string"></retcol>
+<retcol name="ordlin" type="string"></retcol>
+<retcol name="ordsln" type="string"></retcol>
+<retcol name="ship_line_id" type="string"></retcol>
+<retcol name="uc_pckwrk_untcas" type="string"></retcol>
+<retcol name="uc_pckwrk_untpak" type="string"></retcol>
+<retcol name="lotflg" type="string"></retcol>
+<retcol name="revflg" type="string"></retcol>
+<retcol name="invsts" type="string"></retcol>
+<retcol name="uc_pckwrk_lotnum" type="string"></retcol>
+<retcol name="uc_pckwrk_orgcod" type="string"></retcol>
+<retcol name="uc_pckwrk_revlvl" type="string"></retcol>
+
+<retcol name="uc_sh_carcod" type="string"></retcol>
+<retcol name="uc_sh_srvlvl" type="string"></retcol>
+<retcol name="uc_sh_cartyp" type="string"></retcol>
+<retcol name="uc_car_uc_hazmat_code" type="string"></retcol>
+
+
+<retcol name="hazmat_flg" type="string"></retcol>
+<retcol name="uc_haz_un_id" type="string">From vc_tblhmshazmatgeneral table</retcol>
+<retcol name="uc_haz_pg" type="string">From vc_tblhmshazmatgeneral table</retcol>
+<retcol name="uc_haz_hazarddiv1" type="string">From vc_tblhmshazmatgeneral table</retcol>
+<retcol name="uc_haz_hazarddiv2" type="string">From vc_tblhmshazmatgeneral table</retcol>
+<retcol name="uc_haz_hazarddiv3" type="string">From vc_tblhmshazmatgeneral table</retcol>
+<retcol name="uc_haz_hazard_code" type="string">From vc_tblhmshazmatgeneral table</retcol>
+<retcol name="uc_haz_pck_wgt" type="string">If part is hazard it is the weight of that pick.  If not hazard then it is null</retcol>
+
+
+
+<retcol name="uc_pckwrk_rule_nam" type="string"></retcol>
+
+<retcol name="pckqty" type="string"></retcol>
+<retcol name="appqty" type="string"></retcol>
+<retcol name="remqty" type="string"></retcol>
+<retcol name="dtl_pckqty" type="string"></retcol>
+<retcol name="dtl_appqty" type="string"></retcol>
+<retcol name="dtl_remqty" type="string"></retcol>
+
+
+
+<retcol name="ser_num_typ_id" type="string"></retcol>
+<retcol name="uc_outer_subnum" type="string"></retcol>
+<retcol name="uc_rule_revlvl" type="string"></retcol>
+<retcol name="uc_rule_expire_dte" type="string"></retcol>
+<retcol name="uc_use_revlvl" type="string"></retcol>
+
+
+<exception value="eOK">Normal successful completion</exception>
+
+<seealso cref="list ossi pick data"></seealso>
+<seealso cref="list ossi pick detail data"></seealso>
+<seealso cref="list ossi outer container pick header data"></seealso>
+<seealso cref="list ossi pick with outer pick data"></seealso>
+
+</documentation>
+
+</command>
+

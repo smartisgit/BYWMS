@@ -1,0 +1,546 @@
+<command>
+<name>print ossi file</name>
+<description>Basic component to handle printing.  OSSI Version as we have some extensions.  If a site wants to use this instead of print file they could call this from print file</description>
+
+<argument name="uc_is_label" required="no" datatype="string"></argument>
+<argument name="printer" required="no" datatype="string"></argument>
+<argument name="filnam" required="yes" datatype="string"></argument>
+<argument name="wh_id" required="yes" datatype="string"></argument>
+<argument name="options" required="no" datatype="string"></argument>
+<argument name="uc_called_from" required="no" datatype="string"></argument>
+<argument name="oprcod" required="no" datatype="string"></argument>
+<argument name="devcod" required="no" datatype="string"></argument>
+<argument name="copies" required="no" datatype="string"></argument>
+<argument name="delflg" required="no" datatype="string"></argument>
+
+<argument name="uc_doc_id" required="no" datatype="string">If passed in and filnam is not passed in then we take data from table and print that</argument>
+<argument name="uc_add_defer_exec_when_doc_store" required="no" datatype="string">If printing to document store created deferred execution
+for prunt file</argument>
+
+<argument name="uc_keep_printed_file_when_added_to_doc_store" required="no" datatype="string">
+For debugging needs - can set this to 1 to keep file around.  By default if we added to doc_store we should be killing the file</argument>
+
+
+<argument name="uc_rpt_dest_typ" required="no" datatype="string"></argument>
+
+<argument name="uc_force_print_ftp" required="no" datatype="string">Lets say we want to print and ftp.  printer is real printer</argument>
+<argument name="uc_force_print_rename" required="no" datatype="string">Lets say we want to print and rename.  printer is real printer</argument>
+<argument name="uc_force_print_mocacmd" required="no" datatype="string">Not fully implemented but idea is that we want to call MOCA command</argument>
+<argument name="uc_force_convert_pcl" required="no" datatype="string">Convert the PDF file passed in to PCL always</argument>
+<argument name="uc_force_print_usr_ossi_doc_store" required="no" datatype="string">Put to this table</argument>
+
+<argument name="uc_print_file_ov_directory" required="no" datatype="string">When Override to ftp/file.</argument>
+<argument name="uc_print_file_ov_filename_expr" required="no" datatype="string">When Override to ftp/file. This is an expression that will evaluate to the filename to use</argument>
+
+<argument name="uc_print_file_ov_ftp_host" required="no" datatype="string">When Override to FTP</argument>
+<argument name="uc_print_file_ov_ftp_port" required="no" datatype="string">When Override to FTP</argument>
+<argument name="uc_print_file_ov_ftp_destdir" required="no" datatype="string">When Override to FTP</argument>
+<argument name="uc_print_file_ov_ftp_destfile" required="no" datatype="string">When Override to FTP</argument>
+<argument name="uc_print_file_ov_ftp_use_sftp" required="no" datatype="string">When Override to FTP</argument>
+<argument name="uc_print_file_ov_ftp_mode" required="no" datatype="string">When Override to FTP</argument>
+<argument name="uc_print_file_ov_ftp_user_id" required="no" datatype="string">When Override to FTP</argument>
+<argument name="uc_print_file_ov_ftp_password" required="no" datatype="string">When Override to FTP</argument>
+<argument name="uc_create_dlytrn_in_new_trx" required="no" datatype="integer">To force dlytrn for print to be in new trx or not
+leave it null for default behavior.  Default is to do in new transaction for actual print but not in new transaction for deferred
+</argument>
+
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+sl_resolve string_from_env 
+where i_string = nvl(@filnam, @filename)
+|
+publish data 
+where wh_id = nvl(@wh_id, @@wh_id) 
+and uc_lbl_folder = '/labels'
+and uc_ignore_print_errors = @@UC_IGNORE_PRINT_ERRORS
+and filnam = @o_value
+and devcod = nvl(nvl(@devcod, @device), @@DEVCOD)
+and uc_label_recognize_expression = ossi__polval('UC-PRINTING', 'LOGGING', 'ONLY-LABELS', '', 'rtstr1', @wh_id) 
+and uc_add_defer_exec_when_doc_store = nvl(@uc_add_defer_exec_when_doc_store, 1 )
+and uc_deferred_exec_exec_typ = ossi__polval ( 'UC-PRINTING', 'DEFERRED-EXEC', 'EXEC_TYP', '', 'rtstr1', @wh_id )
+and copies = nvl(@copies, 1)
+and uc_force_convert_pcl= nvl(@uc_force_convert_pcl, 0)
+and uc_force_print_ftp = nvl(@uc_force_print_ftp,0)
+and uc_force_print_rename = nvl(@uc_force_print_rename,0)
+and usr_id = nvl(@usr_id, @@USR_ID)
+and locale_id = nvl(@locale_id, @@LOCALE_ID)
+|
+/*
+ * If we are passed in a uc_doc_id and no filnam, then we create file name from that uc_doc_id
+ */
+if ( @uc_doc_id is not null and @filnam is null )
+{
+    get ossi stored file from doc store
+    where uc_write_output_file = 1
+    |
+    if ( lower(@printer) like 'usr_ossi_doc_store%' )
+        publish data
+        where printer = null
+    |
+    publish data
+    where filnam = @uc_written_filnam
+    and delflg = 1
+    and printer = @printer
+    and uc_force_print_usr_ossi_doc_store = 0
+}
+|
+if ( @printer like 'FILE%' or @printer like 'FTP%' or @printer like 'MOCA%' or lower(@printer) like 'usr_ossi_doc_store%' )
+    publish data
+    where uc_special_printer = 1
+else
+    publish data
+    where uc_special_printer = 0
+|
+hide stack variable where name = 'filename'
+|
+hide stack variable where name = 'device'
+|
+/*
+ * See if we have a label.  If not told explicitly then determine based on the policy
+ */
+if ( @uc_is_label = '' )
+{
+    if ( @filnam like '%' || @uc_label_recognize_expression || '%' )
+        publish data
+        where uc_is_label = '1'
+    else
+        publish data
+        where uc_is_label = '0'
+}
+|
+{
+    /*
+     * If we are passed in a printer, use it.  Otherwise determine one based on context.
+     * we will have use_prtque on the stack
+     */
+    if ( @printer is not null )
+    {
+        get ossi printer information
+    }
+    else
+    {
+        get ossi best printer 
+        where uc_get_global_default = 1
+        | 
+        get ossi printer information
+    }
+    |
+    publish data
+    where printer = nvl(@use_prtque, @printer )
+    |    
+    {
+        /*
+         * If we are provided a header label and we are in context of label printing - print that first and get it out of the way
+        if ( @uc_recursive_call != '1' and @uc_is_label = '1' and @uc_label_hdr_label_print = '1' and @hdrlbl != '' )
+            print ossi file
+            where filnam = @hdrlbl
+            and uc_recursive_call = '1'
+            and uc_is_label = '1'
+        ;
+         */
+        /*
+         * TODO 2011 had logic here to merge
+         */
+        {
+            /*
+             * This main block has all logic to handle printing and catch error at end.  it has special features like
+             * FILE -- to just have file and optionall rename
+             * FTP -- to put file somewhere
+             * MOCA -- To call moca command 
+             */
+            {
+                /*
+                 * We can have printer as FILE or FTP - but also for normal printing we can pass in force ftp or rename calls as well
+                 * In the latter case we do both
+                 */
+                if ( @uc_special_printer = 1 or @uc_force_print_ftp = 1 or @uc_force_print_rename = 1 or @uc_force_print_usr_ossi_doc_store = 1)
+                {
+                    /*
+                     * If this is passed in, then we use it to determine where the file should be put to.
+                     */
+                    if ( @uc_rpt_dest_typ is not null )
+                    {
+                        publish ossi polval as projection with evaluated expressions
+                        where polcod = 'UC-PRINTING'
+                        and polvar = 'RPT-DEST-' || @uc_rpt_dest_typ
+                        and polval = '%'
+                        |
+                        if ( @uc_print_file_ov_filename_expr is not null )
+                            execute server command
+                            where cmd = "publish data where uc_print_file_ov_filename = '" || @uc_print_file_ov_filename_expr || "'" 
+                                     || " and uc_print_file_ov_directory = '" || @uc_print_file_ov_directory_expr || "'"
+                        |
+                        publish data
+                        where directory = nvl(@uc_print_file_ov_directory, @directory )
+                        and filename = nvl(@uc_print_file_ov_filename, @filename)
+                    }
+                    |
+                    /*
+                     * Following are needed for ftp but publish them here so that we can utilize them for creating defer
+                     * execution entry
+                     */
+                    publish data
+                    where ftp_destdir   = nvl ( nvl(@uc_print_file_ov_ftp_destdir, @ftp_destdir), @directory )
+                    and   ftp_destfile  = nvl ( nvl(@uc_print_file_ov_ftp_destfile,@ftp_destfile),@filename  )
+                    and   ftp_host      = nvl ( @uc_print_file_ov_ftp_host, @ftp_host )
+                    and   ftp_port      = nvl ( @uc_print_file_ov_ftp_port, @ftp_port )
+                    and   use_sftp      = nvl ( nvl ( @uc_print_file_ov_ftp_use_sftp, @ftp_use_sftp ), 1 )
+                    and   mode          = nvl ( nvl ( @uc_print_file_ov_ftp_mode, @ftp_mode), 'B' )
+                    and   ftp_user_id   = nvl ( @uc_print_file_ov_ftp_user_id, @ftp_user_id )
+                    and   ftp_password  = nvl ( @uc_print_file_ov_ftp_password, @ftp_password )
+                    |
+                    {
+                        /*
+                         * Do we simply put the contents of the file to the doc_store table?
+                         */
+                        if ( lower(@printer) like 'usr_ossi_doc_store%'  or @uc_force_print_usr_ossi_doc_store = 1 )
+                        {
+                            create ossi document store data
+                            where uc_contents_filnam = @filnam
+                            and uc_doc_subtyp_cd = 'print file'
+                            and uc_doc_typ_cd = nvl(@rpt_id, @label_name)
+                            and uc_contents_base64 = null
+                            and uc_doc_id = null
+                            |
+                            {
+                                /* If here then add to table succeeded.  No point in keeping file around */
+                                if ( @uc_keep_printed_file_when_added_to_doc_store != 1 )
+                                   remove file
+                                   where filnam = @filnam
+                                   catch(@?)
+                                ;
+                                if ( @uc_add_defer_exec_when_doc_store = 1 )
+                                {
+                                    /*
+                                     * exec_kv3 is what we will do printing multi threading on.  So that should be a value
+                                     * where we can start multiple processes.  So printer is ok so is ftp directory or ftp destination
+                                     */
+                                    if ( @uc_force_print_ftp = 1 or @printer like 'FTP%' )
+                                        publish data
+                                        where exec_kv3 = 'FTP-' || @ftp_host
+                                    else if ( @printer like 'FILE%' or @uc_force_print_rename = 1 )
+                                        publish data
+                                        where exec_kv3 = 'FILE-' || @directory
+                                    else if ( @printer like 'MOCA%' or @uc_force_print_mocacmd = 1 )
+                                        publish data
+                                        where exec_kv3 = 'MOCA'
+                                    else
+                                        publish data
+                                        where exec_kv3 = nvl(@printer, '----')
+                                    |
+                                    create deferred execution
+                                    where exec_typ = @uc_deferred_exec_exec_typ
+                                    and exec_kv1 = @uc_doc_id
+                                    and exec_kv2 = substr(@filnam,1,100)
+                                    and exec_kv3 = substr(@exec_kv3,1,100)
+                                    and deferred_cmd = "print ossi file"
+                                                    || " where filnam = null "
+                                                    || " and uc_doc_id = " || qq(@uc_doc_id)
+                                                    || " and wh_id = "     || qq(@wh_id)
+                                                    || " and printer = "   || qq(@printer)
+                                                    || " and options = "   || qq(@options)
+                                                    || " and devcod = "    || qq(@devcod)
+                                                    || " and usr_id = "    || qq(@usr_id)
+                                                    || " and locale_id = " || qq(@locale_id)
+                                                    || " and optcod = "    || qq(@oprcod)
+                                                    || " and copies = "    || @copies
+                                                    || " and uc_is_label=" || qq(@uc_is_label)
+                                                    || " and uc_called_from = " || qq(@uc_called_from)
+                                                    /*
+                                                     * If our original print file passed in rpt_dest_typ, that means at this point
+                                                     * we know all the evaluated values.  But we will not know them in deferred exec
+                                                     * context.  So by passing in null for uc_rpt_dest_typ we make sure in deferred
+                                                     * context it will not determine the values.  But the evaluated values themselves
+                                                     * are available
+                                                     */
+                                                    || " and uc_rpt_dest_typ = null" 
+                                                    || " and directory = " || qq(@directory)
+                                                    || " and filename = " || qq(@filename)
+                                                    || " and ftp_destdir = " || qq(@ftp_destdir)
+                                                    || " and ftp_host = " || qq(@ftp_host)
+                                                    || " and ftp_password = " || qq(@ftp_password)
+                                                    || " and ftp_use_sftp = "     || qq(@use_sftp)
+                                                    || " and ftp_port = " || qq(@ftp_port)
+                                                    || " and ftp_mode = " || qq(@ftp_mode)
+                                                    || " and ftp_user_id = " || qq(@ftp_user_id)
+                                                    /* End all parms */
+                                                    || " and uc_force_print_usr_ossi_doc_store = 0"
+                                                    || " and uc_force_convert_pcl = " || @uc_force_convert_pcl
+                                                    || " and uc_force_print_ftp = " || @uc_force_print_ftp
+                                                    || " and uc_force_print_rename = " || @uc_force_print_rename
+                                }
+                            }
+                            |
+                            publish data
+                            where uc_oper = 'usr_ossi_doc_store'
+                            and filnam = @filnam
+                            and uc_print_file_exec_id = @exec_id
+                            and uc_print_file_uc_doc_id = @uc_doc_id
+                        } /* putting file to a table */
+                        /*
+                         * We are printing to a file or renaming the file before print
+                         */
+                        else if ( @printer like 'FILE%' or @uc_force_print_rename = 1)
+                        {
+                            publish data
+                            where to_filnam = @directory || '/' || @filename
+                            |
+                            if ( @directory is null or @filename is null )
+                                publish data
+                                where filnam = @filnam
+                                and uc_oper = 'dest directory or filename null so ignore'
+                            else if ( ossi__replace ( @to_filnam, '\', '/' ) = ossi__replace ( @filnam, '\', '/' ) )
+                                publish data
+                                where filnam = @filnam
+                                and uc_oper = 'NO-RENAME-SAME-ALREADY'
+                            else
+                            {
+                                remove file
+                                where filnam = @to_filnam
+                                catch (@?)
+                                ;
+                                move file
+                                where from = @filnam
+                                and to = @to_filnam
+                                ;
+                                publish data
+                                where filnam = @to_filnam
+                                and uc_oper = 'RENAME DONE'
+                            } /* have to_filnam */
+                        } /* file printer */
+                        /*
+                         * FTP the file somewhere
+                         */
+                        else if ( @printer like 'FTP%' or @uc_force_print_ftp = 1)
+                        {
+                            sl_split filename 
+                            where full_file_name  = @filnam
+                            |
+                            {
+                                put ossi ftp
+                                where host = @ftp_host
+                                and port = @ftp_port
+                                and user = @ftp_user_id
+                                and pass = @ftp_password
+                                and destdir = @ftp_destdir
+                                and destfile = @ftp_destfile
+                                and mode = @mode
+                                and use_sftp = @use_sftp
+                                and srcdir = @s_dir
+                                and srcfile = @s_orig_filename
+                                and use_rename = 1
+                                ;
+                                publish data
+                                where uc_oper = 'FTP DONE-' || @ftp_user_id || '@' || @ftp_host || ':' || @ftp_port || '-sftp=' || @use_sftp || ',orig filename=' || @filnam
+                                and filnam = @destdir || '/' || @destfile
+                            }
+                        } /* FTP */
+                        /*
+                         * Execute MOCA Command
+                         */
+                        else if ( @printer like 'MOCA%' or @uc_force_print_mocacmd = 1)
+                        {
+                            publish data
+                            where uc_oper = 'MOCA Command - TODO, e.g. web-service call'
+                            and filnam = @filnam
+                        } /* Execute a MOCA Command */
+                    } /* scope */
+                    |
+                    publish data
+                    where printer = @printer
+                    and pathname = @filnam
+                    and uc_oper = @uc_oper
+                    and filnam = @filnam
+                    and uc_print_file_exec_id = @uc_print_file_exec_id
+                    and uc_print_file_uc_doc_id = @uc_print_file_uc_doc_id
+                } /* special printers of FILE or FTP or table etc*/
+                |
+                {
+                    /*
+                     * Do we need to convert the file to PCL.  We can force it but also if printer is defined as such it will happen behind the scene
+                     */
+                    if ( @uc_force_convert_pcl = 1 )
+                    {
+                        publish data
+                        where old_filnam = @filnam
+                        |
+                        convert ossi pdf to pcl
+                        where pdf_pathname = @filnam
+                        |
+                        publish data
+                        where filnam = @pcl_pathname
+                        and old_filnam = @old_filnam
+                    }
+                    |
+                    if ( @uc_special_printer != 1 )
+                    {
+                        if(substr(@filnam, len(@filnam) - 3) = '.pdf')
+                        {
+                            print ossi pdf
+                            where filename = @filnam
+                            and @+printer
+                        }
+                        else
+                        {
+                            /*
+                             * the DCS print file needs the filename,
+                             * pass it explicitly.
+                            */
+                            print file
+                            where filnam = @filnam 
+                            and filename = nvl(@filename, @filnam)
+                        }
+                        |
+                        filter data
+                        where moca_filter_level = 1
+                        and old_filnam = @old_filnam
+                        and prttyp = @prttyp
+                    }
+                    else
+                        publish data
+                        where printer = @printer
+                        and pathname = @filnam
+                        and uc_oper = @uc_oper
+                        and filnam = @filnam
+                        and old_filnam = @old_filnam
+                        and prttyp = @prttyp
+                        and uc_print_file_exec_id = @uc_print_file_exec_id
+                        and uc_print_file_uc_doc_id = @uc_print_file_uc_doc_id
+                }
+            }
+            catch(@?) 
+            >> uc_res_print_file
+            |
+            publish data
+            where uc_err_code = @?
+            and uc_err_descr = @!
+            |
+            {
+                if ( @uc_logging_enabled = 1 and (@uc_logging_only_labels = 0 or @uc_is_label = '1' ))
+                    write ossi daily transaction for print
+                    where adj_ref2 = substr(@schbat,1,20)
+                ;
+                if ( @uc_err_code = 0 )
+                    publish data combination
+                    where res = @uc_res_print_file
+                else if ( @uc_ignore_print_errors != 1 )
+                    set return status
+                    where status = @uc_err_code
+                    and message = @uc_err_descr
+                else
+                    publish data
+                    where printer = @printer
+                    and pathname = @filnam
+                    and prttyp = @prttyp
+                    and uc_err_code = @uc_err_code
+                    and uc_err_descr = @uc_err_descr
+            } /* block with error code */
+        } /* additional logic needed post merge logic */
+    } /* have printer */
+} /* scope */
+
+   
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+Override the basic Print file API.  This provides several additional features
+<ul>
+    <li>We log dlytrn for each print in its own commit context.  That helps in troubleshooting.  We know label vs report by name</li>
+    <li>We can pass in filnam for prtining - and also uc_doc_id which is PK of usr_ossi_doc_store.  When that is passed in, it will
+        create file and then print that file</li>
+    <li>We support some special printers</li>
+    <ul>
+        <li>FTP - means rather than printing ftp the file [or pass in uc_force_print_ftp = 1]</li>
+        <li>FILE - means rather than printing just generate the file</li>
+        <li>usr_ossi_doc_store - means file contents re stored in this table.  In this case a deferred execution entry is created
+            to then print it later.  [or pass in uc_force_print_usr_ossi_doc_store = 1]</li>
+    </ul>
+</ul>
+
+Using the usr_ossi_doc_store integration we can do printing [in transaction].  i.e. we can do [print file] and pass in uc_add_defer_exec_when_doc_store=1.
+That means that contents of passed in file will simply be added to usr_ossi_doc_store and no printing is done.  But at the same time 
+a deferred_exec entry is added.  This means that when the triggring transaction actually commits, that is when a separate process will kick
+off printing.
+
+The FTP functionality is primarily for some integrations where we want to push the labels, reports etc. to MHE servers.  So we can consider
+that activity as special type of printing by treating FTP and FILE a special types of printers.
+
+In addition to this, we can also print PCL.  That is a custom attribute for prsmst.prttyp = PCL.  If it is a PCL printer, we will first 
+convert the file to PCL via [convert usr pdf to pcl]
+ 
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+<retcol name="printer" type="string">Name of the printer the file was sent to.</retcol>
+<retcol name="pathname" type="string">The pathname of the file that was printed.</retcol>
+<retcol name="old_filnam" type="string">If we converted to PCL before printing, this is the PDF file name</retcol>
+<retcol name="prttyp" type="string">Printer Type</retcol>
+<retcol name="uc_oper" type="string">Optionally returned. For FILE situation</retcol>
+
+<retcol name="uc_print_file_exec_id" type="string">If we created deferred exec after putting file in table</retcol>
+<retcol name="uc_print_file_uc_doc_id" type="string">If we put in table, then the uc_doc_id value</retcol>
+
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+<policy 
+    polcod="UC-PRINTING" 
+    polvar="RPT-DEST-[identifier for reports]" 
+    polval="DIRECTORY or FILENAME" 
+    rtstr1="MOCA Expression to construct directory or filename">
+    After report has been generated (or fetched from file system), this is used to rename it to make a name per requirements
+</policy>
+
+<policy 
+    polcod="UC-PRINTING" 
+    polvar="DEFERRED-EXEC" 
+    polval="EXEC_TYP" 
+    rtstr1="exec_typ with which we create deferred execution.  Default is DPRT">
+    We can do print file such that the contents of printed file simply go to usr_ossi_doc_store table along with a deferred execution call
+    that would print the file.  That deferred execution is created with this
+</policy>
+
+<policy 
+    polcod="UC-PRINTING" 
+    polvar="LOGGING" 
+    polval="ONLY-LABELS" 
+    rtstr1="what is the pattern to indicate it is a label.  default is /bundle_">
+</policy>
+
+<policy 
+    polcod="UC-PRINTING" 
+    polvar="LOGGING" 
+    polval="ENABLED" 
+    rtnum1="1 to enable.">
+</policy>
+
+
+<seealso cref="write usr daily transaction for print"></seealso>
+<seealso cref="print file"></seealso>
+<seealso cref="convert usr pdf to pcl"></seealso>
+<seealso cref="create ossi document store data"></seealso>
+<seealso cref="put ossi ftp"></seealso>
+<seealso cref="write usr daily transaction for print"></seealso>
+
+
+
+
+</documentation>
+
+
+</command>

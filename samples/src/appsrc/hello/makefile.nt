@@ -1,0 +1,8 @@
+LESDIR=..\..\..\..
+
+TARGET=hello
+TARGETTYPE=.exe
+
+OFILES=hello.obj
+
+!include $(DCSDIR)\makefiles\ntstd.mk

@@ -1,0 +1,133 @@
+<command>
+<name>get ossi app monitor email settings</name>
+<description>Get email settings for an application monitor</description>
+
+<argument name="uc_monitor_id" required="yes" datatype="string"></argument>
+<argument name="uc_mon_data_res" required="yes" datatype="string"></argument>
+<argument name="uc_mon_key_data" required="yes" datatype="string"></argument>
+
+<argument name="uc_mon_mail_from" required="yes" datatype="string">Override value.  If not passed get from policy</argument>
+<argument name="uc_mon_mail_subject" required="yes" datatype="string">Override value.  If not passed get from policy</argument>
+<argument name="uc_mon_mail_message" required="yes" datatype="string">Override value.  If not passed get from policy</argument>
+<argument name="uc_mon_mail_send_to" required="yes" datatype="string">Override value.  If not passed get from policy</argument>
+
+
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+publish data
+where uc_mon_mail_from     = nvl( @uc_mon_mail_from,    ossi__polval_nc ( 'USR-OSSI-APP-MONITOR', 'SETUP', 'MAIL-FROM','', 'rtstr1', '----' ) )
+and   uc_mon_mail_subject  = nvl( @uc_mon_mail_subject, ossi__polval_nc ( 'USR-OSSI-APP-MONITOR', @uc_monitor_id, 'PARAMETERS', 'MAIL-SUBJECT', 'rtstr2', '----' ) )
+and   uc_mon_mail_message  = nvl( @uc_mon_mail_message, ossi__polval_nc ( 'USR-OSSI-APP-MONITOR', @uc_monitor_id, 'PARAMETERS', 'MAIL-MESSAGE', 'rtstr2', '----' ) )
+and   uc_mon_data_rowcount = rowcount(@uc_mon_data_res)
+|
+/*
+ * To support really long list of email to we will support concatenating in multiple rtstr1s
+ */
+if ( @uc_mon_mail_send_to is not null )
+    publish data
+    where uc_mon_mail_send_to = @uc_mon_mail_send_to
+else
+{
+    [
+    select rtstr2 email_to
+    from poldat
+    where polcod = 'USR-OSSI-APP-MONITOR'
+    and polvar = @uc_monitor_id
+    and polval = 'PARAMETERS'
+    and rtstr1 like 'MAIL-SEND-TO%'
+    and wh_id_tmpl = '----'
+    order by srtseq
+    ]
+    catch (-1403,510)
+    >> res_email_to
+    |
+    convert column results to string 
+    where res = @res_email_to 
+    and colnam = 'email_to' 
+    and separator = ';'
+    |
+    publish data
+    where uc_mon_mail_send_to = @result_string
+}
+|
+publish data
+where mail_from = nvl( @uc_mon_mail_from, @@UC_APP_MON_MAIL_FROM )
+and send_to = @uc_mon_mail_send_to
+and subject = nvl( @uc_mon_mail_subject, 'OSSI-MONITOR: (' || @@MOCA_ENVNAME || ')' || @uc_monitor_id || '.  Rowcount = ' || @uc_mon_data_rowcount || '.   Keydata is ' || @uc_mon_key_data )
+and message = nvl( @uc_mon_mail_message, 'Please see attached documents.  Number of rows is ' || @uc_mon_data_rowcount || '. Environment name is ' || @@MOCA_ENVNAME || '.  Key Data is ' || @uc_mon_key_data )
+/**/
+and uc_mon_mail_from = @uc_mon_mail_from
+and uc_mon_mail_subject = @uc_mon_mail_subject
+and uc_mon_mail_message = @uc_mon_mail_message
+
+
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This command is used to get email settings for application monitor.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+<retrows>1</retrows>
+<retcol name="mail_from" type="COMTYP_CHAR">used as from address for email</retcol>
+<retcol name="send_to" type="COMTYP_CHAR">; separated list of to addresses</retcol>
+<retcol name="subject" type="COMTYP_CHAR">subject</retcol>
+<retcol name="message" type="COMTYP_CHAR">Message</retcol>
+<retcol name="uc_mon_mail_from" type="COMTYP_CHAR">Value as retuend from policy</retcol>
+<retcol name="uc_mon_mail_subject" type="COMTYP_CHAR">Value as retuend from policy</retcol>
+<retcol name="uc_mon_mail_message" type="COMTYP_CHAR">Value as retuend from policy</retcol>
+
+
+<policy
+    polcod="USR-OSSI-APP-MONITOR"
+    polvar="SETUP"
+    polval="MAIL-FROM"
+    rtstr1="from address to use generally for monitor email messages"
+></policy>
+
+<policy
+    polcod="USR-OSSI-APP-MONITOR"
+    polvar="specific monitor name"
+    polval="PARAMETERS"
+    rtstr1="MAIL-SUBJECT"
+    rtstr2="Subject for this specific monitor.  If not specified we construct a suitable default which references monitor id and environment"
+></policy>
+
+<policy
+    polcod="USR-OSSI-APP-MONITOR"
+    polvar="specific monitor name"
+    polval="PARAMETERS"
+    rtstr1="MAIL-MESSAGE"
+    rtstr2="Message for this specific monitor.  If not specified we construct a suitable default which references monitor id, environment, and #records in resultset"
+></policy>
+
+<policy
+    polcod="USR-OSSI-APP-MONITOR"
+    polvar="specific monitor name"
+    polval="PARAMETERS"
+    rtstr1="MAIL-SEND-TO%"
+    rtstr2="Multiple rows can be added in this policy with differnt suffix to rtstr1 in place of %"
+></policy>
+
+
+
+
+<seealso cref="send ossi email"></seealso>
+<seealso cref="send ossi app monitor email"></seealso>
+<seealso cref="get ossi global email settings"></seealso>
+
+</documentation>
+
+</command>

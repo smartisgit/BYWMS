@@ -1,0 +1,22 @@
+<trigger>
+<name>process ossi table data change hook</name>
+<on-command>create order</on-command>
+<fire-sequence>100000</fire-sequence>
+
+<local-syntax>
+<![CDATA[
+
+process ossi table data change hook
+where table_name = 'ORD'
+and uc_update_where_clause = null
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<seealso cref="process ossi table data change hook"></seealso>
+
+</documentation>
+
+</trigger>

@@ -1,0 +1,124 @@
+<command>
+<name>change work</name>
+<description>Override to publish old values</description> 
+
+<argument name="reqnum" datatype="integer"></argument>
+<argument name="wrksts" datatype="string"></argument>
+<argument name="effpri" datatype="integer"></argument>
+<argument name="asg_usr_id" datatype="string"></argument>
+<argument name="asg_role_id" datatype="string"></argument>
+<argument name="srcloc" datatype="string"></argument>
+<argument name="dstloc" datatype="string"></argument>
+<argument name="refloc" datatype="string"></argument>
+<argument name="wh_id" datatype="string"></argument>
+
+
+<type>Local Syntax</type>
+
+<local-syntax>
+<![CDATA[
+
+publish data
+where wh_id = nvl(@wh_id, @@WH_ID)
+and uc_new_wrksts = @wrksts
+|
+publish data
+where uc_cancel_pick_disallow_oprcod_list =  ',' || ossi__polval_cat ( 'USR-CANCEL-PICK', 'MISCELLANEOUS', 'PRE-CHECK-WRKQUE-OPRCOD-LIST', '', 'rtstr1', 'rtnum1=1',  ",", @wh_id) || ","
+|
+publish data
+where uc_old_wrkque_wrksts = null
+and   uc_old_wrkque_effpri = null
+and   uc_old_wrkque_asg_usr_id = null
+and   uc_old_wrkque_asg_role_id = null
+and   uc_old_wrkque_srcloc = null
+and   uc_old_wrkque_dstloc = null
+and   uc_old_wrkque_refloc = null
+and   uc_old_wrkque_oprcod = null
+|
+[
+select wrksts      uc_old_wrkque_wrksts,
+       effpri      uc_old_wrkque_effpri,
+       asg_usr_id  uc_old_wrkque_asg_usr_id,
+       asg_role_id uc_old_wrkque_asg_role_id,
+       srcloc      uc_old_wrkque_srcloc,
+       dstloc      uc_old_wrkque_dstloc,
+       refloc      uc_old_wrkque_refloc,
+       oprcod      uc_old_wrkque_oprcod
+from wrkque
+where reqnum = @reqnum
+]
+catch (-1403,510)
+|
+/*
+ * For AGV work statuses (that are in policy above where cancel pick is not allowed) there is no concept of SUSP work
+ * A susp work there means that we will cancel request
+ * Similarly we cannot go from CANP to PEND
+ */
+if ( instr( @uc_cancel_pick_disallow_oprcod_list, ','||@uc_old_wrkque_oprcod||',') > 0 and @wrksts = 'SUSP' )
+    set return status
+    where status = ossi__e ( 'eUSR_OSSI_WRKQUE_CANOT_BE_SUSPENDED' )
+    and reqnum = @reqnum
+    and oprcod = @uc_old_wrkque_oprcod
+    and wrksts = @uc_old_wrkque_wrksts
+    and to_wrksts = @uc_new_wrksts
+else if ( @uc_old_wrkque_wrksts = 'CANP' and @wrksts = 'PEND' )
+    set return status
+    where status = ossi__e ( 'eUSR_OSSI_WRKQUE_CANNOT_MOVE_FROM_CANP' )
+    and reqnum = @reqnum
+    and oprcod = @uc_old_wrkque_oprcod
+    and wrksts = @uc_old_wrkque_wrksts
+    and to_wrksts = @uc_new_wrksts
+else
+    ^change work
+|
+filter data
+where moca_filter_level = 1
+and uc_old_wrkque_wrksts      = @uc_old_wrkque_wrksts
+and uc_old_wrkque_effpri      = @uc_old_wrkque_effpri
+and uc_old_wrkque_asg_usr_id  = @uc_old_wrkque_asg_usr_id
+and uc_old_wrkque_asg_role_id = @uc_old_wrkque_asg_role_id
+and uc_old_wrkque_srcloc      = @uc_old_wrkque_srcloc
+and uc_old_wrkque_dstloc      = @uc_old_wrkque_dstloc
+and uc_old_wrkque_refloc      = @uc_old_wrkque_refloc
+
+]]>
+</local-syntax>
+
+
+<documentation>
+
+<remarks>
+<![CDATA[
+  <p>
+  We are overrding to publish old values for triggers
+  </p>
+
+]]>
+</remarks>
+
+<retcol name="@*" type="COMTYP_CHAR">whatever standard returns</retcol>
+<retcol name="uc_old_wrkque_wrksts" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_old_wrkque_effpri" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_old_wrkque_asg_usr_id" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_old_wrkque_asg_role_id" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_old_wrkque_srcloc" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_old_wrkque_dstloc" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_old_wrkque_refloc" type="COMTYP_CHAR"></retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+<exception value="eDB_NO_ROWS_AFFECTED">No rows found</exception>
+<exception value="eUSR_OSSI_WRKQUE_CANOT_BE_SUSPENDED">Attempt to change work status to SUSP and oprcod was in list where it is not allowed</exception>
+<exception value="eUSR_OSSI_WRKQUE_CANNOT_MOVE_FROM_CANP">Special status CANP to PEND is not allowed </exception>
+
+<policy
+    polcod="USR-CANCEL-PICK"
+    polvar="MISCELLANEOUS"
+    polval="PRE-CHECK-WRKQUE-OPRCOD-LIST"
+    rtstr1="put oprcod here one row at a time for which we should do check to make sure they cannot be suspended"
+    rtnum1="1 to enable a row"
+></policy>
+
+
+</documentation>
+
+</command>

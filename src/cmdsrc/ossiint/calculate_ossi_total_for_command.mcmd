@@ -1,0 +1,56 @@
+<command>
+<name>calculate ossi total for command</name>
+<description>Execute a MOCA command.  Then apply an expression on the resultset and total.  Used for example to comvert a measurement and total it</description>
+
+<argument name="cmd" required="yes" datatype="string">Command to execute</argument>
+<argument name="sum_expr" required="yes" datatype="string">Expression built from command output which is then totalled</argument>
+
+<type>Local Syntax</type>
+
+
+<local-syntax>
+<![CDATA[
+
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+{
+    publish data
+    where exec_cmd = @cmd || '|' || 'publish data where num_expr =' || @sum_expr
+    |
+    [[
+    Double total = (Double)0;
+    //
+    res = moca.executeInline ( exec_cmd )
+    while ( res.next() )
+    {
+        total += res.getDouble ( "num_expr" );
+    }
+    [uc_res_total:total]
+    ]]
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+Need arose when we needed to sum up invlod captured data (in ounces) but need to report in kilograms.  Since SAP needs the invlod data
+in kg rounded at 3 sig digits we needed to do same logic in WMS.  
+<pre>
+publish data where ship_id = 'S2000009MR'
+|
+publish data 
+where cmd = "[select distinct lodnum from inventory_pckwrk_view where ship_id = @ship_id]|[select vc_netwgt from invlod where lodnum = @lodnum]"
+and sum_expr = "ossi__value_in_other_mu(@vc_netwgt, 'kilogram', '', 3 )" 
+|
+calculate ossi total for command
+</pre>
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+</documentation>
+</command>

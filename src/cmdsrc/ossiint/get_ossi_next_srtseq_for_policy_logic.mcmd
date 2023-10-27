@@ -1,0 +1,39 @@
+<command>
+<name>get ossi next srtseq for policy logic</name>
+<description>Get next srtseq for policy logic</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+[select nvl(max(srtseq), 10000000) + 1 srtseq
+   from poldat_view
+  where polcod = @polcod
+    and polvar = @polvar
+    and polval = @polval
+    and wh_id = nvl(@wh_id, '----')
+    and srtseq > 10000000
+]
+]]>
+</local-syntax>
+<argument name="polcod" required="yes" datatype="string"></argument>
+<argument name="polvar" required="yes" datatype="string"></argument>
+<argument name="polval" required="yes" datatype="string"></argument>
+<argument name="wh_id" required="no" datatype="string"></argument>
+
+<documentation>
+
+<remarks>
+This command is used to get next srtseq for policy logic.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

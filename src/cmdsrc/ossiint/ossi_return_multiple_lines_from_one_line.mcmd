@@ -1,0 +1,49 @@
+<command>
+<name>ossi return multiple lines from one line</name>
+<description>Return multiple lines from one line</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+
+if ( @one_line )
+{
+   publish data where my_len=sl_len(@one_line)
+   |
+   [select ceil(@my_len/(@max_line_len/1.0) ) my_num_lines from dual]
+   |
+   do loop where iterations = @my_num_lines
+   |
+   {
+      publish data
+      where
+            line_part_num=@i
+      and   line_part=substr
+                      (
+                         @one_line,
+                         (@i*@max_line_len)+1,
+                         @max_line_len
+                       )
+   }
+}
+]]>
+</local-syntax>
+<documentation>
+<remarks>
+<![CDATA[
+This component breaks up the passed one line into multiple
+lines.
+Pass in the following:
+- max_line_len -- what is the maximum length for each line
+- one_line     -- one line of text
+]]>
+</remarks>
+<retcol name="line_part_num" type="COMTYP_INT"></retcol>
+<retcol name="line_part" type="COMTYP_STRING"></retcol>
+<exception value="eOK">Normal successful completion</exception>
+</documentation>
+</command>

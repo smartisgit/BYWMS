@@ -1,0 +1,72 @@
+<command>
+<name>change ossi general policy for auto waving</name>
+<description>This command will change general setting of auto waving</description>
+ 
+<argument name="old_uc_auto_wave_setting_cd" required="yes"   datatype="string">Autowave setting code</argument>
+<argument name="old_uc_auto_wave_rule_id" required="yes"   datatype="string">Old Wave Rule</argument>
+<argument name="old_srtseq"   required="yes" datatype="string">Policy Sort Sequence</argument>
+<argument name="old_uc_gnrl_ena_flg"  required="no"  datatype="string">General Setting enabled</argument>
+<argument name="old_uc_setting_1" required="no"  datatype="string">Setting 1</argument>
+<argument name="old_uc_setting_2" required="no"  datatype="string">Setting 2</argument>
+<argument name="new_uc_auto_wave_setting_cd" required="yes"   datatype="string">Autowave setting code</argument>
+<argument name="new_uc_auto_wave_rule_id" required="yes"   datatype="string">New Wave Rule</argument>
+<argument name="new_srtseq"   required="yes" datatype="string">Policy Sort Sequence</argument>
+<argument name="new_uc_gnrl_ena_flg"  required="no"  datatype="string">General Setting enabled</argument>
+<argument name="new_uc_setting_1" required="no"  datatype="string">Setting 1</argument>
+<argument name="new_uc_setting_2" required="no"  datatype="string">Setting 2</argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+    remove policy
+      where polcod = 'USR-WAVE-PLANNING'
+        and wh_id_tmpl = '----'
+        and polvar = decode(@old_uc_auto_wave_setting_cd,'RULE_PARM-MAP','WAVE-RULE-PARAMETER-TABLE','AUTO-WAVE')
+        and polval = @old_uc_auto_wave_rule_id
+        and srtseq = @old_srtseq
+    |
+    create policy 
+      where polcod = 'USR-WAVE-PLANNING'
+        and wh_id_tmpl = '----'
+        and polvar = decode(@new_uc_auto_wave_setting_cd,'RULE_PARM-MAP','WAVE-RULE-PARAMETER-TABLE','AUTO-WAVE')
+        and polval = @new_uc_auto_wave_rule_id
+        and srtseq = @new_srtseq
+        and wh_id_tmpl = '----'
+        and rtstr1 = @new_uc_setting_1
+        and rtstr2 = @new_uc_setting_2
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This will change a general policy of auto waving.
+</p>
+]]>
+</remarks>
+
+<retrows>0</retrows>
+<exception value="eOK">The command completed successfully.</exception>
+
+<example>
+<![CDATA[
+<p>
+</p>
+]]>
+
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+<seealso cref="list ossi general policies for auto waving"></seealso>
+<seealso cref="create ossi general policy for auto waving"></seealso>
+<seealso cref="remove ossi general policy for auto waving"></seealso>
+
+</documentation>
+
+
+</command>

@@ -1,0 +1,94 @@
+<command>
+<name>list ossi pick with outer pick data</name>
+<description>
+we can have case picks within another case pick.  This component will return data for the outer casing
+</description>
+
+<argument name="wh_id" required="yes" datatype="string"></argument>
+<argument name="wrkref" required="yes" datatype="string"></argument>
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+{
+    execute ossi les_cmd
+    where les_cmd_id = 'uc_ctxt_cmd_list_ossi_pick_with_outer_data'
+    and uc_les_cmd_inline = 1
+    and exec_uc_les_cmd_cust_lvl = null
+    and uc_inhibit_return_extra_columns = 1
+    catch (-1403,510)
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+The picks can be of following types:
+<ul>
+    <li>Normal L pick.  That is outer most pick but not for case pick mhe system</li>
+    <li>Uncartonized D pick. Not typical but that will also not be for a typical MHE case system</li>
+    <li>Cartonized D pick.  That is not an outer pick so should not be going to an MHE case system</li>
+    <li>Normal K pick which is outer most.  This will be something that goes to MHE.  The pckwrk_hdr row here does not have ctnnum set</li>
+    <li>Sensitive K pick.  This is inside anoter K.  So these are not outer most.  Signature is that there is another P pick for that subnum</li>
+    <li>Senstive K pick has a P pick as well.  This is an intermediate pick work and should not go to MHE</li>
+</ul>
+</p>
+]]>
+</remarks>
+
+
+<retrows>1</retrows>
+
+<retcol name="uc_mhe_case_flg" type="COMTYP_CHAR">1 or 0.  if 1 a typical case level MHE system should get this ock</retcol>
+<retcol name="uc_is_outer_flg" type="COMTYP_CHAR">is it an outer pick.  This is 1 for anything not in a carton and also the K pick itself which is outermost</retcol>
+<retcol name="uc_outer_wrkref" type="COMTYP_CHAR">Outer wrkref</retcol>
+<retcol name="uc_outer_ctncod" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_outer_subnum" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_outer_lodlvl" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_outer_prtnum" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_outer_wrktyp" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_outer_vc_capnum" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_outer_subucc" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_outer_srcloc" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_outer_loc_typ" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_outer_uc_area_proc_cd" type="COMTYP_CHAR"></retcol>
+
+<retcol name="wrkref" type="COMTYP_CHAR">passed in pick data</retcol>
+<retcol name="wrktyp" type="COMTYP_CHAR"></retcol>
+<retcol name="lodlvl" type="COMTYP_CHAR"></retcol>
+<retcol name="prtnum" type="COMTYP_CHAR"></retcol>
+<retcol name="ctnnum" type="COMTYP_CHAR"></retcol>
+<retcol name="ctncod" type="COMTYP_CHAR"></retcol>
+<retcol name="subnum" type="COMTYP_CHAR"></retcol>
+<retcol name="srcloc" type="COMTYP_CHAR"></retcol>
+<retcol name="loc_typ" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_area_proc_cd" type="COMTYP_CHAR"></retcol>
+
+
+<example>
+<![CDATA[
+<p>
+</p>
+]]>
+
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+<seealso cref="list ossi pick data"></seealso>
+<seealso cref="list usr pick detail data"></seealso>
+<seealso cref="list usr outer container pick header data"></seealso>
+<seealso cref="list usr pick with outer pick data"></seealso>
+
+
+</documentation>
+
+
+</command>

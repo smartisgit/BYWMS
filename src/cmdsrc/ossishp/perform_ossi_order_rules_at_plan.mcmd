@@ -1,0 +1,95 @@
+<command>
+<name>perform ossi order rules at plan</name>
+<description>perform rules at planning time, i.e. order is planned to shipment</description>
+
+<argument name="wh_id" required="yes" datatype="string"></argument>
+<argument name="ship_id" required="yes" datatype="string"></argument>
+<argument name="uc_called_from" required="yes" datatype="string"></argument>
+
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20200415 mustafa.ahmed
+ */
+publish data
+where wh_id = nvl ( @wh_id, @@WH_ID)
+and client_id = nvl(@client_id, '----')
+and uc_called_from = nvl(@uc_called_from, 'postconsolidate shipment lines' )
+and uc_do_work_wf = 0 /* hard code as that is not a current amway need */
+|
+publish data
+where uc_table_list_set_defaults = ossi__polval ( 'USR-OSSI-DATA-CHANGE-HOOK', 'ORD', 'TABLE-LIST-DEFAULT',  '', 'rtstr1', '----' )
+and uc_set_default_rule_grp_id = ossi__polval ( 'USR-OSSI-DATA-CHANGE-HOOK', 'ORD', 'UC_RULE_GRP', '', 'rtstr1', '----')
+|
+{
+   [
+   select client_id,
+          wh_id,
+          ordnum,
+          schbat
+   from shipment_line
+   where ship_id = @ship_id
+   and linsts != 'B'
+   group by client_id, wh_id, ordnum, schbat
+   order by 1,2,3
+   ]
+   catch (-1403,510)
+   |
+   if ( @? = 0 )
+   {
+       process ossi post tasks for crud action using rules
+       where uc_table_list_set_defaults = @uc_table_list_set_defaults
+       and uc_set_default_rule_grp_id = @uc_set_default_rule_grp_id
+       and uc_table_rule_typ = 'PLN'
+       and uc_rule_grp_id = null
+       and uc_rule_subgrp_id = null
+       and uc_les_cmd_cond_rules = null
+       and uc_transaction_action = 'R'
+       ;
+       publish data
+       where wh_id = @wh_id
+       and client_id = @client_id
+       and ordnum = @ordnum
+       and schbat = @schbat
+   }
+} /* block */
+
+   
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+Perform any tasks that ae to be done at order level.  When this is run order lines should exist as well.
+At this time we are not creating workflows here as that is not a current amway need
+</p>
+]]>
+</remarks>
+
+<retrows>0</retrows>
+
+<retcol name="none" type="COMTYP_CHAR"></retcol>
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+
+<seealso cref="set ossi order calculated fields"></seealso>
+
+
+
+</documentation>
+
+
+</command>

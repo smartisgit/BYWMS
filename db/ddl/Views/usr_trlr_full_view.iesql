@@ -1,0 +1,31 @@
+#use $DCSDIR/include
+#include <dcsddl.h>
+#include <dcscolwid.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+#use $SALDIR/include
+
+#include <salcolwid.h>
+
+mset command on
+
+[drop view usr_trlr_full_view] catch(@?)
+;
+publish data
+where uc_rcvtrk_cols = ossi__table_columns_as_list ( 'rcvtrk', 1, 'rcvtrk', 'uc_rt_' )
+and uc_trlr_cols = ossi__table_columns_as_list ( 'trlr', 1, 'trlr', '' )
+and uc_cm_cols = ossi__table_columns_as_list ( 'car_move', 1, 'car_move', 'uc_cm_' )
+|
+[
+create view usr_trlr_full_view
+as
+select @uc_trlr_cols:raw,
+       @uc_rcvtrk_cols:raw,
+       @uc_cm_cols:raw
+from trlr
+     left outer join rcvtrk on rcvtrk.trlr_id = trlr.trlr_id
+     left outer join car_move on car_move.trlr_id = trlr.trlr_id
+]
+RUN_DDL
+
+mset command on

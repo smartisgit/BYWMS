@@ -1,0 +1,102 @@
+<command>
+<name>ossi to_char</name>
+<description>Passing in a single D in the string crashes normal to_char, so this fixes that</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+
+publish data
+  where date = @moca_farg1
+    and format = @moca_farg2
+|
+if (@format not like '%D%')
+{
+  publish data where string = to_char(@date, @format)
+}
+else
+{
+  /* Take out single Ds and put them back in after doing a to_char */
+  [[
+    List<Integer> list = new ArrayList<Integer>();
+    int charIndex = 0;
+    boolean foundD = false;
+    boolean foundDD = false;
+    while (charIndex < format.length())
+    {
+      char c = format.charAt(charIndex);
+      if (foundD)
+      {
+        if (c == 'D')
+        {
+          foundDD = true;
+        }
+        else
+        {
+          if (!foundDD)
+          {
+            list.add(charIndex-1);
+          }
+          foundD = false;
+          foundDD = false;
+        }
+      }
+      else
+      {
+        if (c == 'D')
+        {
+          foundD = true;
+        }
+        else
+        {
+          foundD = false;
+          foundDD = false;
+        }
+      }
+      charIndex++;
+    }
+    if (foundD && !foundDD)
+    {
+      list.add(format.length()-1);
+    }
+    StringBuilder buf = new StringBuilder(format);
+    int listIndex = list.size()-1;
+    while (listIndex >= 0)
+    {
+      charIndex = list.get(listIndex--);
+      buf.deleteCharAt(charIndex);
+    }
+    String cmd = "publish data where x = to_char(@date, '" + buf.toString() + "')";
+    res = moca.executeInline(cmd);
+    res.next();
+    String resultStr = res.getString(0);
+    buf = new StringBuilder(resultStr);
+    listIndex = 0;
+    while (listIndex < list.size())
+    {
+      charIndex = list.get(listIndex++);
+      buf.insert(charIndex, 'D');
+    }
+  [string:buf.toString()]
+  ]]
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<remarks>
+Passing in a single D in the string crashes normal to_char, so this fixes that.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

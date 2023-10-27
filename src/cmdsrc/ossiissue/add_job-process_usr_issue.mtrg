@@ -1,0 +1,27 @@
+<trigger>
+<name>process usr issue</name>
+<on-command>add job</on-command>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ */
+process ossi issue for tasks and jobs
+   where uc_table_name = 'JOB_DEFINITION'
+   and uc_action = 'ADD'
+   and uc_pk_column_name = 'job_id'
+
+]]></local-syntax>
+<fire-sequence>10000</fire-sequence>
+<documentation>
+
+<remarks>
+This trigger add job and process issues.
+</remarks>
+
+<seealso cref="process usr issue"></seealso>
+
+</documentation>
+</trigger>

@@ -1,0 +1,61 @@
+<command>
+<name>ossi get_sql_in_from_string</name>
+<description>Given a string convet to a series of in clauses for SQL </description>
+<type>Local Syntax</type>
+ 
+<argument datatype="string" name="moca_farg1">CSV string</argument>
+<argument datatype="string" name="moca_farg2">null value</argument>
+<argument datatype="string" name="moca_farg3">U to upper case L to lower case nothing to leave as-is</argument>
+<argument datatype="string" name="moca_farg4">Separator</argument>
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+publish data
+where csv_string = @moca_farg1
+and null_value = @moca_farg2
+and do_case_conversion = @moca_farg3
+and separator = nvl(@moca_farg4,',')
+|
+{
+    if ( @csv_string is not null )
+    {
+        convert list 
+        where string = @csv_string 
+        and type = 'S' 
+        and separator = @separator
+        |
+        if ( @do_case_conversion = 'U' )
+            publish data
+            where ret = upper ( @retstr )
+        else if ( @do_case_conversion = 'L' )
+            publish data
+            where ret = lower ( @retstr )
+        else
+            publish data
+            where ret = @retstr
+    }
+    else
+        publish data
+        where ret = "'" || @null_value || "'"
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+MOCA Function to convert a csv into a string for in clause
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

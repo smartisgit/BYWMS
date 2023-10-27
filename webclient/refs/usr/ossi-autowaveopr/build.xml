@@ -1,0 +1,17 @@
+<project name="ossi-autowaveopr" default="build">
+ 
+  <property environment="env" />
+  <import file="${env.REFSDIR}/buildfiles/client.xml" />
+
+  <property name="appId" value="ossi-autowaveopr" />
+  <property name="configFile" value="ossi-autowaveopr.xml" />
+ 
+  <target name="build" description="build the app" depends="clean">
+    <csbuilder-macrodef configFile="${configFile}" appId="${appId}" />
+  </target>
+ 
+  <target name="clean" description="clean admin app">
+      <delete dir="E:/JDA\AM_POR191/rpweb/web/${appId}"/>
+      <delete dir="E:/JDA\AM_POR191/rpweb/deploy/${appId}"/>
+  </target>
+</project>

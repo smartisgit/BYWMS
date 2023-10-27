@@ -1,0 +1,67 @@
+<command>
+<name>list ossi criteria</name>
+<description>List criteria data</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+{
+  /* List vars like pckgr1 are prefixed with "l_" and their values change the " || " delimiter to "," */
+  [select decode(rule_parm.parm_typ, 'L', 'l_', '') || var_nam var_nam,
+          decode(rule_parm.parm_typ, 'L', REPLACE(value, ' || ', ','), value) value,
+          rule_parm.parm_typ
+     from criteria_mst
+     left outer join rule_parm
+       on criteria_mst.prf_nam = rule_parm.rule_nam
+      and criteria_mst.var_nam = rule_parm.parm_id
+    where appl_id = @appl_id
+      and frm_id = @frm_id
+      and prf_nam = @prf_nam
+      and crt_nam = @crt_nam
+  ]
+  |
+  /* Custom format of d_var allows input of "sysdate" in value */
+  if (@var_nam like 'd_%')
+  {
+    execute server command
+      where cmd = 'publish data where value = ' || @value
+    |
+    publish data
+      where var_nam = substr(@var_nam, 3)
+        and value = @value
+  }
+  else 
+  {
+    filter data
+      where moca_filter_level = '2'
+  }
+}
+>> res
+|
+flatten ossi results
+  where res = @res
+    and col1 = 'var_nam'
+    and col2 = 'value'
+
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This command may be used to get criteria data.
+</remarks>
+
+<retcol name="var_nam" type="String">Variable Name</retcol>
+<retcol name="value" type="String">Value</retcol>
+<retcol name="parm_typ" type="String">Parameter Type</retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

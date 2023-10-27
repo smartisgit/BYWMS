@@ -1,0 +1,34 @@
+<command>
+<name>set ossi integration communication context</name>
+<description>Set the variable to indicate that we are in integration communiation</description>
+<type>Local Syntax</type>
+
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20210418 saad.ahmad - 11989 - Autostore project
+ */
+save session variable
+where name = 'uc_int_comm_context'
+and value = 'SMART_INT_CONTEXT'
+;
+noop
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+This is invoked in communication (in integrator) to set the context so that we know we are in communication logic
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

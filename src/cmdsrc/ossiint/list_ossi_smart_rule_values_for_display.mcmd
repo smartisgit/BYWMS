@@ -1,0 +1,48 @@
+<command>
+<name>list ossi smart rule values for display</name>
+<description>List smart ruke values for display</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ * Chris.Holdren - 200506 - Changed field names to match usr_rule_engine_expr
+ */
+list ossi smart rule values
+|
+publish data
+    where srtseq = @srtseq
+       and uc_rule_grp_id = nvl(@polcod, @uc_rule_grp_id)
+       and uc_rule_subgrp_id = nvl(@polvar, @uc_rule_subgrp_id)
+       and uc_rule_value = nvl(@polval, @uc_rule_value)
+       and seqnum = @seqnum
+       and ena_flg = nvl(@rtnum1, @ena_flg)
+       and uc_rule_expr = nvl(@rtstr1, @uc_rule_expr)
+       and uc_rule_comment = nvl(@rtstr2, @uc_rule_comment)
+       and uc_rule_parm_01 = @uc_rule_parm_01
+       and uc_rule_parm_02 = @uc_rule_parm_02
+       and uc_rule_catg_cd = @uc_rule_catg_cd
+       and uc_cust_flg = @uc_cust_flg
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+Get the smart rule values for display.
+</p>
+]]>
+</remarks>
+
+<retrows>n</retrows>
+
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+</documentation>
+</command>

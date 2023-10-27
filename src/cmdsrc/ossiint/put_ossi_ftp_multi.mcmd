@@ -1,0 +1,316 @@
+<command>
+<name>put ossi ftp multi</name>
+<description>Put files on a remote ftp server using sftp.  Handle multiple files in one session</description>
+
+<argument datatype="string" name="res_ff">Recordset with file information</argument>
+<argument datatype="string" name="r_server"></argument>
+<argument datatype="string" name="r_port"></argument>
+<argument datatype="string" name="r_user"></argument>
+<argument datatype="string" name="r_password"></argument>
+<argument datatype="string" name="r_dir"></argument>
+<argument datatype="string" name="l_processed_dir"></argument>
+<argument datatype="string" name="uc_transfer_mode"></argument>
+<argument datatype="string" name="uc_show_detailed_results"></argument>
+<argument datatype="string" name="uc_temp_ext"></argument>
+<argument datatype="string" name="uc_use_sftp"></argument>
+<argument datatype="string" name="uc_new_name_expr"></argument>
+
+<argument datatype="string" name="uc_log_each_ftp">Show in usr_ossi_job_log each ftp action</argument>
+<argument datatype="string" name="uc_ossi_job_seq">job Sequence if we are logging it</argument>
+<argument datatype="string" name="uc_ossi_module_seq">module Sequence if we are logging it</argument>
+<argument datatype="string" name="uc_ossi_who"></argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+publish data
+where r_port = int(decode ( @r_port, null, decode ( @uc_use_sftp, '1', '22', '21'), @r_port ))
+and uc_transfer_mode = nvl(@uc_transfer_mode, 'B' )
+and uc_show_detailed_results = nvl(@uc_show_detailed_results, '0' )
+and uc_temp_ext = nvl(@uc_temp_ext, '.tmp' )
+and uc_new_name_expr = nvl(@uc_new_name_expr, '' )
+and l_processed_dir = nvl(@l_processed_dir, '' )
+and uc_log_each_ftp = nvl(@uc_log_each_ftp, '0' )
+and uc_ossi_job_seq = nvl(@uc_ossi_job_seq, 0 )
+and uc_ossi_module_seq = nvl(@uc_ossi_module_seq, 0)
+and uc_ossi_who = nvl(@uc_ossi_who, '' )
+|
+publish data
+where uc_ossi_job_seq = int(@uc_ossi_job_seq)
+|
+{
+   [[
+   import java.io.File;
+   import com.jscape.inet.ftp.Ftp;
+   import com.jscape.inet.sftp.Sftp;
+   import com.jscape.inet.ssh.util.SshParameters;
+   //
+   SimpleResults res = new SimpleResults();
+   boolean ftp_ok = false;
+   boolean ftp_rename_ok = false;
+   Integer num_files = 0;
+   Integer num_ftp_ok = 0;
+   Integer num_ftp_rename_ok = 0;
+   Integer num_ftp_err = 0;
+   Integer num_ftp_rename_err = 0;
+   Integer num_move_ok = 0;
+   Integer num_move_err = 0;
+   String ftp_err_msg;
+   String ftp_rename_err_msg;
+   String move_err_msg;
+   String temp_dest_file;
+   String dest_file;
+   Integer last_dot_at_in_dest_file;
+   String dest_file_ext;
+   String dest_file_without_ext;
+   String uc_new_dest_file;
+   String err_msg_prefix;
+   boolean bFileStatus;
+   boolean bChangedLocalDir = false;
+   Integer my_action = 0;
+   //
+   // create result set
+   //
+   res.addColumn ( "filename",             MocaType.STRING ); 
+   res.addColumn ( "l_pathname",           MocaType.STRING ); 
+   res.addColumn ( "r_dir",                MocaType.STRING ); 
+   res.addColumn ( "temp_dest_file",       MocaType.STRING ); 
+   res.addColumn ( "final_dest_file",      MocaType.STRING ); 
+   res.addColumn ( "uc_trasnfer_status",   MocaType.STRING ); 
+   res.addColumn ( "uc_ftp_rename_status", MocaType.STRING ); 
+   res.addColumn ( "uc_l_move_status",     MocaType.STRING ); 
+   res.addColumn ( "l_prc_dir",            MocaType.STRING ); 
+   //
+   if ( uc_use_sftp == "1" )
+   {
+      params = new SshParameters(r_server, r_port, r_user, r_password);
+      ftp = new Sftp(params);
+   }
+   else
+   {
+      ftp =  new Ftp(r_server, r_user, r_password, r_port);
+   }
+   //
+   ftp.connect();
+   if (uc_transfer_mode.equals("B"))
+      ftp.setBinary();
+   else
+      ftp.setAscii();
+   ftp.setDir ( r_dir );
+   while ( res_ff.next() )
+   {
+      num_files++;
+      //
+      // Parse the file name into pieces
+      dest_file      = res_ff.getString ( "filename" );
+      dest_file_dir  = new File ( res_ff.getString("pathname") ).parent;
+      last_dot_at_in_dest_file = dest_file.lastIndexOf('.');
+      if ( last_dot_at_in_dest_file >= 0 )
+      {
+         dest_file_ext = dest_file.substring(last_dot_at_in_dest_file);
+         dest_file_without_ext  = dest_file.substring(0, last_dot_at_in_dest_file );
+      }
+      else
+      {
+         dest_file_ext = "";
+         dest_file_without_ext  = dest_file;
+      }
+      //
+      // Log the action
+      //
+      if ( uc_log_each_ftp == '1' &&  uc_ossi_job_seq > 0 )
+      {
+         res_act = moca.executeInline ( " publish data" +
+                                        " where aa = ossi__register_action ( @uc_ossi_job_seq, @uc_ossi_module_seq, 'FTP1',"+
+                                        " @dest_file, @uc_ossi_who ) catch(@?)",
+                                        [dest_file:dest_file] );
+         if ( res_act.next() )
+            my_action = res_act.getInt ( "aa" );
+      }
+      //
+      // If a new name expression is provided, determine the new name
+      if ( uc_new_name_expr.length() > 0 )
+      {
+         try
+         {
+            res_nn = moca.executeCommand ( " publish data " +
+                                           " where dest_file     = @dest_file" +
+                                           " and   dest_file_dir = @dest_file_dir" +
+                                           " and   dest_file_ext = @dest_file_ext" +
+                                           " and   dest_file_without_ext = @dest_file_without_ext" +
+                                              " | " +
+                                           " publish data where uc_new_dest = " + uc_new_name_expr,
+                                           [dest_file:dest_file,
+                                            dest_file_dir:dest_file_dir,
+                                            dest_file_ext:dest_file_ext,
+                                            dest_file_without_ext:dest_file_without_ext] );
+            res_nn.next();
+            uc_new_dest_file = res_nn.getString ( "uc_new_dest" );
+         } 
+         catch ( Exception ee )
+         {
+            uc_new_dest_file = dest_file;
+         }
+      }
+      else
+      {
+         uc_new_dest_file = dest_file;
+      }
+
+      temp_dest_file = dest_file + ".tmp";
+      err_msg_prefix = dest_file + ":" + temp_dest_file + ":";
+      //
+      // Set local directory because then ftp and sftp code can remain same
+      if ( ! bChangedLocalDir )
+      {
+         ftp.setLocalDir(new File(dest_file_dir));
+         bChangedLocalDir = true;
+      }
+      //
+      res.addRow();
+      res.setValue ( "filename",       dest_file );
+      res.setValue ( "temp_dest_file", temp_dest_file );
+      res.setValue ( "l_pathname",     res_ff.getString ( "pathname" ) );
+      res.setValue ( "r_dir",          r_dir );
+      res.setValue ( "l_prc_dir",      l_processed_dir );
+      res.setValue ( "final_dest_file",uc_new_dest_file );
+      //
+      // upload to server as temp file
+      try
+      {
+         ftp.upload ( dest_file, temp_dest_file );
+         res.setValue ( "uc_trasnfer_status", "OK" );
+         ftp_ok = true;
+         num_ftp_ok++;
+      }
+      catch ( Exception ee )
+      { 
+         ftp_err_msg = err_msg_prefix + ee.getMessage();
+         res.setValue ( "uc_trasnfer_status", ftp_err_msg );
+         ftp_ok = false;
+         num_ftp_err++;
+      }
+      if ( ftp_ok )
+      {
+         //
+         // now rename the temp file to actual file
+         try
+         {
+            ftp.renameFile ( temp_dest_file, uc_new_dest_file );
+            res.setValue ( "uc_ftp_rename_status", "OK" );
+            ftp_rename_ok = true;
+            num_ftp_rename_ok++;
+         }
+         catch ( Exception ee )
+         { 
+            ftp_rename_err_msg = err_msg_prefix + ee.getMessage();
+            res.setValue ( "uc_ftp_rename_status", ftp_rename_err_msg );
+            ftp_rename_ok = false;
+            num_ftp_rename_err++;
+         }
+      }
+      //
+      // Now if ftp put is ok and rename is ok then move the file
+      if ( ftp_ok && ftp_rename_ok )
+      {
+         try
+         {
+            File h_l_file    = new File ( res_ff.getString ( "pathname" ) );
+            if (  l_processed_dir.length() > 0 )
+            {
+               File h_l_prc_dir = new File ( l_processed_dir );
+               bFileStatus = h_l_file.renameTo ( new File ( h_l_prc_dir, h_l_file.getName() ) ); 
+            }
+            else
+            {
+               bFileStatus = h_l_file.delete();
+            }
+            if ( bFileStatus )
+            {
+               res.setValue ( "uc_l_move_status", "OK" );
+               num_move_ok++;
+            }
+            else
+            {
+               move_err_msg = err_msg_prefix + "renameTo to " + l_processed_dir + " returned false";
+               res.setValue ( "uc_l_move_status", move_err_msg );
+               num_move_err++;
+            }
+         }
+         catch ( Exception ee )
+         {
+            move_err_msg = err_msg_prefix + ee.getMessage();
+            res.setValue ( "uc_l_move_status", move_err_msg );
+            num_move_err++;
+         }
+      }
+      //
+      // complete the action
+      //
+      if ( uc_log_each_ftp == '1' &&  uc_ossi_job_seq > 0 && my_action > 0)
+      {
+         moca.executeInline ( "complete ossi job log where uc_ossi_action_seq = @uc_ossi_action_seq catch(@?)",
+                              [uc_ossi_action_seq:my_action] );
+      }
+   } // while
+   ftp.disconnect();
+   [
+   uc_num_files:num_files,
+   uc_num_ftp:num_ftp_ok,
+   uc_num_ftp_rename:num_ftp_rename_ok,
+   uc_num_move:num_move_ok,
+   uc_num_ftp_err:num_ftp_err,
+   uc_num_ftp_rename_err:num_ftp_rename_err,
+   uc_num_move_err:num_move_err,
+   uc_ftp_err_msg:ftp_err_msg,
+   uc_ftp_rename_err_msg:ftp_rename_err_msg,
+   uc_move_err_msg:move_err_msg,
+   res_d:res
+   ]
+   ]]
+   |
+   if ( @uc_show_detailed_results = '1' )
+      publish data combination 
+      where res = @res_d
+      and uc_num_files = @uc_num_files
+      and uc_num_ftp = @uc_num_ftp
+      and uc_num_ftp_rename = @uc_num_ftp
+      and uc_num_move = @uc_num_move
+      and uc_num_ftp_err = @uc_num_ftp_err
+      and uc_num_ftp_rename_err = @uc_num_ftp_err
+      and uc_num_move_err = @uc_num_move_err
+      and uc_ftp_err_msg = @uc_ftp_err_msg
+      and uc_ftp_rename_err_msg = @uc_ftp_err_msg
+      and uc_move_err_msg = @uc_move_err_msg
+   else
+      filter data where moca_filter_level = '1'
+}
+
+
+]]>
+</local-syntax>
+<documentation>
+<remarks>
+Put files to a remote ftp server
+</remarks>
+
+<retcol name="status" type="uc_num_files"></retcol>
+<retcol name="status" type="uc_num_ftp"></retcol>
+<retcol name="status" type="uc_num_ftp_rename"></retcol>
+<retcol name="status" type="uc_num_move"></retcol>
+<retcol name="status" type="uc_num_ftp_err"></retcol>
+<retcol name="status" type="uc_num_ftp_rename_err"></retcol>
+<retcol name="status" type="uc_num_move_err"></retcol>
+<retcol name="status" type="uc_ftp_err_msg"></retcol>
+<retcol name="status" type="uc_ftp_rename_err_msg"></retcol>
+<retcol name="status" type="uc_move_err_msg"></retcol>
+<retcol name="status" type="res_d">
+   If input parameter uc_show_detailed_results is set to '1' then we expand this by using publish data combination.  This has following fields:
+   filename, l_pathname, r_dir,uc_trasnfer_status, uc_l_move_status, l_prc_dir
+</retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+</documentation>
+</command>

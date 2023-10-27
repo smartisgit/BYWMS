@@ -1,0 +1,65 @@
+<command>
+<name>list usr affected seamles objects for issue</name>
+<description>List affected seamles objects for issue</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ */
+[select uc_ossi_obj_grp, 
+	uc_ossi_obj_key_col, 
+	uc_ossi_obj_key_data, 
+	pv.rtnum1,
+	max(uc_ossi_upd_dt) uc_ossi_upd_dt,
+     max(uc_ossi_fil_cre_dt) uc_ossi_fil_cre_dt,
+     max(uc_ossi_commit_dt) uc_ossi_commit_dt,
+	max(uc_ossi_revision) uc_ossi_revision,
+	uc_ossi_issue_assign_seq
+   from usr_ossi_issue_obj_log log 
+   left outer join poldat_view pv
+     on pv.polcod = 'USR-OSSI-VERSION-CONTROL' 
+    and pv.polvar = 'OBJECT-GROUP' 
+    and pv.polval = log.uc_ossi_obj_grp 
+  where uc_ossi_issue_assign_seq = @uc_ossi_issue_assign_seq
+    and uc_ossi_obj_grp is not null 
+  group by pv.rtnum1, 
+	uc_ossi_obj_grp, 
+	uc_ossi_obj_key_col, 
+	uc_ossi_obj_key_data,
+	uc_ossi_issue_assign_seq
+  having (@uc_show_uncommitted is null 
+       or @uc_show_uncommitted != 1 
+       or max(uc_ossi_commit_dt) is null 
+       or max(uc_ossi_upd_dt) > max(uc_ossi_commit_dt)) 
+  order by pv.rtnum1, 
+	uc_ossi_obj_grp, 
+	uc_ossi_obj_key_col, 
+	uc_ossi_obj_key_data
+] catch (-1403) 
+]]>
+</local-syntax>
+<argument name="uc_ossi_issue_assign_seq" required="yes" datatype="integer"></argument>
+<argument name="uc_show_uncommitted" datatype="integer">1 to show only those objects changed since the last commit</argument>
+<documentation>
+
+<remarks>
+This command is used to list affected seamles objects for issue.
+</remarks>
+
+<retcol name="uc_ossi_obj_grp" type="String"></retcol>
+<retcol name="uc_ossi_obj_key_col" type="String"></retcol>
+<retcol name="uc_ossi_obj_key_data" type="String"></retcol>
+<retcol name="rtnum1" type="String"></retcol>
+<retcol name="uc_ossi_upd_dt" type="Date"></retcol>
+<retcol name="uc_ossi_fil_cre_dt" type="Date"></retcol>
+<retcol name="uc_ossi_commit_dt" type="Date"></retcol>
+<retcol name="uc_ossi_revision" type="String"></retcol>
+<retcol name="uc_ossi_issue_assign_seq" type="String"></retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

@@ -1,0 +1,84 @@
+<command>
+<name>list usr specific job log</name>
+<description>list specific job log entry - to show stuff in a display</description>
+
+<argument name="wh_id" required="no" datatype="String"></argument>
+<argument name="uc_ossi_job_id" required="no" datatype="String"></argument>
+<argument name="uc_ossi_module_id" required="no" datatype="String"></argument>
+<argument name="uc_ossi_typical_async_queue" required="no" datatype="String"></argument>
+<argument name="uc_ossi_job_id_suffix" required="no" datatype="String"></argument>
+<argument name="uc_ossi_job_object_id" required="no" datatype="String"></argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ * 11426 - 13-07-2020 - muhammad haris convert that command for amway 2020 mssql server **need to validate** 
+ */
+ 
+publish data
+where wh_id = nvl(@wh_id, @@WH_ID )
+|
+if ( @uc_ossi_typical_async_queue = 1 )
+{
+    publish data
+    where uc_ossi_job_id = nvl( @uc_ossi_job_id,     'UC_W_' || @wh_id || '_' || @uc_ossi_job_id_suffix )
+    and uc_ossi_module_id = nvl(@uc_ossi_module_id,  'DO-'   || @uc_ossi_job_object_id )
+}
+|
+{
+    [
+    select x.*
+    from 
+    (
+        select uc_ossi_start_dt,
+               uc_ossi_end_dt,
+               moca_util.date_diff_days( uc_ossi_start_dt, uc_ossi_end_dt)*24*3600 uc_ossi_dur,
+               uc_ossi_err_code,
+               uc_ossi_err_descr
+        from usr_ossi_job_log
+        where uc_ossi_job_id = @uc_ossi_job_id
+        and uc_ossi_module_id = @uc_ossi_module_id
+		and rownum<9999999999999999		/*when selecting one row top will give an error so that why i add rownum*/
+        order by uc_ossi_job_seq desc
+   ) x
+   where rownum < 2
+   ]
+   catch (-1403,510)
+}
+
+]]>
+</local-syntax>
+
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This shows data for specific module.  Handy to show this data in other screens
+</p>
+]]>
+</remarks>
+
+<retrows>n</retrows>
+
+<retcol name="uc_ossi_start_dt" type="COMTYP_INT"></retcol>
+<retcol name="uc_ossi_end_dt" type="COMTYP_STRING"></retcol>
+<retcol name="uc_ossi_dur" type="COMTYP_STRING"></retcol>
+<retcol name="uc_ossi_err_code" type="COMTYP_INT">Error Code, 0 means success </retcol>
+<retcol name="uc_ossi_err_descr" type="COMTYP_INT"></retcol>
+
+
+
+<exception value="eOK">The command completed successfully.</exception>
+<exception value="510">If variable was not passed and no default was passed.</exception>
+
+<seealso cref="list usr job log"></seealso>
+
+</documentation>
+
+</command>

@@ -1,0 +1,56 @@
+<command>
+<name>write ossi csv</name>
+<description></description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+/*
+ * HISTORY
+ * 2020-04-09 JJS - Upgraded from 2009.2 to 2018.1 (no changes required)
+ */
+
+if(@uc_hdr_flg = 1)
+{
+[[
+import com.oracular.util.*;
+int n = 0;
+String hdr = '';
+while (n < res.getColumnCount())
+{
+  MocaResults result = moca.executeCommand(" get mls text where mlsid = '" + res.getColumnName(n) + "' and localeid = nvl(@@locale_id,'US_ENGLISH') catch(-1403)");
+  if(result.next())
+  {
+    hdr += result.getString("mls_text");
+  }
+  else 
+  {
+    hdr += res.getColumnName(n);
+  }
+  
+  n++;
+  if(n!=res.getColumnCount())
+  {
+    hdr += ",";
+  }
+}
+String csv = MOCAUtils.getCSV(res,false);
+SaveTextHelper.write(new File(filename), hdr + System.getProperty("line.separator") + csv);
+]]
+}
+
+else
+{
+[[
+  import com.oracular.util.*;
+  String csv = MOCAUtils.getCSV(res);
+  SaveTextHelper.write(new File(filename), csv);
+]]
+}
+
+
+]]>
+</local-syntax>
+<argument name="res" required="yes" datatype="resultset"></argument>
+<argument name="filename" required="yes" datatype="string"></argument>
+</command>

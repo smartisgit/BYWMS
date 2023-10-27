@@ -1,0 +1,275 @@
+<command>
+<name>execute ossi all conditional rules</name>
+<description>Execute all conditional rules</description>
+
+<argument name="uc_rule_grp_id" required="yes" datatype="string"></argument>
+<argument name="uc_rule_subgrp_id" required="yes" datatype="string"></argument>
+<argument name="uc_get_rules_command" required="yes" datatype="string">This is the command that will give us what we need to execute</argument>
+<argument name="uc_cache_key" required="yes" datatype="string"></argument>
+
+
+<argument name="uc_inhibit_ossi_cache" required="yes" datatype="string">FRONT-END-ONLY: Pass in as '1' from maintenance app for testing the rules</argument>
+<argument name="uc_force_run_all_flg" required="yes" datatype="string">FRONT-END-ONLY: Pass in 1 to force that all commands run.  So bypass the evaluation and assume it all passes</argument>
+<argument name="uc_inhibit_run_action_flg" required="yes" datatype="string">FRONT-END-ONLY: Pass in 1 to 
+not actually run the action and simply return what it will do</argument>
+
+<argument name="uc_continue_if_action_error" required="yes" datatype="integer">1 or 0.  If 1 then we continue on action error.  Default 0</argument>
+<argument name="uc_mode_get_action_cmds" required="yes" datatype="string">If we pass in 1 then we will simply get a recordset of the actions</argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+
+publish data
+where uc_get_rules_command = nvl( @uc_get_rules_command, 'get ossi commands for condition' )
+and uc_force_run_all_flg = nvl(@uc_force_run_all_flg, 0 )
+and uc_inhibit_run_action_flg = nvl(@uc_inhibit_run_action_flg, 0 )
+and uc_mode_get_action_cmds = nvl(@uc_mode_get_action_cmds, 0)
+and uc_continue_if_action_error = nvl(@uc_continue_if_action_error, 0 )
+and wh_id = nvl(@wh_id, @@WH_ID)
+|
+/*
+ * If cache key is not passed in, determine it
+ */
+if ( @uc_cache_key is null )
+{
+    publish data
+    where uc_ctxt_vars_list = ossi__polval_cat ( 'USR-CTXT-' || @uc_rule_grp_id , @uc_rule_subgrp_id, '', '', 'polval', 'rtnum1=2', ',', '----' )
+    |
+    if ( @uc_ctxt_vars_list is not null )
+    {
+        convert list
+        where string = @uc_ctxt_vars_list
+        and separator = ','
+        and type = 'L'
+        >> res_var_list
+        |
+        [[
+        MocaContext currentContext = MocaUtils.currentContext(); 
+        StringBuffer ret = new StringBuffer("");
+        //
+        while ( res_var_list.next() )
+        {
+            this_value = currentContext.getVariable (  res_var_list.getString("retstr") );
+            if ( this_value == null )
+                this_value = "";
+            ret.append ( "_" );
+            ret.append ( this_value );
+        }  
+        [ret:ret.toString()]
+        ]]
+        |
+        publish data
+        where uc_cache_key = 'UC_OSSI_COND_RULE_' || @uc_rule_grp_id || '_' || @uc_rule_subgrp_id || @ret
+    }
+}
+|
+{
+    execute ossi moca and cache
+    where uc_cache_grp = 'OSSI__COND_COMMANDS'
+    and uc_moca_cmd = @uc_get_rules_command
+    and uc_inline = 1
+    and uc_force_ossi_cache1 = '1'  
+    and uc_cache_key = @uc_cache_key
+    >> res_release_cmds
+    |
+    if ( @uc_mode_get_action_cmds = 1 )
+        publish data
+        where uc_res_action_cmds = @res_release_cmds
+    else if ( @? = 0 and rowcount ( @res_release_cmds) > 0 )
+    {
+        [[
+        Integer      run_seq = 0;
+        //
+        ret_r = new SimpleResults();
+        ret_r.addColumn ( "run_seq",                    MocaType.INTEGER );
+        ret_r.addColumn ( "used_rule_id",               MocaType.STRING );
+        ret_r.addColumn ( "used_main_ord",              MocaType.STRING );
+        ret_r.addColumn ( "condition",                  MocaType.STRING );
+        ret_r.addColumn ( "condition_met",              MocaType.INTEGER );
+        ret_r.addColumn ( "executed_cmd",               MocaType.STRING );
+        ret_r.addColumn ( "exec_sts",                   MocaType.INTEGER );
+        ret_r.addColumn ( "exec_msg",                   MocaType.STRING );
+        ret_r.addColumn ( "rpt_id",                     MocaType.STRING );
+        ret_r.addColumn ( "label_name",                 MocaType.STRING );
+        ret_r.addColumn ( "printer",                    MocaType.STRING );
+        ret_r.addColumn ( "printed_filnam",             MocaType.STRING );
+        ret_r.addColumn ( "uc_string_1",                MocaType.STRING );
+        ret_r.addColumn ( "uc_string_2",                MocaType.STRING );
+        ret_r.addColumn ( "uc_abort_conditional_rules", MocaType.INTEGER );
+        ret_r.addColumn ( "uc_cmd_res",                 MocaType.RESULTS );
+        //
+        res_release_cmds.reset();
+        while ( res_release_cmds.next() )
+        {
+            pathname = "";
+            printer = "";
+            rpt_id = "";
+            label_name = "";
+            exec_sts = 0;
+            exec_msg = "";
+            condition_met = 0;
+            uc_abort_conditional_rules = 0;
+            uc_string_1 = "";
+            uc_string_2 = "";
+            //
+            used_rule_id  = res_release_cmds.getString ( "uc_rule_id" );
+            used_main_ord = res_release_cmds.getString ( "main_ord" );
+            //
+            res_clause = moca.executeInline ( "get ossi policy expression command where rtstr1 = @uc_condition_expr", [uc_condition_expr:res_release_cmds.getString ( "uc_condition_expr" )] );
+            if ( res_clause.next() )
+            {
+                res_if = moca.executeInline ( res_clause.getString("cmd") )
+                //
+                if ( res_if.next() )
+                {
+                    if ( res_if.getInt ( 0 ) == 1 || uc_force_run_all_flg == 1 )
+                    {
+                        condition_met = 1;
+                        //
+                        // From front-end we can pass in a flag to indicate we dont want to run the comamnd
+                        //
+                        if ( uc_inhibit_run_action_flg != 1 )
+                        {
+                            try
+                            {
+                                res_run = moca.executeInline ( res_release_cmds.getString ( "uc_execute_cmd" ));
+                                if ( res_run.next() )
+                                {
+                                    try{ uc_abort_conditional_rules = res_run.getInt ( "uc_abort_conditional_rules") } catch ( Exception ee ) {};
+                                    //
+                                    // There is no guarentee that following variables are in resultset.  But publishing them
+                                    // for easier use when they are available
+                                    //
+                                    try{ pathname   = res_run.getString("pathname") } catch ( Exception ee ) {};
+                                    try{ printer    = res_run.getString("printer") } catch ( Exception ee ) {};
+                                    try{ rpt_id     = res_run.getString("rpt_id") } catch ( Exception ee ) {};
+                                    try{ label_name = res_run.getString("label_name") } catch ( Exception ee ) {};
+                                    //
+                                    try{ uc_string_1 = res_run.getString ("uc_string_1") } catch ( Exception ee ) {};
+                                    try{ uc_string_2 = res_run.getString ("uc_string_2") } catch ( Exception ee ) {};
+                                }
+                            }
+                            catch ( Exception ee )
+                            {
+                                exec_sts = ee.getErrorCode();
+                                exec_msg = ee.getMessage();
+                                //
+                                // if we have an execution error and we are not in a mode where we ignore errors
+                                // and not being forced to rrun all then raise the errot to caller
+                                if ( uc_continue_if_action_error == 0 && uc_force_run_all_flg == 0)
+                                {
+                                    moca.executeCommand ( "set return status where status = @exec_sts and message = @exec_msg", 
+                                                          [exec_sts:exec_sts,exec_msg:exec_msg] );
+                                }
+                            }
+                        } // actually run - dont inhibit run 
+                    } // conditin passed
+                    else
+                    {
+                        res_run =  new SimpleResults();
+                    }
+                } // we have an if clause
+                //
+                // Put in result set.  We do it only if the test passed or we are forcing all
+                //
+                if ( condition_met == 1 || uc_force_run_all_flg  == 1 )
+                {
+                    ret_r.addRow();
+                    ret_r.setValue ( "run_seq",         run_seq );
+                    ret_r.setValue ( "used_rule_id",    used_rule_id );
+                    ret_r.setValue ( "used_main_ord",   used_main_ord );
+                    ret_r.setValue ( "condition",       res_release_cmds.getString ( "uc_condition_expr" ) );
+                    ret_r.setValue ( "condition_met",   condition_met );
+                    ret_r.setValue ( "executed_cmd",    res_release_cmds.getString ( "uc_execute_cmd" ) );
+                    ret_r.setValue ( "exec_sts",        exec_sts );
+                    ret_r.setValue ( "exec_msg",        exec_msg );
+                    ret_r.setValue ( "rpt_id",          rpt_id );
+                    ret_r.setValue ( "label_name",      label_name  );
+                    ret_r.setValue ( "printer",         printer );
+                    ret_r.setValue ( "printed_filnam",  pathname );
+                    ret_r.setValue ( "uc_string_1",     uc_string_1 );
+                    ret_r.setValue ( "uc_string_2",     uc_string_2 );
+                    ret_r.setValue ( "uc_abort_conditional_rules", uc_abort_conditional_rules );
+                    ret_r.setValue ( "uc_cmd_res",                 res_run );
+                }
+                //
+                // Our execution wanted to end rules after its execution.  If we are force running all then dont abort
+                if ( uc_abort_conditional_rules == 1 && uc_force_run_all_flg != 1)
+                    break;
+                run_seq++;
+            } // got clause sucessfully
+        } // while end
+        [ret_r:ret_r]
+        ]]
+        |
+        publish data combination
+        where res = @ret_r
+        |
+        filter data
+        where moca_filter_level = 1
+        and uc_rule_grp_id = @uc_rule_grp_id
+        and uc_rule_subgrp_id = @uc_rule_subgrp_id
+        and uc_get_rules_command = @uc_get_rules_command
+        and uc_cache_key = @uc_cache_key
+    }
+}
+   
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+Execute the stuff based on rules engine that are conditional
+</p>
+]]>
+</remarks>
+
+<retrows>n - based on each rule that is defined</retrows>
+
+
+
+<retcol name="uc_res_action_cmds" type="COMTYP_RES">If uc_mode_get_action_cmds is 1 then we get back this only</retcol>
+
+<retcol name="uc_rule_grp_id" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_rule_subgrp_id" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_get_rules_command" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_cache_key " type="COMTYP_CHAR"></retcol>
+
+
+<retcol name="run_seq" type="COMTYP_CHAR">Sequence number for each condition evaluated.  Starting with 0</retcol>
+<retcol name="used_rule_id" type="COMTYP_CHAR"></retcol>
+<retcol name="used_main_ord" type="COMTYP_CHAR"></retcol>
+<retcol name="condition" type="COMTYP_CHAR">Condition as defined in table</retcol>
+<retcol name="condition_met" type="COMTYP_CHAR">1 or 0.  1 means condition was satisfied</retcol>
+<retcol name="executed_cmd" type="COMTYP_CHAR">The command as defined to be executed</retcol>
+<retcol name="exec_sts" type="COMTYP_CHAR">Status of execution. 0 means success</retcol>
+<retcol name="exec_msg" type="COMTYP_CHAR">Message of execution.  Null when ok</retcol>
+<retcol name="rpt_id" type="COMTYP_CHAR">If command returned this column, it is published else null</retcol>
+<retcol name="label_name" type="COMTYP_CHAR">If command returned this column, it is published else null</retcol>
+<retcol name="printer" type="COMTYP_CHAR">If command returned this column, it is published else null</retcol>
+<retcol name="printed_filnam" type="COMTYP_CHAR">If command returned column pathname, it is published else null</retcol>
+<retcol name="uc_string_1" type="COMTYP_CHAR">If command returned this name, it is published</retcol>
+<retcol name="uc_string_2" type="COMTYP_CHAR">If command returned this name, it is published</retcol>
+<retcol name="uc_cmd_res" type="COMTYP_CHAR">Complete resultset of command execution</retcol>
+<retcol name="uc_abort_conditional_rules" type="COMTYP_CHAR">if called logic retruned it, it is retruned out as well</retcol>
+
+
+
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+<seealso cref="release ossi pick using rules"></seealso>
+
+</documentation>
+
+
+</command>

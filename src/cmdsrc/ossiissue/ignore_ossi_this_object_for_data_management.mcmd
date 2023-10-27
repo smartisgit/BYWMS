@@ -1,0 +1,41 @@
+<command>
+<name>ignore ossi this object for data management</name>
+<description>Find a policy value as a function</description>
+<type>Local Syntax</type>
+<argument datatype="string" name="table_name">table</argument>
+<argument datatype="string" name="@*">PK information taken from stack</argument>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ */
+publish data
+where table_name = upper(nvl(@table_name, @table))
+|
+if (
+      @table_name = 'SYS_AUDIT' or
+      ( @table_name like 'USR_OSSI_TEST_CASE%'         and @uc_ossi_test_case_id like 'TMP%' ) or
+      ( @table_name like 'USR_OSSI_TEST_CASE_RUN_SET%' and @uc_ossi_run_id like 'TMP%' )
+   )
+   publish data where uc_do_issue_logging = '0'
+else
+   publish data where uc_do_issue_logging = '1'
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+One row reurned
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+<retcol name="uc_do_issue_logging" type="string">1 or 0.  1 implies do issue logging 0 for ignore</retcol>
+
+</documentation>
+
+
+</command>

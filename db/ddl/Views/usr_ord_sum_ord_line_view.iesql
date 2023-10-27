@@ -1,0 +1,116 @@
+#use $DCSDIR/include
+#include <dcsddl.h>
+#include <dcscolwid.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+#use $SALDIR/include
+
+#include <salcolwid.h>
+
+mset command on
+
+[drop view usr_ord_sum_ord_line_view] catch(@?)
+;
+get ossi table column list for default logic 
+where table_name = 'ord' 
+and uc_output_col_select_clause = 'uc_ctxt_clause_ord_sel' 
+and uc_output_col_group_clause = 'uc_ctxt_clause_ord_group'
+and column_source_prefix = 'ord.'
+|
+get ossi table column list for default logic 
+where table_name = 'adrmst' 
+and uc_output_col_select_clause = 'uc_ctxt_clause_adrmst_st_sel' 
+and uc_output_col_group_clause = 'uc_ctxt_clause_adrmst_st_group'
+and column_source_prefix = 'adrmst_st.'
+and column_name_prefix = 'uc_st_'
+|
+get ossi table column list for default logic 
+where table_name = 'adrmst' 
+and uc_output_col_select_clause = 'uc_ctxt_clause_adrmst_bt_sel' 
+and uc_output_col_group_clause = 'uc_ctxt_clause_adrmst_bt_group'
+and column_source_prefix = 'adrmst_bt.'
+and column_name_prefix = 'uc_bt_'
+|
+get ossi table column list for default logic 
+where table_name = 'adrmst' 
+and uc_output_col_select_clause = 'uc_ctxt_clause_adrmst_rt_sel' 
+and uc_output_col_group_clause = 'uc_ctxt_clause_adrmst_rt_group'
+and column_source_prefix = 'adrmst_rt.'
+and column_name_prefix = 'uc_rt_'
+|
+get ossi table column list for default logic 
+where table_name = 'wh' 
+and uc_output_col_select_clause = 'uc_ctxt_clause_wh_sel' 
+and uc_output_col_group_clause = 'uc_ctxt_clause_wh_group'
+and column_source_prefix = 'wh.'
+and column_name_prefix = 'uc_wh_'
+|
+get ossi table column list for default logic 
+where table_name = 'adrmst' 
+and uc_output_col_select_clause = 'uc_ctxt_clause_adrmst_wh_sel' 
+and uc_output_col_group_clause = 'uc_ctxt_clause_adrmst_wh_group'
+and column_source_prefix = 'adrmst_wh.'
+and column_name_prefix = 'uc_wha_'
+|
+get ossi table column list for default logic 
+where table_name = 'GROUP-ORD_LINE' 
+and uc_output_col_select_clause = 'uc_ctxt_clause_ord_line_sel' 
+and uc_output_col_group_clause = '' /* we dont need these */
+and column_source_prefix = ''
+and column_name_prefix = ''
+|
+[
+create view usr_ord_sum_ord_line_view
+as
+select ord.client_id, ord.wh_id, ord.ordnum,
+       @uc_ctxt_clause_ord_sel:raw,
+       @uc_ctxt_clause_adrmst_st_sel:raw,
+       @uc_ctxt_clause_adrmst_bt_sel:raw,
+       @uc_ctxt_clause_adrmst_rt_sel:raw,
+       @uc_ctxt_clause_wh_sel:raw,
+       @uc_ctxt_clause_adrmst_wh_sel:raw,
+       @uc_ctxt_clause_ord_line_sel:raw
+from ord
+     join adrmst adrmst_st on adrmst_st.adr_id = ord.st_adr_id
+     join adrmst adrmst_bt on adrmst_bt.adr_id = ord.bt_adr_id
+     join adrmst adrmst_rt on adrmst_rt.adr_id = ord.rt_adr_id
+     join wh on wh.wh_id = ord.wh_id
+     join adrmst adrmst_wh on adrmst_wh.adr_id = wh.adr_id
+     left outer join ord_line on ord_line.client_id = ord.client_id and ord_line.wh_id = ord.wh_id and ord_line.ordnum = ord.ordnum
+     left outer join prtmst_view prtmst on prtmst.prt_client_id = ord_line.prt_client_id and prtmst.prtnum = ord_line.prtnum and prtmst.wh_id = ord_line.wh_id
+     left outer join prtftp prtftp_def on prtftp_def.prt_client_id = prtmst.prt_client_id and prtftp_def.wh_id = prtmst.wh_id and prtftp_def.defftp_flg = 1
+     left outer join prtftp_dtl prtftp_dtl_ea 
+         on prtftp_dtl_ea.prt_client_id = prtftp_def.prt_client_id
+         and prtftp_dtl_ea.prtnum = prtftp_def.prtnum
+         and prtftp_dtl_ea.wh_id = prtftp_def.wh_id
+         and prtftp_dtl_ea.ftpcod = prtftp_def.ftpcod
+         and prtftp_dtl_ea.stk_flg = 1
+     left outer join prtftp_dtl prtftp_dtl_ca 
+         on prtftp_dtl_ca.prt_client_id = prtftp_def.prt_client_id
+         and prtftp_dtl_ca.prtnum = prtftp_def.prtnum
+         and prtftp_dtl_ca.wh_id = prtftp_def.wh_id
+         and prtftp_dtl_ca.ftpcod = prtftp_def.ftpcod
+         and prtftp_dtl_ca.cas_flg = 1
+     left outer join prtftp_dtl prtftp_dtl_pa 
+         on prtftp_dtl_pa.prt_client_id = prtftp_def.prt_client_id
+         and prtftp_dtl_pa.prtnum = prtftp_def.prtnum
+         and prtftp_dtl_pa.wh_id = prtftp_def.wh_id
+         and prtftp_dtl_pa.ftpcod = prtftp_def.ftpcod
+         and prtftp_dtl_pa.cas_flg = 1
+     left outer join prtftp_dtl prtftp_dtl_ip 
+         on prtftp_dtl_ip.prt_client_id = prtftp_def.prt_client_id
+         and prtftp_dtl_ip.prtnum = prtftp_def.prtnum
+         and prtftp_dtl_ip.wh_id = prtftp_def.wh_id
+         and prtftp_dtl_ip.ftpcod = prtftp_def.ftpcod
+         and prtftp_dtl_ip.pak_flg = 1
+group by ord.client_id, ord.wh_id, ord.ordnum,
+         @uc_ctxt_clause_ord_group:raw,
+         @uc_ctxt_clause_adrmst_st_group:raw,
+         @uc_ctxt_clause_adrmst_bt_group:raw,
+         @uc_ctxt_clause_adrmst_rt_group:raw,
+         @uc_ctxt_clause_wh_group:raw,
+         @uc_ctxt_clause_adrmst_wh_group:raw
+]
+RUN_DDL
+
+mset command on

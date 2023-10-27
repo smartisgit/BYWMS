@@ -1,0 +1,98 @@
+<command>
+<name>get ossi head for integration documentation</name>
+<description>Get the header section for generated HTML documenattion so that our documentation looks like normal documentation</description>
+
+<argument name="html_title" required="yes" datatype="string">Value</argument>
+<argument name="doc_title" required="yes" datatype="string">Value</argument>
+<argument name="ref_main_index" required="yes" datatype="string">Value</argument>
+<argument name="path_to_docs" required="yes" datatype="string">Path that takes us INSIDE docs</argument>
+
+
+<type>Local Syntax</type>
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20191003 saad.ahmad - 10291 - Generate docymentaion
+ */
+publish data
+where path_to_docs = nvl( @path_to_docs, ".." )
+|
+publish data
+where html_title = nvl(@html_title, "Integration documentation" )
+and ref_main_index = nvl(@ref_main_index, @path_to_docs || '/integration/index.html')
+and main_css_path = nvl(@main_css_path,   @path_to_docs|| "/css/redprairie.css" )
+and main_int_index = @path_to_docs || '/index.html'
+and main_int_doc_gif = @path_to_docs || '/gif/jda.gif'
+|
+publish data
+where uc_html_head = "<head>"
+                  || '<link rel="stylesheet" type="text/css" href="' || @main_css_path || '"></link>'
+                  || '<STYLE type="text/css"></STYLE>'
+                  || '</head>'
+and uc_html_title = "<title>" || @html_title || "</title>"
+and uc_html_meta = '<meta charset="UTF-8"></meta>'
+and uc_html_main_page_head  = '<table class="title-table">'
+                           || '<tr valign="bottom">'
+                           || '    <td>'
+                           || '        <span class="title">' || @doc_title || '</span>'
+                           || '        <span class="backlink"><a class="link" href="' || @ref_main_index || '">[INTEGRATION INDEX]</a></span>'
+                           || '    </td>'
+                           || '    <td>'
+                           || '        <a href="' || @main_int_index || '"><img align="right" border="0" alt="E2e Documentation" src="' || @main_int_doc_gif || '"></img></a>'
+                           || '    </td>'
+                           || '</tr>'
+                           || '</table>'
+                           || '<hr size="1"></hr>'
+and uc_html_main_data_div_start = '<div class="section" style="width: 883; height: 1098"><div class="indent1">'
+and uc_html_main_data_div_end   = '</div></div>'
+|
+filter data
+where moca_filter_level = 1
+and uc_typical_file_header = '<html>' || @uc_html_head || @uc_html_title || @uc_html_meta || '<body>' || @uc_html_main_page_head || @uc_html_main_data_div_start
+and uc_typical_file_footer = @uc_html_main_data_div_end || '</body></html>'
+and uc_typical_tr_data     = '<tr class="my-td">'
+and uc_typical_tr_head     = '<tr class="my-th">'
+and uc_typical_table       = '<table class="my-table" width="90%">'
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+Use these to generate the custom documentation
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+<retcol name="uc_html_head" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_html_title" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_html_meta" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_html_main_page_head" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_html_main_data_div_start" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_typical_file_header" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_typical_file_footer" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_typical_tr_data" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_typical_tr_head" type="COMTYP_CHAR"></retcol>
+
+
+
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+<seealso cref="get ossi documentation alg usage"></seealso>
+
+</documentation>
+
+
+
+</command>

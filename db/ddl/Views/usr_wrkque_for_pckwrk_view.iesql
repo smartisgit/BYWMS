@@ -1,0 +1,95 @@
+#use $DCSDIR/include
+#include <dcsddl.h>
+#include <dcscolwid.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+#use $SALDIR/include
+
+#include <salcolwid.h>
+
+mset command on
+
+/*
+ * This view is called by les_cmd uc_ctxt_post_create_work_post_cmd to establish context during work manaegment but by pckwrk data by wrkref or list_id
+ */
+[drop view usr_wrkque_for_pckwrk_view] catch(@?)
+;
+[
+create view usr_wrkque_for_pckwrk_view
+as
+                           select pckwrk_hdr.wrkref, pckwrk_hdr.list_id, pckwrk_hdr.wh_id,
+                                  pckwrk_hdr.prt_client_id uc_req_prt_client_id,
+                                  pckwrk_hdr.prtnum        uc_req_prtnum,
+                                  pckwrk_hdr.pckqty        uc_req_pckqty,
+                                  pckwrk_hdr.lodlvl        uc_req_lodlvl,
+                                  pckwrk_hdr.lotnum        uc_req_lotnum,
+                                  pckwrk_hdr.orgcod        uc_req_orgcod,
+                                  pckwrk_hdr.revlvl        uc_req_revlvl,
+                                  pckwrk_hdr.invsts        uc_req_invsts,
+                                  pckwrk_hdr.invsts_prg    uc_req_invsts_prg,
+                                  pckwrk_dtl.cmbcod        uc_req_cmbcod,
+                                  pckwrk_dtl.client_id     uc_req_client_id,
+                                  pckwrk_dtl.ship_id       uc_req_ship_id,
+                                  pckwrk_dtl.ship_line_id  uc_req_ship_line_id,
+                                  pckwrk_dtl.ordnum        uc_req_ordnum,
+                                  pckwrk_dtl.ordlin        uc_req_ordlin,
+                                  pckwrk_dtl.ordsln        uc_req_ordsln,
+                                  pckwrk_dtl.wkonum        uc_req_wkonum,
+                                  pckwrk_dtl.wkorev        uc_req_wkorev,
+                                  pckwrk_dtl.wkolin        uc_req_wkolin,
+                                  pckwrk_hdr.srcloc        uc_req_srcloc,
+                                  pckwrk_hdr.srcare        uc_req_srcare,
+                                  pckwrk_hdr.wrktyp        uc_req_wrktyp,
+                                  pckwrk_dtl.schbat        uc_req_schbat,
+                                  null                     uc_req_dstare,
+                                  pckwrk_dtl.subucc        uc_req_subucc,
+                                  pckwrk_dtl.cur_cas       uc_req_cur_cas,
+                                  pckwrk_dtl.tot_cas_cnt   uc_req_tot_cas_cnt,
+                                  nvl(pckwrk_dtl.subnum, pckwrk_hdr.ctnnum) uc_req_ctnnum,
+                                  pckwrk_dtl.dst_mov_zone_id uc_req_dst_mov_zone_id,
+                                  pckwrk_dtl.dstloc        uc_req_dstloc,
+                                  ord.ordtyp uc_req_ordtyp,
+                                  ord.rush_flg uc_req_rush_flg,
+                                  shipment.carcod uc_req_shp_carcod,
+                                  shipment.srvlvl uc_req_shp_srvlvl,
+                                  shipment.early_shpdte uc_req_shp_early_shpdte,
+                                  shipment.early_dlvdte uc_req_shp_early_dlvdte,
+                                  cardtl.cartyp uc_req_shp_cartyp,
+                                  ord_line.carcod uc_req_ol_carcod,
+                                  ord_line.srvlvl uc_req_ol_srvlvl,
+                                  adrmst_rt.host_ext_id uc_req_rt_host_ext_id,
+                                  adrmst_rt.adrnam uc_req_rt_adrnam,
+                                  adrmst_rt.adrln1 uc_req_rt_adrln1,
+                                  adrmst_rt.adrln2 uc_req_rt_adrln2,
+                                  adrmst_rt.adrln3 uc_req_rt_adrln3,
+                                  adrmst_rt.adrcty uc_req_rt_adrcty,
+                                  adrmst_rt.adrstc uc_req_rt_adrstc,
+                                  adrmst_rt.adrpsz uc_req_rt_adrpsz,
+                                  adrmst_rt.ctry_name uc_req_rt_ctry_name,
+                                  ctry_mst_rt.iso_2_ctry_name uc_req_rt_ctry_iso2,
+                                  ctry_mst_rt.iso_3_ctry_name uc_req_rt_ctry_iso3
+                           from pckwrk_hdr
+                                join pckwrk_dtl on pckwrk_hdr.wrkref = pckwrk_dtl.wrkref
+                                join locmst locmst_src on locmst_src.wh_id = pckwrk_hdr.wh_id and locmst_src.stoloc = pckwrk_hdr.srcloc
+                                left outer join loc_typ loc_typ_src on loc_typ_src.loc_typ_id = locmst_src.loc_typ_id
+                                left outer join locmst locmst_dst
+                                   on locmst_dst.wh_id = pckwrk_dtl.wh_id
+                                   and locmst_dst.stoloc = pckwrk_dtl.dstloc
+                                left outer join ord
+                                    on ord.client_id = pckwrk_dtl.client_id
+                                    and ord.wh_id = pckwrk_dtl.wh_id
+                                    and ord.ordnum = pckwrk_dtl.ordnum
+                                left outer join adrmst adrmst_rt on adrmst_rt.adr_id = ord.rt_adr_id
+                                left outer join ctry_mst ctry_mst_rt on ctry_mst_rt.ctry_name = adrmst_rt.ctry_name
+                                left outer join shipment on shipment.ship_id = pckwrk_dtl.ship_id
+                                left outer join cardtl on cardtl.carcod = shipment.carcod and cardtl.srvlvl = shipment.srvlvl
+                                left outer join ord_line
+                                    on ord_line.client_id = pckwrk_dtl.client_id
+                                    and ord_line.wh_id = pckwrk_dtl.wh_id
+                                    and ord_line.ordnum = pckwrk_dtl.ordnum
+                                    and ord_line.ordlin = pckwrk_dtl.ordlin
+                                    and ord_line.ordsln = pckwrk_dtl.ordsln
+]
+RUN_DDL
+
+mset command on

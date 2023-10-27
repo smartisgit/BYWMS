@@ -1,0 +1,185 @@
+<command>
+<name>publish ossi default values for rule grp for table data</name>
+<description>Utilize the rules defined and publish out the data as columns</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="uc_rule_grp_id"></argument>
+<argument datatype="string" name="uc_rule_subgrp_id_prefix">This is the prefix.  Dont have the last -.  So SET-ORD</argument>
+<argument datatype="string" name="uc_get_ctxt_cmd">An override get context command.  If not passed in we go by les_cmd</argument>
+<argument datatype="string" name="uc_return_column_delim">The delimiter for the return columns.  Default is ,</argument>
+
+<argument datatype="integer" name="uc_mode_get_table_list_only">
+Default is 0.  If 1 the idea is to return the list of tables affected only
+</argument>
+
+
+
+
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Saad.Ahmad 12535
+*/
+publish data
+where uc_get_data_les_cmd = 'uc_ctxt_table_data_' || lower(@uc_rule_subgrp_id_prefix)
+and uc_return_column_delim = nvl(@uc_return_column_delim, "," )
+and uc_mode_get_table_list_only = nvl(@uc_mode_get_table_list_only, 0 )
+|
+publish data
+where uc_rule_subgrp_id_prefix = @uc_rule_subgrp_id_prefix || '-'
+and uc_res_table_list= null
+|
+{
+    if ( @uc_get_ctxt_cmd is not null )
+        execute server command
+        where cmd = @uc_get_ctxt_cmd 
+        and inline = 1
+    else
+        execute ossi les_cmd
+        where les_cmd_id = @uc_get_data_les_cmd
+        and uc_les_cmd_inline = 1
+        and exec_uc_les_cmd_cust_lvl = null
+        and uc_inhibit_return_extra_columns = 1
+    |
+    execute ossi moca and cache
+    where uc_cache_grp = 'OSSI_DEFAULT_RULES'
+    and uc_cache_key = @uc_rule_grp_id || '__' || @uc_rule_subgrp_id_prefix || '__TABLE_LIST'
+    and uc_inline = 1
+    and uc_moca_cmd =
+       " [/*#nobind*/"
+    || " select distinct substr( x.uc_set_column_expr, 1, instr(x.uc_set_column_expr,'-')-1) uc_set_table_name"
+    || " from"
+    || " ("
+    || "     select replace(uc_rule_subgrp_id," || qq(@uc_rule_subgrp_id_prefix) || ",'') uc_set_column_expr"
+    || "     from usr_rule_engine_expr"
+    || "     where uc_rule_grp_id    =    " || qq(@uc_rule_grp_id)
+    || "     and   uc_rule_subgrp_id like " || qq(@uc_rule_subgrp_id_prefix || '%')
+    || "     and   ena_flg = 1"
+    || " ) x"
+    || " order by 1"
+    || " ]"
+    || " catch (-1403,510)"
+    catch (-1403,510)
+    >> uc_res_table_list
+    |
+    if ( @uc_mode_get_table_list_only = 1 )
+    {
+        if ( @uc_res_table_list is null )
+            noop >> uc_set_default_table_list
+        else
+            publish data
+            where uc_set_default_table_list = @uc_res_table_list
+    }
+    else if ( @uc_res_table_list is not null and rowcount(@uc_res_table_list) > 0 )
+    {
+        publish data combination
+        where res = @uc_res_table_list
+        |
+        {
+            if ( @uc_set_table_name is not null )
+            {
+                publish data
+                where new_rule_grp_prefix = @uc_rule_subgrp_id_prefix || @uc_set_table_name || '-'
+                |
+                execute ossi moca and cache
+                where uc_cache_grp = 'OSSI_DEFAULT_RULES'
+                and uc_cache_key = @uc_rule_grp_id || '__' || @uc_rule_subgrp_id_prefix || '__' || @uc_set_table_name || '__SETCOLS'
+                and uc_inline = 1
+                and uc_moca_cmd =
+                   " [/*#nobind*/"
+                || " select distinct replace(uc_rule_subgrp_id," || qq(@new_rule_grp_prefix) || ",'') uc_set_column_name, uc_rule_subgrp_id"
+                || " from usr_rule_engine_expr"
+                || " where uc_rule_grp_id    =    " || qq(@uc_rule_grp_id)
+                || " and   uc_rule_subgrp_id like " || qq(@new_rule_grp_prefix || '%')
+                || " and   ena_flg = 1"
+                || " order by 1"
+                || " ]"
+                || " catch (-1403,510)"
+                >> res_cols
+                |
+                if ( @? = 0 and rowcount(@res_cols) > 0 )
+                {
+                    [[
+                    String this_value;
+                    StringBuffer ret_buffer = new StringBuffer("");
+                    boolean first = true;
+                    //
+                    while ( res_cols.next() )
+                    {
+                        this_value = "";
+                        res_eval = moca.executeInline ( " get ossi result by evaluating policy" +
+                                                        " where uc_rule_grp_id = @uc_rule_grp_id" +
+                                                        " and   uc_rule_subgrp_id = @uc_rule_subgrp_id",
+                                                        [uc_rule_grp_id:uc_rule_grp_id, uc_rule_subgrp_id:res_cols.getString("uc_rule_subgrp_id")] );
+                        if ( res_eval.next() )
+                            this_value = res_eval.getString ( "r_polval" );
+                        //
+                        if (!first )
+                           ret_buffer.append ( " " + uc_return_column_delim + " " );
+                        //
+                        ret_buffer.append ( res_cols.getString ( "uc_set_column_name" ) + " = '" + this_value.replace("'", "''" ) + "'" );
+                        first = false;
+                    }
+                    [ret_buffer:ret_buffer.toString()]
+                    ]]
+                    |
+                    publish data
+                    where uc_rule_grp_id = @uc_rule_grp_id
+                    and uc_get_ctxt_cmd = @uc_get_ctxt_cmd
+                    and uc_get_data_les_cmd = @uc_get_data_les_cmd
+                    and uc_rule_subgrp_id_prefix = @uc_rule_subgrp_id_prefix
+                    and uc_return_column_delim = @uc_return_column_delim
+                    and uc_set_table_name = @uc_set_table_name
+                    and uc_set_table_data_clause = @ret_buffer
+                }
+            } /* have uc_set_table_name */
+        } /* scope of uc_res_table_list */
+    } /* have some tables retuned in uc_res_table_list */
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+We have special category of data in usr_rule_engine_expr where uc_rule_subrgp_id is named as (delimited by -)
+1. operation group e.g. SET
+2. Which table are we acting on, e.g. ORD
+3. Which table are we updating, e.g. ORD_LINE
+
+So if we set on ORD and have 3rd part as ORD_LINE it is saying that we set all columns on ord_line to the value.
+</remarks>
+
+<retrows>n</retrows>
+
+
+<retcol name="uc_set_default_table_list" type="COMTYP_RES">If uc_mode_get_table_list_only = 1 then this is the only variable retuend
+and in that case it is a resultset with one column uc_set_table_name.  Idea is that caller can check if there is any defaulting rule
+that is enabled.  They can see the count of this res</retcol>
+
+
+<retcol name="uc_rule_grp_id" type="COMTYP_CHAR">passed in value</retcol>
+<retcol name="uc_get_ctxt_cmd" type="COMTYP_CHAR">passed in value</retcol>
+<retcol name="uc_return_column_delim" type="COMTYP_CHAR">passed in value - may have been defaulted</retcol>
+
+
+<retcol name="uc_get_data_les_cmd" type="COMTYP_CHAR">LES Command that we execute</retcol>
+<retcol name="uc_rule_subgrp_id_prefix" type="COMTYP_CHAR">passed in value</retcol>
+<retcol name="uc_set_table_name" type="COMTYP_CHAR">Per dodcumentation the 3rd part</retcol>
+<retcol name="uc_set_table_data_clause" type="COMTYP_CHAR">A complete where clause that can be passed to </retcol>
+
+
+<exception value="eOK">Normal successful completion</exception>
+
+
+<seealso cref="process ossi post tasks for crud action using rules">Call with uc_mode_get_table_list_only = 1 to optimize processing
+if we did not have any enabled rules</seealso>
+
+<seealso cref="get ossi result by evaluating policy"></seealso>
+<seealso cref="process ossi default values for rule grp for table data"></seealso>
+</documentation>
+
+
+</command>

@@ -1,0 +1,30 @@
+<command>
+<name>remove role option</name>
+<description>Ath_typ not provided, so must be pre-trigger</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ */
+process usr issue
+  where uc_table_name = 'LES_OPT_ATH'
+    and uc_action = 'REMOVE'
+;
+^remove role option
+  where @*
+
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This command can be used to remove role options
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

@@ -1,0 +1,485 @@
+<command>
+<name>load ossi inbound file contents to table</name>
+<description>This will poll a folder and then load the contents of the file to a table</description>
+<type>Local Syntax</type>
+
+
+<argument datatype="string" name="uc_folder">REQUIRED: Which folder to poll.  With trailing / needed</argument>
+<argument datatype="string" name="uc_filename_expr">REQUIRED: Wild expression to find files in this folder</argument>
+<argument datatype="string" name="uc_processed_folder">REQUIRED: File will moved here once processed</argument>
+
+<argument datatype="string" name="uc_filename_sort_list">How to sort the inbound files.  Default is [uc_max_file_dt a, uc_filename_only a]</argument>
+
+
+<argument datatype="string" name="wh_id">Can pass it in then all uploads will get that in the context.  Other option is to determine from file name</argument>
+
+
+<argument datatype="string" name="uc_ossi_job_id">Optional Job Id</argument>
+<argument datatype="string" name="uc_ossi_who"></argument>
+
+
+
+<argument datatype="string" name="uc_doc_typ_cd">Optionally pass in the document type for all documents in this folder.  It can be also overridden by expression provided below</argument>
+<argument datatype="string" name="comflg">Commit on every file.  Only suppored value is 1.  0 is for debugging only</argument>
+
+<argument datatype="string" name="uc_temp_folder">File will moved here first using move file.  This will help in exposing sharing violation</argument>
+
+<argument datatype="string" name="uc_filter_moca_expr">A MOCA Expresison can be passed in which needs to pass for file to be processed.  For example we can use it to see that file is older than a certain tiome </argument>
+
+<argument datatype="string" name="uc_expr_wh_id">Expression to determine warehouse</argument>
+<argument datatype="string" name="uc_expr_doc_typ_cd">Expression to determine document type</argument>
+<argument datatype="string" name="uc_expr_doc_subtyp_cd">Expression to determine document sub type</argument>
+
+
+<argument datatype="string" name="uc_expr_ordnum">Expression to determine order number</argument>
+<argument datatype="string" name="uc_expr_cponum">Expression to determine order number</argument>
+<argument datatype="string" name="uc_expr_ship_id">Expression to determine ship_id number</argument>
+<argument datatype="string" name="uc_expr_schbat">Expression to determine wave number</argument>
+<argument datatype="string" name="uc_expr_trknum">Expression to determine trknum</argument>
+<argument datatype="string" name="uc_expr_invnum">Expression to determine invoice#</argument>
+
+
+
+<local-syntax>
+<![CDATA[
+
+if ( @uc_folder is null or @uc_filename_expr is null or @uc_processed_folder is null )
+    set return status
+    where status = 507
+    and verb = 'load'
+    and noun = 'ossi inbound file contents to table'
+    and argname = 'uc_folder, uc_filename_expr, uc_processed_folder'
+;
+publish data
+where uc_in_pathname = @uc_folder || '/' || @uc_filename_expr
+and uc_expr_wh_id = nvl(@uc_expr_wh_id, "@wh_id")
+and uc_expr_doc_typ_cd = nvl(@uc_expr_doc_typ_cd, "@uc_doc_typ_cd")
+and comflg = nvl(@comflg, 1 )
+and now_dt = sysdate
+and uc_ossi_job_id = nvl(@uc_ossi_job_id, 'UC_W_' || nvl(@wh_id,'GLOBAL') || '_LOAD_INB-RPT_' || @uc_doc_typ_cd )
+and uc_ossi_who = nvl(@uc_ossi_who, @@USR_ID )
+and uc_filename_sort_list = nvl(@uc_filename_sort_list, "uc_max_file_dt a, uc_filename_only a" )
+|
+publish data
+where uc_ossi_job_seq = ossi__register_job ( @uc_ossi_job_id, 
+                                             'uc_doc_typ_cd='|| @uc_doc_typ_cd,
+                                             @uc_ossi_who )
+|
+try
+{
+    if ( @uc_temp_folder is not null )
+    {
+        publish data
+        where uc_ossi_module_seq = ossi__register_module ( @uc_ossi_job_seq, 'MOVE-TMP-TO-INP', @uc_temp_folder, @uc_ossi_who )
+        |
+        try
+        {
+            find file 
+            where pathname = @uc_temp_folder || '/' || @uc_filename_expr
+            catch(@?)
+            |
+            if ( @? = 0 and @type = 'F' )
+            {
+                sl_split filename
+                where full_file_name = @pathname
+                |
+                publish data
+                where uc_ossi_action_seq = ossi__register_action ( @uc_ossi_job_seq, @uc_ossi_module_seq, 'MOVE-' || @s_orig_filename, @uc_ossi_who )
+                |
+                try
+                {
+                    move file
+                    where from = @pathname
+                    and to = @uc_folder || '/' || @s_orig_filename
+                }
+                finally
+                {
+                    publish data
+                    where uc_ossi_err_code = @?
+                    and uc_ossi_err_descr = @!
+                    |
+                    complete ossi job log
+                }
+            }
+        }
+        finally
+        {
+            complete ossi job log
+        }
+    }
+    ;
+    {
+        publish data
+        where uc_ossi_module_seq = ossi__register_module ( @uc_ossi_job_seq, 'FIND-FILES', @uc_in_pathname, @uc_ossi_who )
+        |
+        {
+            {
+                {
+                    find file 
+                    where pathname = @uc_in_pathname
+                    catch(@?)
+                    |
+                    if ( @? = 0 and @type = 'F' )
+                    {
+                        get file info
+                        |
+                        sl_split filename
+                        where full_file_name = @pathname
+                        |
+                        publish data
+                        where uc_file_created_ts = @created
+                        and uc_file_accessed_ts = @accessed
+                        and uc_file_modified_ts = @modified
+                        and uc_filesize = @size
+                        and uc_file_full_path = @pathname
+                        and uc_file_folder = @s_dir
+                        and uc_filename_only = @s_orig_filename
+                        |
+                        filter data
+                        where moca_filter_level = 1
+                        and uc_max_created_accessed = iif (@uc_file_created_ts > @uc_file_accessed_ts, @uc_file_created_ts, @uc_file_accessed_ts)            
+                        |
+                        filter data 
+                        where moca_filter_level = 1
+                        and uc_max_file_dt = iif (@uc_max_created_accessed > @uc_file_modified_ts, @uc_max_created_accessed, @uc_file_modified_ts )            
+                        |
+                        publish data
+                        where uc_file_age_secs = (@now_dt - to_date(@uc_max_file_dt,'YYYY-MM-DD HH24:MI:SS'))*24*3600
+                        catch(@?)
+                        |
+                        filter data
+                        where moca_filter_level = 2
+                        and uc_file_age_secs = nvl(@uc_file_age_secs, -1 )
+                        |
+                        /*
+                         * We have essential file stuff on stack.  We may want to filter out some files so that is on input
+                         */
+                        if ( @uc_filter_moca_expr is not null )
+                            execute server command 
+                            where cmd = "publish data where file_ok = iif ( " || @uc_filter_moca_expr || ",1,0)"
+                            and inline = 1
+                        else
+                            publish data
+                            where file_ok = 1
+                        |
+                        if ( @file_ok = 1 )
+                        {
+                            filter data
+                            where moca_filter_level = 3
+                        }
+                    } /* find file output */
+                }
+                >> res_files_tmp
+                |
+                if ( rowcount(@res_files_tmp) > 0 )
+                {
+                    sort result set
+                    where result_set = @res_files_tmp
+                    and sort_list = @uc_filename_sort_list
+                }
+            }
+            >> res_files
+            |
+            {
+                /*
+                 * This action will appear to simply show the count of files we found in the run
+                 */
+                publish data
+                where uc_ossi_action_seq = ossi__register_action ( @uc_ossi_job_seq, @uc_ossi_module_seq, 'FIND-FILE-RESULT', 'rows=' || rowcount(@res_files) , @uc_ossi_who )
+                |
+                complete ossi job log
+                ;
+                if ( rowcount(@res_files) > 0 )
+                {
+                    publish top rows
+                    where res = @res_files
+                    and rows = 1
+                    |
+                    publish data
+                    where uc_ossi_action_seq = ossi__register_action ( @uc_ossi_job_seq, @uc_ossi_module_seq, 'FIRST-FILE', @uc_filename_only || '-DT=' || @uc_max_file_dt , @uc_ossi_who )
+                    |
+                    complete ossi job log
+                }
+                ;
+                /*
+                 * And this is to complete the find file module
+                 */
+                complete ossi job log
+                ;
+                publish data
+                where res_files = @res_files
+            }
+        } /* module */
+    } /* scope to get files */
+    |
+    publish data combination
+    where res = @res_files
+    |
+    /*
+     * Above will push all files - multiple rows to the stack.  We are processing row at a time each file
+     */
+    if ( @? = 0 and @uc_filename_only is not null )
+    {
+        /* 
+         * First move this file to a temp folder if one is passed to us
+         */
+        if ( @uc_temp_folder is not null )
+        {
+            publish data
+            where uc_temp_file_full_path = @uc_temp_folder || '/' || @uc_filename_only
+            |
+            {
+                remove file
+                where filnam = @uc_temp_file_full_path
+                catch (@?)
+                ;
+                move file
+                where from = @uc_file_full_path
+                and to = @uc_temp_file_full_path
+                catch (@?)
+                |
+                publish data
+                where uc_ossi_err_code = @?
+                and uc_ossi_err_descr = @!
+                |
+                {
+                    if ( @uc_ossi_err_code != 0 )
+                    {
+                        publish data
+                        where uc_ossi_module_seq = ossi__register_module ( @uc_ossi_job_seq, 'MOV-TMP-ERR' || @uc_file_full_path, @uc_ossi_who )
+                        |
+                        complete ossi job log
+                    }
+                    ;
+                    publish data
+                    where move_status = @uc_ossi_err_code
+                    and move_message = @uc_ossi_err_descr
+                    and process_file_full_path = @uc_temp_file_full_path
+                    and moved_to_temp = 1
+                }
+            }
+        } /* moving to temp */
+        else
+        {
+            publish data
+            where move_status = 0
+            and move_message = ""
+            and process_file_full_path = @uc_file_full_path
+            and moved_to_temp = 0
+        }
+        |
+        if ( @move_status = 0 )
+        {
+            read file
+            where filnam = @process_file_full_path
+            and mode = 'B'
+            catch (@?)
+            |
+            publish data
+            where uc_ossi_err_code = @?
+            and uc_ossi_err_descr = @!
+            |
+            if ( @uc_ossi_err_code != 0 )
+            {
+                publish data
+                where uc_ossi_module_seq = ossi__register_module ( @uc_ossi_job_seq, 'READ-ERR' || @process_file_full_path, @uc_ossi_who )
+                |
+                complete ossi job log
+            }
+            else
+            {
+                publish data
+                where uc_read_file_size = @size
+                |
+                encode to base64
+                where bin_data = @data
+                catch(@?)
+                |
+                publish data
+                where uc_ossi_err_code = @?
+                and uc_ossi_err_descr = @!
+				and uc_contents_base64 = @base64_encoded
+                |
+                if ( @uc_ossi_err_code != 0 )
+                {
+                    publish data
+                    where uc_ossi_module_seq = ossi__register_module ( @uc_ossi_job_seq, 'ENCODE-ERR' || @process_file_full_path, @uc_ossi_who )
+                    |
+                    complete ossi job log
+                }
+                else
+                {
+                    /*
+                     * Now determine the values based on context available thus far
+                     */
+                    if ( @uc_expr_wh_id is not null )
+                        execute server command where cmd = "publish data where wh_id = " || @uc_expr_wh_id and inline = 1
+                    |
+                    if ( @uc_expr_ordnum is not null )
+                        execute server command where cmd = "publish data where ordnum = " || @uc_expr_ordnum and inline = 1
+                    |
+                    if ( @uc_expr_cponum is not null )
+                        execute server command where cmd = "publish data where cponum = " || @uc_expr_cponum and inline = 1
+                    |
+                    if ( @uc_expr_ship_id is not null )
+                        execute server command where cmd = "publish data where ship_id = " || @uc_expr_ship_id and inline = 1
+                    |
+                    if ( @uc_expr_schbat is not null )
+                        execute server command where cmd = "publish data where schbat = " || @uc_expr_schbat and inline = 1
+                    |
+                    if ( @uc_expr_trknum is not null )
+                        execute server command where cmd = "publish data where trknum = " || @uc_expr_trknum and inline = 1
+                    |
+                    if ( @uc_expr_invnum is not null )
+                        execute server command where cmd = "publish data where invnum = " || @uc_expr_invnum and inline = 1
+                    |
+                    if ( @uc_expr_doc_typ_cd is not null )
+                        execute server command where cmd = "publish data where uc_doc_typ_cd = " || @uc_expr_doc_typ_cd and inline = 1
+                    |
+                    if ( @uc_expr_doc_subtyp_cd is not null )
+                        execute server command where cmd = "publish data where uc_doc_subtyp_cd = " || @uc_expr_doc_subtyp_cd and inline = 1
+                    |
+                    {
+                        create ossi document store data
+                        catch (@?)
+                        |
+                        publish data
+                        where uc_ossi_err_code = @?
+                        and uc_ossi_err_descr = @!
+                        |
+                        if ( @uc_ossi_err_code != 0 )
+                        {
+                            publish data
+                            where uc_ossi_module_seq = ossi__register_module ( @uc_ossi_job_seq, 'CREATE-ERR' || @process_file_full_path, @uc_ossi_who )
+                            |
+                            complete ossi job log
+                        }
+                        else
+                        {
+                            publish data
+                            where uc_prc_file_full_path = @uc_processed_folder || '/' || @uc_filename_only
+                            |
+                            {
+                                remove file
+                                where filnam = @uc_prc_file_full_path
+                                catch (@?)
+                                ;
+                                move file
+                                where from = @process_file_full_path
+                                and to = @uc_prc_file_full_path
+                                catch(@?)
+                                |
+                                publish data
+                                where uc_ossi_err_code = @?
+                                and uc_ossi_err_descr = @!
+                                |
+                                {
+                                    if ( @uc_ossi_err_code != 0 )
+                                    {
+                                        publish data
+                                        where uc_ossi_module_seq = ossi__register_module ( @uc_ossi_job_seq, 'CREATE-ERR' || @process_file_full_path, @uc_ossi_who )
+                                        |
+                                        complete ossi job log
+                                    }
+                                    ;
+                                    if ( @comflg = 1 )
+                                    {
+                                        if ( @uc_ossi_err_code = 0 )
+                                            commit
+                                        else
+                                            rollback
+                                        ;
+                                        publish data
+                                        where uc_doc_id = @uc_doc_id
+                                        and uc_doc_typ_cd = @uc_doc_typ_cd
+                                        and uc_doc_subtyp_cd = @uc_doc_subtyp_cd
+                                        and wh_id = @wh_id
+                                        and ordnum = @ordnum
+                                        and ship_id = @ship_id
+                                        and cponum = @cponum
+                                        and schbat = @schbat
+                                        and trknum = @trknum
+                                        and invnum = @invnum
+                                        and uc_file_created_ts = @uc_file_created_ts
+                                        and uc_file_accessed_ts = @uc_file_accessed_ts
+                                        and uc_file_modified_ts = @uc_file_modified_ts
+                                        and uc_filesize = @uc_filesize
+                                        and uc_read_file_size = @uc_read_file_size
+                                        and uc_file_full_path = @uc_file_full_path
+                                        and uc_file_folder = @uc_file_folder
+                                        and uc_filename_only = @uc_filename_only
+                                        and uc_max_file_dt = @uc_max_file_dt
+                                        and uc_file_age_secs = @uc_file_age_secs
+                                        and now_dt = @now_dt
+                                        and uc_move_to_prc_status = @uc_ossi_err_code
+                                        and uc_move_prc_message = @uc_ossi_err_descr
+                                        and processed_file_full_path = @process_file_full_path
+                                        and uc_prc_file_full_path = @uc_prc_file_full_path
+                                    }
+                                } /* move status */
+                            } /* scope of processed file */
+                        } /* created correctly - so move file to processed */
+                    } /* scope */
+                } /* encode was ok */
+            } /* read was ok */
+        } /* move was ok */
+    } /* output of find file */
+} /* main */
+finally
+{
+    complete ossi job
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+This component will poll a folder and read all files from there into the usr_ossi_doc_store table.  Typical use case is that host downlaods some paperwork to us.
+And in those cases the file name can determine stuff like order# etc.  Going at the file system will be slow to read them every time - so this job will consume these files
+and load to this table.  Then when needed this table will be queried to download the contents
+</remarks>
+
+<retrows>n - Based on number of files found in that run</retrows>
+<retcol name="uc_doc_id" type="string">The generated PK value</retcol>
+<retcol name="uc_doc_typ_cd" type="string">Document Type determined</retcol>
+<retcol name="uc_doc_subtyp_cd" type="string">Document Type determined</retcol>
+<retcol name="wh_id" type="string">Context determined</retcol>
+<retcol name="ordnum" type="string">Context determined</retcol>
+<retcol name="ship_id" type="string">Context determined</retcol>
+<retcol name="cponum" type="string">Context determined</retcol>
+<retcol name="schbat" type="string">Context determined</retcol>
+<retcol name="trknum" type="string">Context determined</retcol>
+<retcol name="invnum" type="string">Context determined</retcol>
+
+<retcol name="uc_file_created_ts" type="string">As reported by find file</retcol>
+<retcol name="uc_file_accessed_ts" type="string">As reported by find file</retcol>
+<retcol name="uc_file_modified_ts" type="string">As reported by find file</retcol>
+<retcol name="uc_filesize" type="string">As reported by find file</retcol>
+<retcol name="uc_max_file_dt" type="string">max of all 3 dates</retcol>
+<retcol name="uc_file_age_secs" type="string">Age of file in seconds.  Can come in handy if we want to use uc_filter_moca_expr</retcol>
+
+<retcol name="uc_read_file_size" type="string">Size reported by read file</retcol>
+<retcol name="uc_file_full_path" type="string"></retcol>
+<retcol name="uc_file_folder" type="string"></retcol>
+<retcol name="uc_filename_only" type="string"></retcol>
+
+<retcol name="now_dt" type="string">This is time when this run started.  This value is used to determine file age</retcol>
+<retcol name="uc_move_to_prc_status" type="string">Status of move to processed folder</retcol>
+<retcol name="uc_move_prc_message" type="string">Status of move to processed folder</retcol>
+<retcol name="processed_file_full_path" type="string">Full path of the file when it was read.  This can be different when it was first moved to a temp folder</retcol>
+<retcol name="uc_prc_file_full_path" type="string">Full path of the file moved to processed folder</retcol>
+
+
+<exception value="eOK">Normal successful completion</exception>
+
+<seealso cref="load ossi inbound file contents to table"></seealso>
+<seealso cref="get ossi stored file from doc store"></seealso>
+<seealso cref="usr parse_filenaem_for_doc_store"></seealso>
+
+
+</documentation>
+
+
+
+</command>

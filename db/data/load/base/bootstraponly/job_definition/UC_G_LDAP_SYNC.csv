@@ -1,0 +1,2 @@
+job_id,role_id,name,enabled,type,command,log_file,trace_level,overlap,schedule,start_delay,timer,grp_nam
+UC_G_LDAP_SYNC,,LDAP Sync user and role data,0,timer,process ossi ldap sync,$LESDIR/log/UC_G_LDAP_SYNC.log,,0,,0,300,OSSISVN_10731

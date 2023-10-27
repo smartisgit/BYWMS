@@ -1,0 +1,42 @@
+#use $DCSDIR/include
+
+#include <dcsddl.h>
+
+#include <dcscolwid.h>
+
+#include <dcstbldef.h>
+
+#include <sqlDataTypes.h>
+
+
+#use $SALDIR/include
+
+#include <salcolwid.h>
+
+mset command on
+
+[
+DROP_VIEW(UCDM_PCKREL_00200_PCK_REL_RULE)
+] catch (ERR_CANNOT_DROP_TABLE_NOT_FOUND)
+RUN_DDL
+
+mset command off
+
+CREATE_VIEW(UCDM_PCKREL_00200_PCK_REL_RULE)
+select pck_rel_rule.*,
+        pck_mthd.pck_mthd_nam,
+        mov_zone.mov_zone_cod,
+        pck_mthd.wh_id,
+        dscmst.lngdsc
+   from pck_rel_rule
+   join pck_mthd
+     on pck_rel_rule.pck_mthd_id = pck_mthd.pck_mthd_id
+   left join dscmst
+     on dscmst.colnam = 'pck_mthd_id'
+    and dscmst.colval = pck_mthd.pck_mthd_id
+    and dscmst.locale_id = nvl(NULL, 'US_ENGLISH')
+  left join mov_zone
+    on pck_rel_rule.dst_mov_zone_id = mov_zone.mov_zone_id
+RUN_DDL
+
+mset command on

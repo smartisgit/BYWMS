@@ -1,0 +1,41 @@
+<command>
+<name>ossi ceil</name>
+<description>FUNCTION: Get ceiling value</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+publish data
+where value = float(@moca_farg1)
+|
+{
+   [[r_value=Math.ceil(value)]]
+}
+
+]]>
+</local-syntax>
+
+<argument name="moca_farg1" required="yes" datatype="string">Value to take ceiling of</argument>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+Take ceiling value of a number as a moca function
+</p>
+]]>
+</remarks>
+
+<retrows>MOCA Function - So one row is returned</retrows>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+</documentation>
+
+</command>

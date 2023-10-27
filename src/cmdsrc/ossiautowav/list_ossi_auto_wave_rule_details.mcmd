@@ -1,0 +1,68 @@
+<command>
+<name>list ossi auto wave rule details</name>
+<description>This command will list the auto wave rule details</description>
+ 
+<argument name="wh_id" required="yes" datatype="string"></argument>
+<argument name="uc_auto_wave_rule_id" required="yes" datatype="string">Optionally pass in usr_auto_wave_rule_hdr.uc_auto_wave_rule_id</argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+    [
+    select wh_id,
+           uc_auto_wave_rule_id,
+           uc_auto_wave_ctxt_cd,
+           column_name,
+           uc_rule_fld_value_expr,
+           decode(column_name,'Please Select...','000',column_name) sort_col
+    from usr_auto_wave_rule_def_fld
+    where 1=1
+    and wh_id = @wh_id
+    and uc_auto_wave_rule_id = @uc_auto_wave_rule_id
+    order by wh_id,
+             uc_auto_wave_rule_id,
+             sort_col,
+             uc_auto_wave_ctxt_cd,
+             uc_rule_fld_value_expr
+    ] catch (-1403,510)
+   
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This will list the auto wave rule fields of an autowave rule.
+</p>
+]]>
+</remarks>
+
+<retrows>n</retrows>
+
+<retcol name="wh_id" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_auto_wave_rule_id" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_auto_wave_ctxt_cd" type="COMTYP_CHAR">Context</retcol>
+<retcol name="column_name" type="COMTYP_CHAR">Column Name</retcol>
+<retcol name="column_name" type="COMTYP_CHAR">Value Expression</retcol>
+
+
+<example>
+<![CDATA[
+<p>
+</p>
+]]>
+
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+<seealso cref="process usr auto wave rules"></seealso>
+<seealso cref="change ossi auto wave rule detail"></seealso>
+
+</documentation>
+
+
+</command>

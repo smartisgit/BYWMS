@@ -1,0 +1,136 @@
+<command>
+<name>publish ossi default values</name>
+<description>Find a policy value as a function</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="polcod"></argument>
+<argument datatype="string" name="uc_default_catg"></argument>
+<argument datatype="string" name="wh_id"></argument>
+<argument datatype="string" name="uc_publish_data_cmd">If passed in, execute that first</argument>
+
+
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+publish data
+where polcod = nvl(@polcod, 'USR-DEFAULT' )
+and wh_id = nvl(@wh_id, @@WH_ID)
+and uc_sess_var = "uc_my_publish_data_cmd"
+|
+save session variable
+where name = @uc_sess_var
+and value = "publish data where uc_never_have_this_arg = 1"
+|
+if ( @uc_publish_data_cmd is not null )
+   execute server command
+   where cmd = @uc_publish_data_cmd
+   and inline = 1
+|
+{
+   {
+      /*
+       * We are returing all columns we want to default.  It is possible that one default depends
+       * on another default.  In that case we can use the -SORT policy node.  rtnum2 can provide sort
+       * in that case
+       */
+      [
+      select distinct
+             pdvo.rtnum2 uc_default_ord,
+             pdv.polvar uc_default_polvar,
+             substr(pdv.polvar, instr(pdv.polvar, '-')+1 ) uc_default_col,
+             nvl(pdvzn.rtnum1,0) uc_zero_is_null
+      from poldat_view pdv
+           left outer join poldat_view pdvo
+              on pdvo.polcod = pdv.polcod
+              and pdvo.polvar = @uc_default_catg || '-SORT'
+              and pdvo.polval = pdv.polvar
+              and pdvo.wh_id  = pdv.wh_id
+              and pdvo.rtnum1 = 1
+           left outer join poldat_view pdvzn
+              on pdvzn.polcod = pdv.polcod
+              and pdvzn.polvar = @uc_default_catg || '-ZERO-IS-NULL'
+              and pdvzn.polval = pdv.polvar
+              and pdvzn.wh_id  = pdv.wh_id
+              and pdvzn.rtnum1 = 1
+      where pdv.polcod = @polcod
+      and pdv.polvar like @uc_default_catg || '-%'
+      and pdv.wh_id = @wh_id
+      and pdv.rtnum1 = 1
+      and pdv.polvar != @uc_default_catg || '-SORT'
+      and pdv.polvar != @uc_default_catg || '-ZERO-IS-NULL'
+      order by 1,2
+      ]
+      catch (-1403,510)
+      |
+      if ( @? = 0 )
+      {
+         if ( @uc_zero_is_null = 1 )
+            publish data where uc_null_check_value = 0
+         else
+            publish data where uc_null_check_value = -1000
+         |
+         /* Get current value first */
+         execute server command
+         where cmd = "publish data where uc_test_val = @" || @uc_default_col
+         and inline = 1
+         |
+         /* 0 is null should work only for numbers.  So always have a valid number */
+         publish data
+         where uc_test_val_is_number = ossi__is_number ( @uc_test_val )
+         |
+         if ( @uc_test_val_is_number = 1 )
+            publish data
+            where uc_test_val_int = int(@uc_test_val)
+         else
+            publish data
+            where uc_test_val_int = 0
+         |
+         publish data
+         where uc_value_is_null = iif ( @uc_test_val is null or
+                                        (@uc_test_val_int <= @uc_null_check_value and @uc_test_val_is_number = 1 ) or
+                                        @uc_test_val like '+%' or
+                                        @uc_test_val like '*%', '1', '0' )
+         |
+         if ( @uc_value_is_null = '1' )
+         {
+            /*
+             * Every next default value can use value from earlier
+             */
+            execute server command
+            where cmd = ossi__sess_var ( @uc_sess_var )
+            and inline = 1
+            |
+            get ossi result by evaluating policy
+            where polcod = @polcod
+            and polvar = @uc_default_polvar
+            |
+            save session variable
+            where name = @uc_sess_var
+            and value = ossi__sess_var ( @uc_sess_var ) || " and " || @uc_default_col || " = '" || @r_polval || "'"
+         }
+      } /* data fetch */
+   } /* block for result */
+   ;
+   execute server command
+   where cmd = ossi__sess_var ( @uc_sess_var )
+   and inline = 1
+} /* main block */
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+Publish data from default map for downstream components
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

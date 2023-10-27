@@ -1,0 +1,93 @@
+<command>
+<name>process ossi soap login</name>
+<description>Perform SOAP Login and save security Key</description>
+<type>Local Syntax</type>
+
+<argument name="url" datatype="string"></argument>
+<argument name="sys_id" datatype="string"></argument>
+<argument name="uc_soap_request_userid" datatype="string"></argument>
+<argument name="uc_soap_request_password" datatype="string"></argument>
+<argument name="uc_soap_request_namespace_tag" datatype="string"></argument>
+<argument name="uc_soap_request_envelope" datatype="string"></argument>
+<argument name="uc_soap_action" datatype="string"></argument>
+
+<argument name="uc_force_relogin" datatype="string"></argument>
+
+
+<local-syntax>
+<![CDATA[
+
+publish data
+where my_devcod_lookup_devcod = @sys_id
+and my_devcod_lookup_wh_id = '----'
+and dev_varnam = 'uc_soap_login_token'
+|
+{
+    if ( @uc_force_relogin = 1 )
+        [
+        delete from device_context
+        where wh_id = @my_devcod_lookup_wh_id
+        and devcod = @my_devcod_lookup_devcod
+        and dev_varnam = @dev_varnam
+        and srtseq = 0
+        ]
+        catch (-1403,510)
+    ;
+    [
+    select value uc_soap_login_token
+    from device_context
+    where wh_id = @my_devcod_lookup_wh_id
+    and devcod = @my_devcod_lookup_devcod
+    and dev_varnam = @dev_varnam
+    and srtseq = 0
+    ]
+    catch (-1403,510)
+    |
+    if (@? = 0 and @uc_soap_login_token is not null )
+        publish data
+        where uc_soap_login_token = @uc_soap_login_token
+        and uc_used_body_login = null
+        and uc_body_decoded_login = nulL
+        and uc_elapsed_login = null
+        and uc_soap_request_envelope_login = null
+        and uc_token_src_login = 'cache'
+    else
+    {
+        process ossi soap login core
+        |
+        {
+	        create record
+	        where table = 'device_context'
+	        and devcod = @my_devcod_lookup_devcod
+	        and wh_id = @my_devcod_lookup_wh_id
+	        and dev_varnam = @dev_varnam
+	        and value = @uc_soap_login_token
+	        and srtseq = 0
+	        catch (-1,512)
+	        ;
+	        filter data
+	        where moca_filter_level = 2
+        }
+    }
+}
+
+]]>
+</local-syntax>
+<documentation>
+<private>
+</private>
+<remarks>
+<![CDATA[
+<p>
+This component is used to check missing eo columns.
+</p>
+]]>
+</remarks>
+<retcol name="none" type="COMTYP_STRING">Nothing is returned</retcol>
+
+<seealso cref="sl_check seq">
+</seealso>
+
+<exception value="eOK">Normal successful completion</exception>
+</documentation>
+</command>

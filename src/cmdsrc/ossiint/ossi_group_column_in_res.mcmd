@@ -1,0 +1,56 @@
+<command>
+<name>ossi group_column_in_res</name>
+
+<argument name="moca_farg1" datatype="string">res</argument>
+<argument name="moca_farg2" datatype="string">column</argument>
+<argument name="moca_farg3" datatype="string">operation </argument>
+<argument name="moca_farg4" datatype="string">type</argument>
+
+<description>Apply a group function </description>
+
+<type>Local Syntax</type>
+
+<local-syntax>
+<![CDATA[
+
+publish data
+where res = @moca_farg1
+and column_name = @moca_farg2
+and oper = nvl(@moca_farg3, 'sum' )
+and typ = nvl(@moca_fagr4, 'double' )
+|
+{
+   [[
+   Double t_tot;
+   //
+   res.reset();
+   t_tot = (Double) 0;
+   while ( res.next() )
+   {
+      if ( typ == 'double' )
+      {
+         my_value_d = res.getDouble ( column_name );
+         t_tot += my_value_d;
+      }
+   }
+   [t_tot:t_tot]
+   ]]   
+   |
+   if ( @oper = 'sum' )
+      publish data where ret = @t_tot
+}
+]]>
+</local-syntax>
+
+
+<documentation>
+<remarks>
+<![CDATA[
+    <p>
+    Group data in a result set.  Currently only support sum
+    </p>
+]]>
+</remarks>
+</documentation>
+
+</command>

@@ -1,0 +1,20 @@
+<trigger>
+<name>process usr issue</name>
+<on-command>change pm payment term</on-command>
+<local-syntax>
+<![CDATA[
+process usr issue
+  where uc_table_name = 'PAYTRM'
+    and uc_action = 'UPDATE'
+]]></local-syntax>
+<fire-sequence>10000</fire-sequence>
+<documentation>
+
+<remarks>
+This trigger process issue for changing pm payment term.
+</remarks>
+
+<seealso cref="process usr issue"></seealso>
+
+</documentation>
+</trigger>

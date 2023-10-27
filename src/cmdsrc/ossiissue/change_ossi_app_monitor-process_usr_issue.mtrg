@@ -1,0 +1,28 @@
+<trigger>
+<name>process usr issue</name>
+<on-command>change ossi app monitor</on-command>
+<local-syntax>
+<![CDATA[
+
+/*
+ * Change Log
+ * Initial Check In
+ * 20180612 saad.ahmad - 9126 - publish progress to job log
+ */
+
+if ( @uc_monitor_id not like 'L-%' )
+    process usr issue
+    where uc_table_name = 'USR_OSSI_MON'
+    and uc_action = 'UPDATE'
+]]></local-syntax>
+<fire-sequence>10000</fire-sequence>
+<documentation>
+
+<remarks>
+This trigger process issue for changing application monitors.
+</remarks>
+
+<seealso cref="process usr issue"></seealso>
+
+</documentation>
+</trigger>

@@ -1,0 +1,35 @@
+#use $DCSDIR/include
+
+#include <dcsddl.h>
+
+#include <dcscolwid.h>
+
+#include <dcstbldef.h>
+
+#include <sqlDataTypes.h>
+
+
+#use $SALDIR/include
+
+#include <salcolwid.h>
+
+mset command on
+
+[
+DROP_VIEW(UCDM_LOC_00400_STO_ZONE)
+] catch (ERR_CANNOT_DROP_TABLE_NOT_FOUND)
+RUN_DDL
+
+mset command off
+
+CREATE_VIEW(UCDM_LOC_00400_STO_ZONE)
+select sto_zone.*,
+       dscmst.lngdsc
+from sto_zone
+     left outer join dscmst 
+         on dscmst.colnam = 'sto_zone_cod|wh_id'
+         and dscmst.colval = sto_zone.sto_zone_cod || '|' || sto_zone.wh_id
+         and dscmst.locale_id = 'US_ENGLISH'
+RUN_DDL
+
+mset command on

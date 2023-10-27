@@ -1,0 +1,52 @@
+#use $DCSDIR/include
+
+#include <dcsddl.h>
+
+#include <dcscolwid.h>
+
+#include <dcstbldef.h>
+
+#include <sqlDataTypes.h>
+
+
+#use $SALDIR/include
+
+#include <salcolwid.h>
+
+mset command on
+
+[
+DROP_VIEW(UCDM_LOC_00700_LOCMST)
+] catch (ERR_CANNOT_DROP_TABLE_NOT_FOUND)
+RUN_DDL
+
+mset command off
+
+CREATE_VIEW(UCDM_LOC_00700_LOCMST)
+select locmst.*,
+        cntzon.cnt_zone_cod,
+        pck_zone.pck_zone_cod,
+        sto_zone.sto_zone_cod,
+        mov_zone.mov_zone_cod,
+        zonmst.wrkzon,
+        loc_typ.loc_typ,
+		lvl_typ.lvl_type_name
+   from locmst
+   left outer join cntzon
+     on cntzon.cnt_zone_id = locmst.cnt_zone_id
+   left outer join pck_zone
+     on pck_zone.pck_zone_id = locmst.pck_zone_id
+   left outer join sto_zone
+     on sto_zone.sto_zone_id = locmst.sto_zone_id
+   left outer join mov_zone
+     on mov_zone.mov_zone_id = locmst.mov_zone_id
+   left outer join zonmst
+     on zonmst.wrk_zone_id = locmst.wrk_zone_id
+   left outer join loc_typ
+     on loc_typ.loc_typ_id = locmst.loc_typ_id
+   left outer join lvl_typ
+     on lvl_typ.lvl_typ_id = locmst.loc_typ_id
+	and lvl_typ.wh_id = locmst.wh_id
+RUN_DDL
+
+mset command on

@@ -1,0 +1,73 @@
+<command>
+<name>process usr one auto wave rule</name>
+<description>process one auto wave rule</description>
+
+
+<argument name="wh_id" required="yes" datatype="string">wh</argument>
+<argument name="uc_auto_wave_rule_id" required="yes" datatype="string">shipment</argument>
+<argument name="comflg" required="yes" datatype="string">commit</argument>
+
+
+<argument name="uc_ossi_job_seq" required="yes" datatype="string"></argument>
+<argument name="uc_ossi_module_seq" required="yes" datatype="string"></argument>
+<argument name="uc_ossi_who" required="yes" datatype="string"></argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+
+publish data
+where uc_complete_tran_on_complete = iif ( @comflg = 1, 1, 0 )
+|
+{
+    publish data
+    where uc_ossi_action_seq = ossi__register_action ( @uc_ossi_job_seq, @uc_ossi_module_seq, 'PROCESS', 
+                                                       @uc_auto_wave_rule_id,
+                                                       @uc_ossi_who )
+    |
+    try
+    {
+        process usr auto wave
+        |
+        {
+            /*
+             * If we did not create a wave successfully, we want to raise an error here som that it gets registered as an error and not a successful run.
+             */
+            if ( nvl(@uc_cnt_ship_id,0) = 0 )
+                set return status
+                where status = 10539
+            ;
+            noop
+        }
+        |
+        filter data
+        where moca_filter_level = 2
+    }
+    finally
+    {
+        complete ossi job log
+    }
+}
+
+
+]]>
+</local-syntax>
+<documentation>
+
+<retrows>1</retrows>
+<retcol name="process usr auto wave/*" type="string"></retcol>
+
+
+
+<remarks>
+<![CDATA[
+
+This command is responsible for processing one wave rule execution
+
+]]>
+</remarks>
+
+</documentation>
+</command>

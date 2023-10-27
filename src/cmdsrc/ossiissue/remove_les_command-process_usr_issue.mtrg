@@ -1,0 +1,30 @@
+<trigger>
+<name>process usr issue</name>
+<on-command>remove les command</on-command>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ * 20161002 saad.ahmad - 9126 - mon support
+ */
+if ( @cust_lvl < 100 )
+{
+    process usr issue
+    where uc_table_name = 'LES_CMD'
+    and uc_action = 'REMOVE'
+}
+
+]]></local-syntax>
+<fire-sequence>10000</fire-sequence>
+<documentation>
+
+<remarks>
+This trigger process issue for deleting les command.
+</remarks>
+
+<seealso cref="process usr issue"></seealso>
+
+</documentation>
+</trigger>

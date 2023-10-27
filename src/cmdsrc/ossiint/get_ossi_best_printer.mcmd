@@ -1,0 +1,187 @@
+<command>
+<name>get ossi best printer</name>
+<description>Get printer for identify labels</description> 
+
+<argument name="doc_typ_cod">L for labels.  Default is L</argument>
+<argument name="uc_get_global_default">1 or 0.  default is 1</argument>
+<argument name="devcod">Device</argument>
+<argument name="wh_id">printer</argument>
+<argument name="trknum"></argument>
+<argument name="subnum"></argument>
+<argument name="lodnum"></argument>
+<argument name="dtlnum"></argument>
+
+<type>Local Syntax</type>
+
+<local-syntax>
+<![CDATA[
+
+publish data
+where devcod = nvl(@devcod, @@DEVCOD)
+and doc_typ_cod = nvl(@doc_typ_cod, 'L' )
+and uc_get_global_default = nvl(@uc_get_global_default,'1' )
+and wh_id = nvl(@wh_id, @@WH_ID)
+and lodnum = nvl(@dstlod, @lodnum)
+and subnum = nvl(@dstsub, @subnum)
+and dtlnum = @dtlnum
+|
+if ( @lodnum is null or @lodnum like '%-CRE-%' ) hide stack variable where name = 'lodnum'
+|
+if ( @subnum is null or @subnum like '%-CRE-%' ) hide stack variable where name = 'subnum'
+|
+if ( @dtlnum is null ) hide stack variable where name = 'dtlnum'
+|
+[
+select min(prtadr) uc_default_prtadr
+from prsmst 
+where wh_id = @wh_id
+and prttyp = 'POSTSCRIPT'
+]
+|
+publish data
+where uc_default_lbl_prtque = ossi__polval ( 'VC-HAZMAT', 'LABELS', 'DEFAULT-PRINTER-ADDRESS', '', 'rtstr1', @wh_id)
+|
+/* We store PRTQUE in policy so need to fetch the PRTADR for this since default level commands only use PRTADR */
+if(@uc_default_lbl_prtque#keep is not null) 
+{
+  [select min(prtadr) uc_default_lbl_prtadr
+     from prsmst 
+    where prtque = @uc_default_lbl_prtque 
+      and @+wh_id
+  ] catch(-1403) 
+}
+|
+[
+select lbl_prtadr uc_devcod_lbl_prtadr,
+       prtadr     uc_devcod_prtadr,
+       devcls     uc_devcod_devcls
+from devmst
+where wh_id = @wh_id
+and devcod = @devcod
+]
+catch (-1403,510)
+|
+{
+   /* first find the rcvtrk record for this */
+   if ( @trknum is null and (@lodnum is not null or @subnum is not null or @dtlnum is not null ) )
+   {
+      [
+      select min(rcvlin.trknum) trknum
+      from invlod
+           join invsub on invsub.lodnum = invlod.lodnum
+           join invdtl on invdtl.subnum = invsub.subnum
+           join rcvlin on rcvlin.rcvkey = invdtl.rcvkey
+      where @+invlod.lodnum
+      and @+invsub.subnum
+      and @+invdtl.dtlnum
+      ]
+   }
+   |
+   if ( @trknum is not null )
+   {
+      [
+      select rcvtrk.devcod            uc_rcvtrk_devcod,
+             devmst_rcvtrk.devcls     uc_rcvtrk_devcod_devcls,
+             devmst_rcvtrk.lbl_prtadr uc_rcvtrk_devcod_lbl_prtadr,
+             devmst_rcvtrk.prtadr     uc_rcvtrk_devcod_prtadr,
+             trlr.yard_loc,
+             locmst.devcod            uc_locmst_devcod,
+             devmst_locmst.devcls     uc_locmst_devcod_devcls,
+             devmst_locmst.lbl_prtadr uc_locmst_devcod_lbl_prtadr,
+             devmst_locmst.prtadr     uc_locmst_devcod_prtadr
+      from rcvtrk
+           left outer join devmst devmst_rcvtrk
+              on devmst_rcvtrk.devcod = rcvtrk.devcod
+              and devmst_rcvtrk.wh_id = rcvtrk.wh_id
+           left outer join trlr on trlr.trlr_id = rcvtrk.trlr_id
+           left outer join locmst on locmst.stoloc = trlr.yard_loc and locmst.wh_id = trlr.yard_loc_wh_id
+           left outer join devmst devmst_locmst
+              on devmst_locmst.devcod = locmst.devcod
+              and devmst_locmst.wh_id = locmst.wh_id
+      where rcvtrk.trknum = @trknum
+      and rcvtrk.wh_id = @wh_id
+      and rownum < 2
+      ]
+      catch (-1403,510)
+   }
+   |
+   if ( @uc_rcvtrk_devcod_devcls = 'H' )
+      publish data
+      where uc_use_devcod   = @uc_rcvtrk_devcod
+      and uc_use_devcls     = @uc_rcvtrk_devcod_devcls
+      and uc_use_lbl_prtadr = @uc_rcvtrk_devcod_lbl_prtadr
+      and uc_use_prtadr     = @uc_rcvtrk_devcod_prtadr
+      and uc_use_data       = @trknum
+      and uc_prt_src        = 'RCVTRK'
+   else if ( @uc_locmst_devcod is not null )
+      publish data
+      where uc_use_devcod   = @uc_locmst_devcod
+      and uc_use_devcls     = @uc_locmst_devcod_devcls
+      and uc_use_lbl_prtadr = @uc_locmst_devcod_lbl_prtadr
+      and uc_use_prtadr     = @uc_locmst_devcod_prtadr
+      and uc_use_data       = @yard_loc
+      and uc_prt_src        = 'LOCMST'
+   else if ( @uc_devcod_devcls is not null and @uc_devcod_lbl_prtadr is not null )
+      publish data
+      where uc_use_devcod   = @devcod
+      and uc_use_devcls     = @uc_devcod_devcls
+      and uc_use_lbl_prtadr = @uc_devcod_lbl_prtadr
+      and uc_use_prtadr     = @uc_devcod_prtadr
+      and uc_use_data       = @devcod
+      and uc_prt_src        = 'DEVMST'
+   else if ( @uc_get_global_default = '1' )
+      publish data
+      where uc_use_devcod   = @devcod
+      and uc_use_devcls     = @uc_devcod_devcls
+      and uc_use_lbl_prtadr = @uc_default_lbl_prtadr
+      and uc_use_prtadr     = @uc_default_prtadr
+      and uc_use_data       = ''
+      and uc_prt_src        = 'DEFAULT'
+   else
+      publish data
+      where uc_use_devcod   = @devcod
+      and uc_use_devcls     = @uc_devcod_devcls
+      and uc_use_lbl_prtadr = ''
+      and uc_use_prtadr     = ''
+      and uc_use_data       = ''
+      and uc_prt_src        = 'NO-DEFAULT'
+   |
+   filter data
+   where moca_filter_level = 1
+   and uc_default_prtadr = @uc_default_prtadr
+   and uc_default_lbl_prtadr = @uc_default_lbl_prtadr
+   and printer = decode ( @doc_typ_cod, 'L', @uc_use_lbl_prtadr, @uc_use_prtadr )
+   and devsrc = @uc_prt_src
+}
+
+]]>
+</local-syntax>
+
+
+<documentation>
+
+<remarks>
+<![CDATA[
+  <p>
+  This command is used to get the best printer based on stack
+  </p>
+
+]]>
+</remarks>
+
+<retcol name="uc_use_devcod" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_use_devcls" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_use_lbl_prtadr" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_use_prtadr" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_use_data" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_prt_src" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_default_prtadr" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_default_lbl_prtadr" type="COMTYP_CHAR"></retcol>
+<retcol name="printer" type="COMTYP_CHAR"></retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+<exception value="eDB_NO_ROWS_AFFECTED">No rows found</exception>
+
+</documentation>
+
+</command>

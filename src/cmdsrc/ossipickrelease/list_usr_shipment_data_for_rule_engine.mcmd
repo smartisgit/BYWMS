@@ -1,0 +1,53 @@
+<command>
+<name>list usr shipment data for rule engine</name>
+<description>List the data at the shipment level for rules engine.  This is used by rules engine that register shipment release registration and allocation completion</description> 
+<type>Local Syntax</type>
+ 
+<argument name="ship_id" default-value="" required="No" datatype="string"></argument>
+<argument name="wh_id" default-value="" required="No" datatype="string"></argument>
+
+
+<local-syntax>
+<![CDATA[
+
+{
+    [
+    select shipment.*,
+           cardtl.cartyp,
+           pckwrk_dtl.dst_mov_zone_id,
+           mov_zone.mov_zone_cod uc_dst_mov_zone_cod
+    from shipment
+         join shipment_line on shipment_line.ship_id = shipment.ship_id and shipment_line.linsts != 'B'
+         left outer join pckwrk_dtl on pckwrk_dtl.ship_line_id = shipment_line.ship_line_id
+         left outer join mov_zone on mov_zone.mov_zone_id = pckwrk_dtl.dst_mov_zone_id
+         left outer join cardtl on cardtl.carcod = shipment.carcod and cardtl.srvlvl = shipment.srvlvl
+         join ord
+             on ord.client_id = shipment_line.client_id
+             and ord.wh_id = shipment_line.wh_id
+             and ord.ordnum = shipment_line.ordnum
+    where 1=1
+    and shipment.ship_id = @ship_id
+    and rownum < 2
+    ]
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+This command is used to get the data at the shipment level for rules engine
+</remarks>
+
+<retcol name="shipment.*" type="string">All columns from shipment table</retcol>
+<retcol name="cartyp" type="string">Carrier Type from cardtl.  Useful in dertmining if small package</retcol>
+<retcol name="dst_mov_zone_id" type="string">Destination Move Zone Id.  Pick any value from pckwrk_dtl for the shipment</retcol>
+<retcol name="uc_dst_mov_zone_cod" type="string">Destination Move Zone Code.  Pick any value from pckwrk_dtl for the shipment</retcol>
+
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>
+

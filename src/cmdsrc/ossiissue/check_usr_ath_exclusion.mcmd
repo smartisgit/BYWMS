@@ -1,0 +1,28 @@
+<command>
+<name>check usr ath exclusion</name>
+<description>Check user authentication exclusion</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ */
+check usr column exclusion
+  where table = 'LES_OPT_ATH'
+    and column = 'ATH_TYP'
+    and rtstr1 = @ath_typ
+    
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This component chec user authentication exclusion.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

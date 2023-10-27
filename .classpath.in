@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+    <classpathentry kind="src" output="build/classes" path="src/java"/>
+	<classpathentry kind="src" output="mtfclient/build/classes" path="mtfclient/src/java"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry kind="var" path="TRUNK/moca/lib/moca.jar"/>
+	<classpathentry kind="var" path="TRUNK/mcs/lib/mcs.jar"/>
+	<classpathentry kind="var" path="TRUNK/mtf/lib/mtf.jar"/>
+	<classpathentry kind="var" path="TRUNK/sal/lib/sal.jar"/>
+	<classpathentry kind="var" path="TRUNK/wmd/lib/wmd.jar"/>
+	<classpathentry kind="var" path="TRUNK/wmd/mtfclient/lib/wmd-mtf.jar"/>
+	<classpathentry kind="var" path="TRUNK/tm/lib/tm.jar"/>
+	<classpathentry kind="var" path="TRUNK/mtf/3rdparty/log4j-1.2.15.jar">
+		<attributes>
+			<attribute name="org.eclipse.jdt.launching.CLASSPATH_ATTR_LIBRARY_PATH_ENTRY" value="C:/dev/trunk/mtf/3rdparty"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="var" path="TRUNK/mtf/3rdparty/commons-cli-1.1.jar"/>
+	<classpathentry kind="var" path="TRUNK/mtf/3rdparty/commons-collections-3.2.1.jar"/>
+	<classpathentry kind="var" path="TRUNK/mtf/3rdparty/commons-lang-2.4.jar"/>
+	<classpathentry kind="var" path="TRUNK/mtf/3rdparty/commons-logging-1.1.1.jar"/>
+	<classpathentry kind="var" path="TRUNK/mtf/3rdparty/dom4j-1.6.1.jar"/>
+	<classpathentry kind="var" path="TRUNK/mtf/3rdparty/jaramiko-109.jar"/>
+	<classpathentry kind="var" path="TRUNK/mtf/3rdparty/junit-4.4.jar"/>
+	<classpathentry kind="var" path="TRUNK"/>
+	<classpathentry kind="output" path="mtfclient/build/classes"/>
+</classpath>

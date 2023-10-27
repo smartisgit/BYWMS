@@ -1,0 +1,16 @@
+#use $DCSDIR/include
+#include <dcsddl.h>
+#include <sqlDataTypes.h>
+#include <dcscolwid.h>
+
+#define SEQ uc_ossi_arcnum
+#define SEED 1
+#define INC 1
+#define MAX 999999999999
+
+mset command on
+[
+CREATE_SEQ(SEQ, SEED, INC, MAX)
+] catch (-2714,-955)
+RUN_DDL
+mset command off

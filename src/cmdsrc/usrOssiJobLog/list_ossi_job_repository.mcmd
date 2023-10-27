@@ -1,0 +1,209 @@
+<command>
+<name>list ossi job repository</name>
+<description>list the job repository</description>
+
+<argument name="uc_ossi_job_id" required="no" datatype="String"></argument>
+<argument name="uc_ossi_job_seq" required="no" datatype="String"></argument>
+<argument name="uc_ossi_data" required="no" datatype="String"></argument>
+<argument name="uc_min_cnt_job_exec" required="no" datatype="String"></argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ * Muhammad.Haris - 11125
+ */
+ 
+if ( @uc_ossi_data is not null )
+    publish data
+    where exists_clause = "exists (select 1 from usr_ossi_job_log jle where jle.uc_ossi_job_seq = usr_ossi_job_log.uc_ossi_job_seq and jle.uc_ossi_data||jle.uc_ossi_module_id||jle.uc_ossi_action_id  like '%" || @uc_ossi_data || "%')"
+else
+    publish data
+    where exists_clause = "1=1"
+|
+if ( @uc_min_cnt_job_exec is not null )
+    publish data
+    where exists_clause_cnt = int(@uc_min_cnt_job_exec) || "<=(select count(*) from usr_ossi_job_log jle where jle.uc_ossi_job_seq = usr_ossi_job_log.uc_ossi_job_seq)"
+else
+    publish data
+    where exists_clause_cnt = "1=1"
+|
+{
+    [
+    select x.*
+    from 
+    ( 
+        /*#nobind*/
+        select decode( uc_ossi_job_id, 'JOB-EXEC-MANAGER', uc_ossi_job_id || '-' || uc_ossi_data, uc_ossi_job_id ) uc_ossi_job_id,
+               count(*) uc_cnt_exec,
+               ltrim(to_char(max(uc_ossi_job_seq))) uc_ossi_job_seq,
+               sysdate uc_ossi_start_dt,
+               sysdate uc_ossi_end_dt,
+               0.0 uc_ossi_dur,
+               0 uc_ossi_err_code,
+               'xyz' uc_ossi_err_descr,
+               'usr_ossi_job_log' uc_src_table
+        from usr_ossi_job_log
+        /*#bind*/
+        where 1=1
+        and @exists_clause:raw
+        and @exists_clause_cnt:raw
+        and @+usr_ossi_job_log.uc_ossi_job_seq
+        and uc_ossi_job_id is not null
+        and uc_ossi_module_seq = 0
+        and uc_ossi_action_seq = 0
+        /*#nobind*/
+        group by decode( uc_ossi_job_id, 'JOB-EXEC-MANAGER', uc_ossi_job_id || '-' || uc_ossi_data, uc_ossi_job_id ) 
+        union all
+        select job_definition.job_id uc_ossi_job_id,
+               count(*) uc_cnt_exec,
+               max(to_char(job_definition_exec.start_dte,'YYYYMMDDHH24MISS')) uc_ossi_job_seq,
+               sysdate uc_ossi_start_dt,
+               sysdate uc_ossi_end_dt,
+               0.0 uc_ossi_dur,
+               0 uc_ossi_err_code,
+               'xyz' uc_ossi_err_descr,
+               'job_definition_exec' uc_src_table
+        from job_definition
+             join job_definition_exec on job_definition_exec.job_id = job_definition.job_id
+        /*#bind*/
+        where 1=1
+        and not exists (
+                           select 1
+                           from usr_ossi_job_log jl2
+                           where jl2.uc_ossi_job_id = job_definition.job_id
+                       )
+        /*#nobind*/
+        and lower(job_definition.command) not like 'execute ossi jobs using job manager%'
+        and job_definition.job_id not like 'UC\_G\_%' escape '\' /* This specific sigrature is for our global jobs */
+        group by job_definition.job_id
+    ) x
+    where @*
+    order by 1
+    ]
+    | 
+    if ( nvl(@uc_ossi_job_seq,0) > 0 and @uc_src_table = 'usr_ossi_job_log' )
+    {
+        [
+        select uc_ossi_start_dt,
+               uc_ossi_end_dt,
+               (uc_ossi_end_ts - uc_ossi_start_ts)/1000 uc_ossi_dur,
+               uc_ossi_err_code,
+               uc_ossi_err_descr
+        from usr_ossi_job_log
+        where uc_ossi_job_seq = @uc_ossi_job_seq
+        and uc_ossi_module_seq = 0 
+        and uc_ossi_action_seq = 0
+        ]
+    }
+    /*need to  check the*/
+    else if ( @uc_src_table = 'job_definition_exec' and @uc_ossi_job_seq is not null)
+    {
+        [
+        select x.*
+        from
+        (
+            select start_dte uc_ossi_start_dt,
+                   end_dte uc_ossi_end_dt,
+                   /*(end_dte-start_dte)*24*3600 uc_ossi_dur,*/
+                   (
+                       (
+                           (DatePart(HOUR, end_dte) * 3600)+ (DatePart(MINUTE, end_dte) * 60)+DATEPART(SECOND,end_dte)
+                       )
+                       -
+                       (
+                           (DatePart(HOUR, start_dte) * 3600)+ (DatePart(MINUTE, start_dte) * 60)+DATEPART(SECOND,start_dte)
+                       )
+                   ) uc_ossi_dur,
+                   status uc_ossi_err_code,
+                   message uc_ossi_err_descr
+            from job_definition_exec
+            where job_id = @uc_ossi_job_id
+            and start_dte = @uc_ossi_job_seq:date
+            and rownum < 999999
+        ) x
+        where rownum < 2
+        ]
+    }
+    |
+    { 
+        /* Insert the job in code master if it does not exist there.  Use insert statement to avoid change management triggers */
+        [
+        select nvl(max(srtseq),-1) uc_max_srtseq
+        from codmst
+        where colnam = 'uc_ossi_job_id'
+        and codval = @uc_ossi_job_id
+        ]
+        catch (-1403,510)
+        |
+        if ( @uc_max_srtseq < 0 )
+        {
+            [
+            insert into codmst (colnam, codval, srtseq )
+            values ( 'uc_ossi_job_id', @uc_ossi_job_id, @uc_max_srtseq+1 )
+            ]
+            catch (-1)
+            ;
+            [
+            insert into dscmst ( colnam, colval, locale_id, lngdsc, short_dsc )
+            values ( 'uc_ossi_job_id', @uc_ossi_job_id, nvl(nvl(@locale_id, @@LOCALE_ID), 'US_ENGLISH'), @uc_ossi_job_id, substr(@uc_ossi_job_id,1,15) )
+            ]
+            catch (-1)
+        }
+        ;
+        noop
+    }
+    |
+    publish data
+    where uc_ossi_job_id = @uc_ossi_job_id
+    and uc_cnt_exec = @uc_cnt_exec
+    and uc_ossi_job_seq = @uc_ossi_job_seq
+    and uc_ossi_start_dt = @uc_ossi_start_dt
+    and uc_ossi_end_dt = @uc_ossi_end_dt
+    and uc_ossi_dur = @uc_ossi_dur
+    and uc_ossi_err_code = @uc_ossi_err_code
+    and uc_ossi_err_descr = @uc_ossi_err_descr
+    and uc_src_table = @uc_src_table
+}
+
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<remarks>
+  <![CDATA[
+    <p>
+    This command will list the job repository
+    job first.
+    </p>
+  ]]>
+</remarks>
+
+<retrows>n</retrows>
+
+<retcol name="uc_ossi_job_id" type="COMTYP_INT"></retcol>
+<retcol name="uc_cnt_exec" type="COMTYP_STRING"></retcol>
+<retcol name="uc_ossi_job_seq" type="COMTYP_STRING"></retcol>
+<retcol name="uc_ossi_start_dt" type="COMTYP_STRING"></retcol>
+<retcol name="uc_ossi_end_dt" type="COMTYP_STRING"></retcol>
+<retcol name="uc_ossi_dur" type="COMTYP_FLOAT">Duration in seconds</retcol>
+<retcol name="uc_ossi_err_code" type="COMTYP_INT">Error Code, 0 means success </retcol>
+<retcol name="uc_ossi_err_descr" type="COMTYP_INT">Error Code, 0 means success </retcol>
+
+
+<exception value="eOK">The command completed successfully.</exception>
+<exception value="510">If variable was not passed and no default was passed.</exception>
+
+<seealso cref="list usr job log"></seealso>
+<seealso cref="list ossi job repository"></seealso>
+
+
+</documentation>
+
+</command>

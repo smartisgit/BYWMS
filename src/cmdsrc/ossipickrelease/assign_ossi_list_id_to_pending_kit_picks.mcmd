@@ -1,0 +1,53 @@
+<command>
+<name>assign ossi list id to pending kit picks</name>
+<description>Bug 6965</description>
+<type>Local Syntax</type>
+<local-syntax>
+
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161220 saad.ahmad - 7123 - Aframe
+ */
+if (@wrkref is null)
+{
+  [select wrkref
+     from pckwrk_view
+    where wh_id = nvl(@wh_id, @@wh_id)
+      and pcksts = nvl(@pcksts, 'L')
+      and wrktyp = 'K'
+      and pckqty > appqty
+      and list_id is null
+  ]
+} catch (-1403,510)
+|
+if (@? = 0)
+{
+  create pick list
+    where list_typ = 'ORD'
+  |
+  [update pckwrk_hdr
+      set list_id = @list_id
+    where wrkref = @wrkref
+  ]
+  |
+  publish data 
+    where wrkref = @wrkref 
+      and list_id = @list_id
+}
+
+]]>
+</local-syntax>
+<argument name="wrkref" required="no" datatype="string"></argument>
+<argument name="wh_id" required="yes" datatype="string"></argument>
+<argument name="pcksts" required="no" datatype="string"></argument>
+<documentation>
+
+<remarks>
+This command is used to assign list ids to the pending kit picks.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+</documentation>
+</command>

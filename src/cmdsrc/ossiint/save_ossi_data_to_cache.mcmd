@@ -1,0 +1,40 @@
+<command>
+<name>save ossi data to cache</name>
+<description>Save data to a cached variable</description>
+<type>Local Syntax</type>
+
+<argument datatype="String" name="uc_cache_name"></argument>
+<argument datatype="String" name="uc_cache_value"></argument>
+
+
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+
+publish data
+where uc_cache_name = upper(@uc_cache_name )
+|
+{
+   put os var
+   where var = @uc_cache_name
+   and val = @uc_cache_value
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+MOCA Function to get a policy value
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

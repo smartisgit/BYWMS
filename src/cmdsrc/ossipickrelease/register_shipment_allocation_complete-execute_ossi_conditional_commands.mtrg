@@ -1,0 +1,41 @@
+<trigger>
+<name>execute ossi conditional commands</name>
+<on-command>register shipment allocation complete</on-command>
+<fire-sequence>100000</fire-sequence>
+ 
+<local-syntax>
+<![CDATA[
+
+if ( @ship_id is not null and @uc_inhibit_change_hook != '1')
+{
+    if ( ossi__polval ( 'USR-OSSI-DATA-CHANGE-HOOK', 'CMD_REGISTER_SHIPMENT_ALLOCATION_COMPLETE_POST', 'ENABLED', '', 'rtnum1', nvl(@wh_id,@@WH_ID)) != 0 )
+    {
+        execute ossi les_cmd
+        where les_cmd_id = 'uc_ctxt_post_action_cmd_shipment_alloc_cmpl'
+        and uc_les_cmd_inline = 1
+        and exec_uc_les_cmd_cust_lvl = null
+        and uc_inhibit_return_extra_columns = 1
+        catch (-1403,510)
+        |
+        if ( @? = 0 )
+        {
+            execute ossi all conditional rules
+            where uc_rule_grp_id = 'OSSI-SHIPMENT-ALLOCATION-COMPLETE'
+            and uc_rule_subgrp_id = 'GLOBAL-MAP'
+            and uc_cache_key= null
+            catch (-1403,510)
+        }
+    }
+}
+
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<seealso cref="register usr order fully released"></seealso>
+
+</documentation>
+
+</trigger>

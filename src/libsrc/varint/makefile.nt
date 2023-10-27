@@ -1,0 +1,9 @@
+LESDIR=..\..\..
+
+TARGET=VARint
+TARGETTYPE=.dll
+
+OFILES=MOCAversion.obj \
+       varTestVarCommand.obj
+
+!include $(LESDIR)\makefiles\ntstd.mk

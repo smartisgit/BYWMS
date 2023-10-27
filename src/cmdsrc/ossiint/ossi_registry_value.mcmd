@@ -1,0 +1,35 @@
+<command>
+<name>ossi registry_value</name>
+<description>Get Registry value</description>
+
+<argument datatype="string" name="moca_farg1">key</argument>
+<argument datatype="string" name="moca_farg2">subkey</argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+get registry value
+where key = @moca_farg1
+and subkey = @moca_farg2
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<remarks>
+This command may be used to get registry values.
+</remarks>
+
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

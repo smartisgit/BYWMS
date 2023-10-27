@@ -1,0 +1,47 @@
+<command>
+<name>sl_send ifd_data_kw</name>
+<description>This is a standard command called in context of sending data so that it can support keywords for eventual head/tail.
+We are overriding it simply because we know that it is called AFTER IFD has been created and we are using it call delayed commands</description>
+<type>Local Syntax</type>
+
+<argument name="mode_cd" required="yes" datatype="string"></argument>
+<argument name="parm_cd" datatype="string"></argument>
+<argument name="parm_ptr" datatype="pointer"></argument>
+
+
+<local-syntax>
+<![CDATA[
+
+
+if ( @mode_cd#keep = 'I' ) /* it is always invoked with I mode first.  So we will hang our logic here */
+{
+    process ossi delayed execution for integration
+}
+;
+^sl_send ifd_data_kw where @* 
+
+
+]]>
+</local-syntax>
+<documentation>
+<private>
+</private>
+<remarks>
+<![CDATA[
+<p>
+This is a standard command that is called after the IFD has been created.  The purpose is to initialize (I mode) and then set (S mode) for various concepts
+for the IFD.  event data has not been written yet. So we will execute our buffered delayed executins first in case of I mode.
+We are relying on this undocumented call flow to get the desired functionality where we want the functionality to execute before the event 
+data is declared complete.
+</p>
+]]>
+</remarks>
+<retcol name="@*" type="COMTYP_STRING">Whatever standard returns</retcol>
+
+<seealso cref="process ossi delayed execution for integration"></seealso>
+<seealso cref="sl_log event"></seealso>
+
+
+<exception value="eOK">Normal successful completion</exception>
+</documentation>
+</command>

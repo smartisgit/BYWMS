@@ -1,0 +1,38 @@
+<command>
+<name>qq</name>
+<description>To quote a string properly</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="moca_farg1">String</argument>
+<argument datatype="string" name="moca_farg2">Quote character</argument>
+
+
+
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+publish data
+where quote_char = nvl(@moca_farg2, "'" )
+and str = @moca_farg1
+|
+publish data
+where ret = @quote_char || ossi__replace ( @str, @quote_char, @quote_char||@quote_char ) || @quote_char
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+A function to peroperly quote things to embed in commands
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

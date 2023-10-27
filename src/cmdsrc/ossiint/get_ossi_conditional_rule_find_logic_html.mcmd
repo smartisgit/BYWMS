@@ -1,0 +1,90 @@
+<command>
+<name>get ossi conditional rule find logic html</name>
+<description>This component returns an HTML string to properly show the order in which we utilize the context and wild cards to find the conditional rules to execute</description>
+<type>Local Syntax</type>
+
+<argument name="uc_rule_grp_id" required="yes" datatype="string"></argument>
+
+
+
+<local-syntax>
+<![CDATA[
+
+{
+    [
+    select *
+    from poldat
+    where polcod = 'USR-CTXT-' || @uc_rule_grp_id
+    and polval like 'UC_RULE_ID%'
+    and wh_id_tmpl = '----'
+    and rtnum1 = 1
+    order by srtseq
+    ]
+    catch (-1403,510)
+    >> res_rule_find_eval
+    |
+    [
+    select *
+    from poldat
+    where polcod = 'USR-CTXT-' || @uc_rule_grp_id
+    and wh_id_tmpl = '----'
+    and rtnum1 = 2
+    order by srtseq
+    ]
+    catch (-1403,510)
+    >> res
+    |
+    if ( @? = 0 and rowcount(@res) > 0 )
+    {
+        publish data where my_rowcount = rowcount(@res)
+        |
+        [[
+        ret_str = new StringBuffer ( "These rules have " + my_rowcount + " part rule id.  Note that actions are executed in order of these first and then the order in which they appear in the rules engine." +
+                                     "So exact actions fire first and then the ones that are satisfied by wild cards.<ol>" );
+        while ( res.next() )
+        {
+            ret_str.append ( "<li>" + res.getString("polval").toLowerCase() + ": Provide value or use XXXX to imply any</li>" );
+        }
+        ret_str.append ( "</ol>" );
+        ret_str.append ( "The exact order of evaluating the rules is as follows:<ol>" );
+        while ( res_rule_find_eval.next() )
+        {
+            ret_str.append ( "<li>" + res_rule_find_eval.getString("rtstr1") + "</li>" );
+        }
+        ret_str.append ("</ol>");
+        [ret:ret_str.toString()]
+        ]]
+        |
+        publish data
+        where uc_html_cond_rule_exec_logic = @ret
+    }
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+   This command returns the HTML that can be inserted within the documentation to insert the logic for finding the rules to run.
+</p>
+]]>
+</remarks>
+
+<retrows>n</retrows>
+<retcol name="uc_html_cond_rule_exec_logic" type="COMTYP_CHAR">HTML that has the logc</retcol>
+
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+<seealso cref="get ossi rule documentation"></seealso>
+
+</documentation>
+
+
+
+</command>

@@ -1,0 +1,25 @@
+#use $DCSDIR/include
+#include <dcsddl.h>
+#include <sqlDataTypes.h>
+#include <dcscolwid.h>
+
+#define SEQ uc_ossi_issue_assign_seq
+#define SEED 1
+#define INC 1
+#define MAX 999999999999
+
+mset command on
+[
+CREATE_SEQUENCE(SEQ, SEED, INC, MAX)
+] catch (ERR_TABLE_ALREADY_EXISTS)
+RUN_DDL
+mset command off
+
+mset command on
+[insert into sysctl (numcod, prefix, prelen, prlflg, seqlen,
+ 		suflen, btsflg, lstseq, seqflg)
+    values ('uc_ossi_issue_assign_seq', '', 0, 0, 9,
+             0, 0, 0, 0)
+] catch (-1)
+RUN_DDL
+mset command off

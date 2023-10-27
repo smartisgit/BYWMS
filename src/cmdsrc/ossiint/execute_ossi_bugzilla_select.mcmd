@@ -1,0 +1,58 @@
+<command>
+<name>execute ossi bugzilla select</name>
+<description>Execute a SQL Select against bugzilla database</description>
+
+<argument name="uc_select_stmt" required="yes" datatype="string"></argument>
+
+<type>Local Syntax</type>
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+
+ossi expand vars in string
+where sl_string = @uc_select_stmt
+|
+get ossi bugzilla connection information
+| 
+{
+   [[
+   import java.sql.Connection;
+   import java.sql.DriverManager;
+   import java.sql.SQLException;
+   import java.sql.*;
+   //
+   Connection conn = null;
+   Class.forName(uc_bugzilla_db_driver).newInstance();
+   conn = DriverManager.getConnection(uc_bugzilla_db_conn, uc_bugzilla_db_userid, uc_bugzilla_db_password);
+   Statement st = conn.createStatement();
+   ResultSet res = st.executeQuery(sl_expanded);
+   EditableResults ret_r = (EditableResults) (new SimpleResults());
+   int xx = com.redprairie.moca.util.MocaUtils.copySqlResults ( (EditableResults) ret_r, (ResultSet) res );
+   conn.close();
+   [ret_r:ret_r]
+   ]]
+   |
+   publish data combination where res = @ret_r  
+}
+
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+Execute any SQL Select statement
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

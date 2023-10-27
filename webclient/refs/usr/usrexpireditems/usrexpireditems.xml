@@ -1,0 +1,9 @@
+<project project-dir='.' js-dir='${project-dir}' app-id='${appId}' hf-compliant='true'>
+	<target name='les.usr.usrexpireditems' type='js' source-dir='${js-dir}'>
+		<include name = 'MainStore.js' />
+		<include name = 'UsrexpireditemsStore.js' />
+		<include name = 'MainView.js' />
+		<include name = 'MainController.js' />
+		<include name = 'App.js' />
+	</target>
+</project>

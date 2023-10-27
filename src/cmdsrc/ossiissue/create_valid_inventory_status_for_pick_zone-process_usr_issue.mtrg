@@ -1,0 +1,20 @@
+<trigger>
+<name>process usr issue</name>
+<on-command>create valid inventory status for pick zone</on-command>
+<local-syntax>
+<![CDATA[
+process usr issue
+  where uc_table_name = 'PCK_ZONE_INVSTS'
+    and uc_action = 'ADD'
+]]></local-syntax>
+<fire-sequence>10000</fire-sequence>
+<documentation>
+
+<remarks>
+This trigger process issue for creating valid inventory status for pick zone.
+</remarks>
+
+<seealso cref="process usr issue"></seealso>
+
+</documentation>
+</trigger>

@@ -1,0 +1,50 @@
+<command>
+<name>ossi str_right</name>
+<description>Get n characters from right</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+
+publish data
+where str = @moca_farg1
+and num_chars = int(nvl(@moca_farg2,'0'))
+|
+if ( @str is null )
+   publish data
+   where ret = ''
+else
+{
+   if ( @num_chars > len(@str) )
+      publish data
+      where num_chars = len(@str)
+   |
+   sl_get right
+   where i_string = @str
+   and i_max_chars = @num_chars
+   |
+   publish data
+   where ret = @o_value
+}
+
+]]>
+</local-syntax>
+
+<argument name="moca_farg1" required="no" datatype="string">String to search</argument>
+<argument name="moca_farg2" required="no" datatype="string"># chars from right</argument>
+<documentation>
+
+<remarks>
+This command is used to get characters from right
+</remarks>
+
+<example>
+</example>
+
+<exception value="eOK">Normal successful completion</exception>
+</documentation>
+</command>

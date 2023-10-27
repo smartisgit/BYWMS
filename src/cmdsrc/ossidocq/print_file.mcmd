@@ -1,0 +1,54 @@
+<command>
+<name>print file</name>
+<description>This is print file override to upload the labels to document queue if and when needed
+</description>
+<type>Local Syntax</type>
+
+<argument name="filnam" alias="filename" datatype="string"> </argument>
+<argument name="devcod" alias="device"   datatype="string"> </argument>
+<argument name="wh_id"                   datatype="string"> </argument>
+<argument name="delflg"                  datatype="integer"> </argument>
+<argument name="copies"  datatype="integer"> </argument>
+<argument name="options" datatype="string"> </argument>
+<argument name="printer" datatype="string"> </argument>
+
+
+
+<local-syntax>
+<![CDATA[
+
+enqueue ossi label output for upload when needed
+;
+^print file where @*
+
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+   This is an override of core print file so that we can enqueue labels to document queue by properly detecting that we are in context
+   of a label print
+</p>
+]]>
+</remarks>
+
+<retrows>n - see base command</retrows>
+<retcol name="print file/*" type="COMTYP_CHAR">All output columns from here</retcol>
+
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+<seealso cref="enqueue ossi label output for upload when needed"></seealso>
+
+
+</documentation>
+
+
+
+</command>

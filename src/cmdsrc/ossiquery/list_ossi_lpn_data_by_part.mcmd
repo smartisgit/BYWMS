@@ -1,0 +1,159 @@
+<command>
+<name>list ossi lpn data by part</name>
+<description>
+This is called by various labels to get the data at the load level
+</description> 
+<type>Local Syntax</type>
+
+<argument name="wh_id" default-value="" required="No" datatype="string"></argument>
+<argument name="lodnum" default-value="" required="No" datatype="string">Also respect lpn stack variable</argument>
+<argument name="locale_id" default-value="" required="No" datatype="string"></argument>
+<argument name="uc_get_add_data_rule_grp_id" default-value="" required="No" datatype="string">A rule group to add additoional columns. e.g. OUTPUT-SET-LABEL-INVLOD-BY-PART</argument>
+
+
+
+<local-syntax>
+<![CDATA[
+
+publish data
+where wh_id = nvl(@wh_id, @@WH_ID)
+and lodnum = nvl(@lodnum, @lpn)
+and locale_id = nvl(nvl(@locale_id, @@LOCALE_ID), 'US_ENGLISH') 
+and uc_get_add_data_rule_grp_id = nvl(@uc_get_add_data_rule_grp_id, 'OUTPUT-SET-LABEL-INVLOD-BY-PART' )
+|
+if ( @lodnum is null ) hide stack variable where name = 'lodnum'
+|
+{
+    execute ossi les_cmd
+    where les_cmd_id = 'uc_query_list_ossi_lpn_data_by_part_base'
+    and uc_les_cmd_inline = 1
+    and exec_uc_les_cmd_cust_lvl = null
+    and uc_inhibit_return_extra_columns = 1
+    |
+    {
+        filter data
+        where moca_filter_level = 2
+        >> res1
+        |
+        if ( @uc_get_add_data_rule_grp_id is not null and @uc_get_add_data_rule_grp_id != '----' )
+        {
+            /*
+             * We collapsed all results above - but our rule engine needs to see them as values
+             */
+            publish data combination where res = @res1
+            |
+            publish ossi fields from rules engine
+            where uc_rule_grp_id = @uc_get_add_data_rule_grp_id
+            and uc_table_name = 'INVLOD'
+            and uc_set_default_mode = 'LBL'
+            and uc_ignore_field_errors = 1
+            and uc_publish_error_fields_with_error_info = 1
+            catch(@?) /* since user could mistype something */
+            >> res2
+        }
+        else
+            noop >> res2 /* so that we get a good res even in else as it is later used in combine */
+        |
+        combine ossi columns from multiple results
+        where uc_cmb_res1 = @res1
+        and uc_cmb_res2 = @res2
+    }    
+}
+
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+This component is used to print labels that are at the load level.
+</remarks>
+
+<retrows>n</retrows>
+
+
+<retcol name="wh_id" type="string"></retcol>
+<retcol name="lodnum" type="string"></retcol>
+<retcol name="stoloc" type="string"></retcol>
+<retcol name="prtnum" type="string"></retcol>
+<retcol name="prt_client_id" type="string"></retcol>
+<retcol name="lotnum" type="string"></retcol>
+<retcol name="stkuom" type="string"></retcol>
+<retcol name="prtfam" type="string"></retcol>
+<retcol name="hazmat_flg" type="string"></retcol>
+<retcol name="mandte" type="string"></retcol>
+<retcol name="expire_dte" type="string"></retcol>
+<retcol name="trknum" type="string"></retcol>
+<retcol name="invnum" type="string"></retcol>
+<retcol name="vc_ven_lotnum" type="string"></retcol>
+<retcol name="sup_lotnum" type="string"></retcol>
+<retcol name="untqty" type="string"></retcol>
+<retcol name="invsts" type="string">max(invsts)</retcol>
+
+
+
+<retcol name="uc_ghs_eye_hazard" type="string"></retcol>
+<retcol name="uc_ghs_react_hazard1" type="string"></retcol>
+<retcol name="uc_ghs_react_hazard2" type="string"></retcol>
+<retcol name="uc_ghs_react_hazard3" type="string"></retcol>
+<retcol name="uc_ghs_resp_hazard" type="string"></retcol>
+<retcol name="uc_ghs_skin_hazard" type="string"></retcol>
+<retcol name="vc_react_hazard_code1" type="string"></retcol>
+<retcol name="vc_react_hazard_code2" type="string"></retcol>
+<retcol name="vc_inhala_hazard_code" type="string"></retcol> uc_pw_hdr_lotnum
+<retcol name="vc_contact_hazard_code" type="string"></retcol>
+<retcol name="uc_gmo" type="string"></retcol>
+<retcol name="uc_allergen" type="string"></retcol>
+<retcol name="uc_prt_lngdsc" type="string"></retcol>
+<retcol name="uc_prt_short_dsc" type="string"></retcol>
+<retcol name="uc_prt_haz_lngdsc" type="string"></retcol>
+<retcol name="uc_prt_haz_short_dsc" type="string"></retcol>
+<retcol name="uc_prt_haz1_lngdsc" type="string"></retcol>
+<retcol name="uc_prt_haz1_short_dsc" type="string"></retcol>
+<retcol name="uc_prt_haz2_lngdsc" type="string"></retcol>
+<retcol name="uc_prt_haz2_short_dsc" type="string"></retcol>
+<retcol name="uc_prt_haz3_lngdsc" type="string"></retcol>
+<retcol name="uc_prt_haz3_short_dsc" type="string"></retcol>
+<retcol name="uc_prt_rsph_lngdsc" type="string"></retcol>
+<retcol name="uc_prt_rsph_short_dsc" type="string"></retcol>
+<retcol name="uc_prt_eyeh_lngdsc" type="string"></retcol>
+<retcol name="uc_prt_eyeh_short_dsc" type="string"></retcol>
+<retcol name="uc_prt_skinh_lngdsc" type="string"></retcol>
+<retcol name="uc_prt_skinh_short_dsc" type="string"></retcol>
+<retcol name="uc_prt_rhz1_lngdsc" type="string"></retcol>
+<retcol name="uc_prt_rhz1_short_dsc" type="string"></retcol>
+<retcol name="uc_prt_rhz2_lngdsc" type="string"></retcol>
+<retcol name="uc_prt_rhz2_short_dsc" type="string"></retcol>
+<retcol name="uc_prt_rhz2_lngdsc" type="string"></retcol>
+<retcol name="uc_prt_rhz2_short_dsc" type="string"></retcol>
+<retcol name="uc_prt_inhh_lngdsc" type="string"></retcol>
+<retcol name="uc_prt_inhh_short_dsc" type="string"></retcol>
+<retcol name="uc_prt_conh_lngdsc" type="string"></retcol>
+<retcol name="uc_prt_conh_short_dsc" type="string"></retcol>
+<retcol name="uc_ghs_react_hazard_code_dsc" type="string"></retcol>
+<retcol name="uc_ghs_react_hazard_code" type="string"></retcol>
+
+<retcol name="uc_gmo_dsc" type="string">get description for uc_gmo dscmst for each field embedded here.  Each part assumed 2 long</retcol>
+<retcol name="uc_uc_allergen_dsc" type="string">get description for uc_allergen dscmst for each field embedded here.  Each part assumed 2 long</retcol>
+<retcol name="uc_hazmat_dsc_01" type="string">Assuming description of prtmst.prtnum in hazmat_text dscmat is ^ delimited string.  1st part here and 2 to 5 next</retcol>
+<retcol name="uc_hazmat_dsc_02" type="string">2nd</retcol>
+<retcol name="uc_hazmat_dsc_03" type="string">3rd</retcol>
+<retcol name="uc_hazmat_dsc_04" type="string">4th</retcol>
+<retcol name="uc_hazmat_dsc_05" type="string">5th</retcol>
+<retcol name="uc_hazmat_dsc_06" type="string">6th</retcol>
+
+<retcol name="uc_prt_lngdsc_15_1" type="string">For labels, part decription at 15 length part 1</retcol>
+<retcol name="uc_prt_lngdsc_15_2" type="string">For labels, part decription at 15 length part 2</retcol>
+
+<retcol name="flex output" type="string">Based on rule passed in, e.g. OUTPUT-SET-LABEL-INV-CONTAINER.  We will show additional columns.  This is when uc_get_add_data_rule_grp_id is passed in with the rule id </retcol>
+
+
+<exception value="eOK">Normal successful completion</exception>
+
+<seealso cref="publish ossi fields from rules engine"></seealso>
+
+</documentation>
+
+
+</command>
+

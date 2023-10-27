@@ -1,0 +1,59 @@
+#use $LESDIR/include
+#use $DCSDIR/include
+#use $MOCADIR/include
+#use $LESDIR/db/ddl/Indexes
+
+#include <dcsddl.h>
+#include <dcscolwid.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+
+mset command on
+[
+CREATE_TABLE(USR_OSSI_JOB_LOG)
+(
+   UC_OSSI_JOB_SEQ        FIXED_INT_TY(12)     NOT NULL,
+   UC_OSSI_MODULE_SEQ     FIXED_INT_TY(12)     NOT NULL,
+   UC_OSSI_ACTION_SEQ     FIXED_INT_TY(12)     NOT NULL,
+   UC_OSSI_WHO            STRING_TY(300),
+   UC_OSSI_JOB_ID         STRING_TY(300),
+   UC_OSSI_MODULE_ID      STRING_TY(300),
+   UC_OSSI_ACTION_ID      STRING_TY(300),
+   UC_OSSI_DATA           STRING_TY(4000),
+   UC_OSSI_START_DT       DATE_TY,  
+   UC_OSSI_END_DT         DATE_TY,
+   UC_OSSI_START_TS       FIXED_INT_TY(20),
+   UC_OSSI_END_TS         FIXED_INT_TY(20),
+   UC_OSSI_ERR_CODE       FIXED_INT_TY(8),
+   UC_OSSI_ERR_DESCR      STRING_TY(255)
+)
+
+] catch (-2714,-955) 
+RUN_DDL
+mset command off
+
+#include <usr_ossi_job_log_pk.idx>
+
+
+mset command on
+create db documentation
+where table                 = "usr_ossi_job_log"
+and table_comment           = "We use this table to record the progress and run time details of long running jobs.  We view any long running job as a job which has multiple modules which has multiple actions"
+and uc_ossi_job_seq         = "This is an ascending number for each job run"
+and uc_ossi_module_seq      = "For a new module within the job"
+and uc_ossi_action_seq      = "For a new action within the module"
+and uc_ossi_who             = "An arbitrary identifier to represent a user or a process"
+and uc_ossi_job_id          = "This is the job name"
+and uc_ossi_module_id       = "This is module name.  When row is added for the job then this is %"
+and uc_ossi_action_id       = "This is the action name.  When row is added for the job or module, it is %"
+and uc_ossi_data            = "When logging, it is possible to provide some additional context data"
+and uc_ossi_start_dt        = "Start Date/time for this record"
+and uc_ossi_end_dt          = "End Date/Time for this record.  Note that when it is the job row (with % action and % module) then this is the end time for the group.  Similarly for module row where action is % this is for the whole modiule"
+and uc_ossi_start_ts        = "Goes with uc_ossi_start_dt - it is a timestamp in milliseconds.  Useful in finding elapsed time in milliseconds"
+and uc_ossi_end_ts          = "Goes with uc_ossi_end_dt - it is a timestamp in milliseconds.  Useful in finding elapsed time in milliseconds"
+and uc_ossi_err_code        = "Code for the erorr. 0 or null means sucess"
+and uc_ossi_err_descr       = "Error text.  Meaningful only when there was an error"
+
+RUN_DDL
+mset command off
+ 

@@ -1,0 +1,25 @@
+#use $DCSDIR/include
+#include <dcsddl.h>
+#include <dcscolwid.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+
+#use $SALDIR/include
+#include <salcolwid.h>
+
+mset command on
+[
+ALTER_TABLE_TABLE_INFO(invsub)
+ALTER_TABLE_ADD_COLUMN_START(uc_orig_lodnum)
+     STRING_TY(LODNUM_LEN)
+ALTER_TABLE_ADD_COLUMN_END
+] catch (ERR_COLUMN_ALREADY_EXISTS)
+RUN_DDL
+
+create db column comment 
+where table_name   = 'invsub' 
+and column_name    = 'uc_orig_lodnum'
+and column_comment = 'While doing palletize, store original load number here so that we can do undo.  Cleared when pallet build is complete'
+RUN_DDL
+
+mset command off

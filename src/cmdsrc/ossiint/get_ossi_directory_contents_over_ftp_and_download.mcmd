@@ -1,0 +1,154 @@
+<command>
+<name>get ossi directory contents over ftp and download</name>
+<description>get a directory via ftp.</description>
+<type>Local Syntax</type>
+<argument name="host" required="yes" datatype="string">
+</argument>
+<argument name="port" default-value="21" datatype="string">
+</argument>
+<argument name="user" datatype="string">
+</argument>
+<argument name="pass" datatype="string">
+</argument>
+<argument name="srcdir" datatype="string">
+</argument>
+<argument name="srcfilepattern" datatype="string">
+</argument>
+<argument name="mode" datatype="string">
+</argument>
+<argument name="use_sftp" default-value="0" datatype="integer">
+</argument>
+<argument name="trg_prefix" datatype="string">
+</argument>
+<argument name="trg_extension" datatype="string">
+</argument>
+<argument name="destdir" datatype="string">
+</argument>
+<argument name="remove_on_server" datatype="string">
+</argument>
+<argument name="rename_on_server_ext" datatype="string">
+</argument>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+get ossi directory contents over ftp
+|
+if (@data_filename != null)
+{
+  get ossi ftp where srcfile = @data_filename
+                 and destfile = @data_filename 
+  catch(@?)
+  |
+  publish data where message = @!
+  |
+  if (@err_code != 0)
+  {
+    remove file where filename = @destdir || '/' || @data_filename catch(@?)
+    ;
+    set return status where status = 97051
+                        and message = @message
+  }
+  else
+  {
+    /* Now we have the local file so remove/rename on the server */
+    if ( @remove_on_server = 1 )
+    {
+      remove ossi ftp where targetfile = @data_filename
+                        and targetdir = @srcdir 
+      catch(@?)
+      |
+      publish data where message = @!
+      |
+      if ( @err_code != 0 )
+      {
+        remove file where filename = @destdir || '/' || @data_filename catch (@?)
+        ;
+        set return status where status = 97051
+                            and message = @message
+      }
+      ;
+      /* catch error because if data file has been removed, 
+       * an error on trigger file can be ignored.
+       * but put a trace message
+       */
+      remove ossi ftp where targetfile = @trg_filename
+                        and targetdir = @srcdircatch
+      catch (@?)
+      |
+      if (@? != 0)
+      {
+        write trace message where message = 'Error removing trigger: ' || @!
+      }
+    }
+    else if ( @rename_on_server_ext is not null )
+    {
+      /* same idea as remove but rename.  
+       * Same exception handling.
+       * In this case still remove the trigger file, but rename the data file.
+       */
+      rename ossi ftp where targetfile = @data_filename
+                        and targetdir = @srcdir
+                        and newfile = @data_filename || @rename_on_server_ext
+      catch(@?)
+      |
+      publish data where message = @!
+      |
+      if ( @err_code != 0 )
+      {
+        move file where filename = @local_filename catch (@?)
+        ;
+        set return status where status = 97051
+                            and message = @message
+      }
+      ;
+      /* catch error because if data file has been removed, 
+       * an error on trigger file can be ignored.
+       * but put a trace message
+       */
+      remove ossi ftp where targetfile = @trg_filename
+                        and targetdir = @srcdir
+                        and newfile = @trg_filename || @rename_on_server_ext
+      catch(@?)
+      |
+      if (@? != 0)
+      {
+        write trace message where message = 'Error renaming trigger: ' || @!
+      }      
+    }
+    else
+    {
+      write trace message where message = 'Leaving files on server'
+    }
+    ;
+    /* Return the local and server file name.  
+     * When it is in the loop we will end up getting multiple rows.
+     */  
+    publish data where data_filename = @data_filename
+                   and data_filepath = @destdir
+  }
+}
+
+]]>
+</local-syntax>
+<documentation>
+<remarks>
+<![CDATA[
+  Returns:
+  Server_data_filename
+  Server_data_filepath
+  Local_data_filename
+  Local_data_filepath
+]]>
+</remarks>
+<exception value="eOK">The command completed successfully.</exception>
+<exception value="eMOCA_FTP_COM_FAILURE">An FTP communication failure occurred.</exception>
+<seealso cref="get ossi ftp">
+</seealso>
+</documentation>
+</command>

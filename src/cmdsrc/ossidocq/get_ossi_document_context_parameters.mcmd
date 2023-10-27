@@ -1,0 +1,63 @@
+<command>
+<name>get ossi document context parameters</name>
+<description>This command will return multiple rows for key values for a document that is going to be uploaded
+</description>
+<type>Local Syntax</type>
+
+<argument name="@*" required="yes" datatype="string">Nothing specific here but [get ossi document context key parameters] is called</argument>
+
+
+<local-syntax>
+<![CDATA[
+
+publish data
+where sess_var = 'uc_my_doc_ctxt_parm_rownum'
+|
+{
+    save session variable where name = @sess_var and value = '0'
+    ;
+    {
+        get ossi document context key parameters
+    }
+    |
+    {
+        save session variable
+        where name = @sess_var and value = string ( int(ossi__sess_var(@sess_var,'0','Y')) + 1 )
+        ;
+        filter data
+        where moca_filter_level = 2
+        and uc_doc_ctxt_parm_seq = int(ossi__sess_var(@sess_var,'0','Y'))
+    }    
+}
+
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+   This command calls various other commands to capture all context and then makes it available for eventually adding to the document context table
+</p>
+]]>
+</remarks>
+
+<retrows>n</retrows>
+<retcol name="get ossi document context key parameters/*" type="COMTYP_CHAR">All output columns from here</retcol>
+<retcol name="uc_doc_ctxt_parm_seq" type="COMTYP_CHAR">Integer value ascending based on 1 for each row</retcol>
+
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+<seealso cref="get ossi document context key parameters"></seealso>
+
+
+</documentation>
+
+
+
+</command>

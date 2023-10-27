@@ -1,0 +1,45 @@
+<command>
+<name>complete usr issue</name>
+<description>Override the PK data that was logged for one</description>
+
+<argument name="uc_ossi_issue_assign_seq" required="yes" datatype="string">
+</argument>
+<argument name="close_issue" datatype="string">
+</argument>
+<argument name="do_commit" datatype="string">
+</argument>
+<argument name="username" datatype="string">
+</argument>
+<argument name="password" datatype="string">
+</argument>
+<argument name="comment" datatype="string">
+</argument>
+<argument name="create_rollout" datatype="string">
+</argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ * 20170711 ossi\saad.ahmad - 7026 - Bring the core Oracular components
+ */
+override ossi pk data for issue assignment
+;
+complete usr issue core
+    
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This command can be used to user issue.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

@@ -1,0 +1,39 @@
+<command>
+<name>remove ossi policy logic value</name>
+<description>Remove policy logic value</description>
+
+<argument name="uc_rule_grp_id" required="yes" datatype="string"></argument>
+<argument name="uc_rule_subgrp_id" required="yes" datatype="string"></argument>
+<argument name="uc_rule_value" required="yes" datatype="string"></argument>
+<argument name="seqnum" required="yes" datatype="string">This user does not see.  Ever ascending value based on max and add 1</argument>
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+parse ossi policy logic
+|
+{
+    remove ossi rule engine expression
+      where seqnum = iif(@seqnum is null, 1, @seqnum)
+    catch (-1403,510)
+}
+
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This command may be used to remove policy logic value.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

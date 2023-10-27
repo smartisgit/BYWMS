@@ -1,0 +1,69 @@
+<command>
+<name>ossi translate</name>
+<description>This implements oracle translate type function</description>
+
+<argument name="moca_farg1" required="yes" datatype="string">Source string</argument>
+<argument name="moca_farg2" required="yes" datatype="string">Character string with source characters</argument>
+<argument name="moca_farg3" required="yes" datatype="string">Character string with Target characters</argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* saad.ahmad - 11919
+*/
+publish data
+where src = @moca_farg1
+and translate_expr_src = @moca_farg2
+and translate_expr_dest = @moca_farg3
+|
+{
+    if ( @src is null or @translate_expr_src is null or @translate_expr_dest is null )
+        publish data
+        where ret = null
+    else
+    {
+        [[
+        StringBuffer ret = new StringBuffer("");
+        len = src.length()
+        len_dst = translate_expr_dest.length();
+        //
+        for ( ii in 0 .. len-1 )
+        {
+            ch = src.substring(ii,ii+1);
+            if ( (found_at = translate_expr_src.indexOf(ch)) >= 0 )
+            {
+                if ( found_at >= len_dst )
+                    repl_with = " ";
+                else
+                    repl_with = translate_expr_dest.substring(found_at,found_at+1);
+            }
+            else
+                repl_with = ch;
+            //
+            ret.append ( repl_with );
+        }
+        [ret:ret.toString()]
+        ]]
+    }
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<remarks>
+This implements the oracle translate function so that we can call it for all cases rather than oracle translate SQL function
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+<retcol name="ret" type="COMTYP_CHAR"></retcol>
+
+
+</documentation>
+</command>

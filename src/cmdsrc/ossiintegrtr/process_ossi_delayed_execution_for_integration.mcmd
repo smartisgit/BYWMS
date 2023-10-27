@@ -1,0 +1,76 @@
+<command>
+<name>process ossi delayed execution for integration</name>
+<description>
+Execute the commands that have been buffered for delayed execution
+</description>
+
+<type>Local Syntax</type>
+
+<local-syntax>
+<![CDATA[
+
+publish data
+where uc_my_sess_var = 'uc_delayed_int_execution_list'
+|
+publish data
+where uc_exec_this = ossi__sess_var ( @uc_my_sess_var, '', 'Y' )
+|
+if ( @uc_exec_this is not null )
+{
+    execute server command
+    where cmd = @uc_exec_this
+    and inline = 1
+    ;
+    /*
+     * It should really not be called again before transaction ends - but still to make sure we simply clear the session variable
+     * explicitly
+     */
+    save session variable
+    where name = @uc_my_sess_var
+    and value = ''
+}
+;
+noop
+
+]]>
+</local-syntax>
+
+
+<documentation>
+
+<remarks>
+<![CDATA[
+There are concepts like order and order lines; or items and footprints.  When we have integrations that populate header and detail data in 
+the same transaction.  While doing that we may have a case where some data needs to be executed at the header level AFTER all processing has been done.
+In integrations that is traditionally achieved by putting logic in post algorithm of the IFD.
+This interface allows us to buffer some commands and they will be executed implicitly after the IFD has been created.  This is biased towards the 
+traditional (and recommended) way the data to BY WMS is supposed to be processed where destination is DCS and the result IFD is sync delivery.
+It relies on an internal (undocumented) command that is called just before send process starts, i.e. [sl_send ifd_data_kw] to execure this.
+]]>
+</remarks>
+
+<retrows>0</retrows>
+
+<exception value="eOK">Normal successful completion</exception>
+
+<seealso cref="sl_send ifd_data_kw"></seealso>
+
+<example>
+<![CDATA[
+{
+    submit ossi command for delayed integration execution
+    where uc_command_call = "publish data where a=1"
+    ;
+    submit ossi command for delayed integration execution
+    where uc_command_call = "publish data where a=1"
+    ;
+    submit ossi command for delayed integration execution
+    where uc_command_call = "set return status where status = 999999 and message ='test of delayed execution'"
+    ;
+    process ossi delayed execution for integration
+}
+]]>
+</example>
+
+</documentation>
+</command>

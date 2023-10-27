@@ -1,0 +1,77 @@
+<command>
+<name>check usr column exclusion</name>
+<description>Returns 510 if the column should be excluded</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ * 20170711 ossi\saad.ahmad - 7026 - Bring the core Oracular components
+ */
+publish data
+where uc_this_wh_id = upper(nvl(nvl(@wh_id#keep,@wh_id_tmpl#keep), @@WH_ID))
+and uc_do_only_wh_id = ossi__replace(upper(@@UC_VERSION_DO_ONLY_WH_ID),'"','')
+|
+{
+  check usr column exclusion by environment
+  |
+  if ( @uc_inhibit = '1' )
+    set return status where status = 510
+  else
+  {
+    [
+    select rtnum1 uc_exclude,
+           nvl(rtnum2,0) uc_but_allow_dev_wh
+    from poldat_view
+    where polcod = 'USR-OSSI-VERSION-CONTROL' 
+    and polvar = 'OBJECT-TABLE-' || upper(@table) 
+    and polval = 'EXCLUDE-' || upper(@column) 
+    and wh_id = '----'
+    and @rtstr1 like rtstr1 escape '\'
+    and rownum < 2
+    ]
+    catch (-1403,510)
+    |
+    if ( @? = 0 )
+    {
+      if ( @uc_exclude = 1 ) /* excluding this e.g. certain colnames in dscmst */
+      {
+        if ( @uc_but_allow_dev_wh = 1 )
+        {
+          if ( @uc_this_wh_id is not null and instr( ','||@uc_do_only_wh_id||',', ','||@uc_this_wh_id||',') > 0 )
+          {
+            noop /* this was that special warehouse do not raising error - implying it will be part of version control */
+          }
+          else
+          {
+            set return status where status = 510 /* raise error so exluded */
+          }
+        } /* have special wh exception enabled */
+        else
+        {
+          set return status where status = 510 /* raise error so exluded */
+        }
+      } /* exclude was enabled for this colnam */
+    } /* found an exclude rule */
+  }
+}
+    
+]]>
+</local-syntax>
+<argument name="table" required="yes" datatype="string"></argument>
+<argument name="column" required="yes" datatype="string"></argument>
+<argument name="rtstr1" required="yes" datatype="string">
+A literal string or like clause
+</argument>
+<documentation>
+
+<remarks>
+This command can be used to check column exclution. It returns 510 if the column should be excluded.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

@@ -1,0 +1,200 @@
+<command>
+<name>add usr sl issue objects</name>
+<description>Add user sl issue objects</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ */
+{
+[select * from sl_evt_def_grp where evt_grp_id like 'UC%'] catch (-1403)
+|
+if (@? = 0)
+process usr issue base where uc_table_name = 'SL_EVT_DEF_GRP'
+    and group = 'SL_EVT_GRP'  
+    and uc_action = 'UPDATE'
+}
+&
+{
+[select * from sl_sys_def_grp where sys_grp_id like 'UC%'] catch (-1403)
+|
+if (@? = 0)
+process usr issue base where uc_table_name = 'SL_SYS_DEF_GRP'
+    and group = 'SL_SYS_GRP'  
+    and uc_action = 'UPDATE'
+}
+&
+{
+[select * from sl_alg_def_grp where alg_grp_id like 'UC%'] catch (-1403)
+|
+if (@? = 0)
+process usr issue base where uc_table_name = 'SL_ALG_DEF_GRP'
+    and group = 'SL_ALG_GRP'  
+    and uc_action = 'UPDATE'
+}
+&
+{
+[select * from sl_ifd_def_grp where ifd_grp_id like 'UC%'] catch (-1403)
+|
+if (@? = 0)
+process usr issue base where uc_table_name = 'SL_IFD_DEF_GRP'
+    and group = 'SL_IFD_GRP'  
+    and uc_action = 'UPDATE'
+}
+&
+{
+[select * from sl_sys_def where sys_id like 'UC%'] catch (-1403)
+|
+if (@? = 0)
+process usr issue base where uc_table_name = 'SL_SYS_DEF'
+    and group = 'SL_SYS'  
+    and uc_action = 'UPDATE'
+}
+&
+{
+[select * from sl_alg_def where alg_id like 'UC%'] catch (-1403)
+|
+if (@? = 0)
+process usr issue base where uc_table_name = 'SL_ALG_DEF'
+    and group = 'SL_ALG'  
+    and uc_action = 'UPDATE'
+}
+&
+{
+[select * from SL_COMM_MTHD_DEF where comm_mthd_id like 'UC%'] catch (-1403)
+|
+if (@? = 0)
+process usr issue base where uc_table_name = 'SL_COMM_MTHD_DEF'
+    and group = 'SL_COMM_MTHD'  
+    and uc_action = 'UPDATE'
+}
+&
+{
+[select * from SL_RETR_MTHD_DEF where retr_mthd_id like 'UC%'] catch (-1403)
+|
+if (@? = 0)
+process usr issue base where uc_table_name = 'SL_RETR_MTHD_DEF'
+    and group = 'SL_RETR_MTHD'  
+    and uc_action = 'UPDATE'
+}
+&
+{
+[select * from SL_EVT_DEF where evt_id like 'UC%'] catch (-1403)
+|
+if (@? = 0)
+process usr issue base where uc_table_name = 'SL_EVT_DEF'
+    and group = 'SL_EVT'  
+    and uc_action = 'UPDATE'
+}
+&
+{
+[select * from SL_IFD_DEF def
+where ifd_id like 'UC%'
+or exists (select 1 
+             from sl_ifd_seg seg 
+            where seg.ifd_id = def.ifd_id 
+              and seg.ifd_ver = def.ifd_ver 
+              and (seg.ifd_seg_id like 'UC%' or PRE_ALG_ID like 'UC%' OR POST_ALG_ID like 'UC%' OR BLK_ALG_ID like 'UC%' OR PROC_ALG_ID like 'UC%')
+          )
+or exists (select 1 
+             from sl_ifd_fld f 
+            where f.ifd_id = def.ifd_id 
+              and f.ifd_ver = def.ifd_ver 
+              and (f.ifd_fld_id like 'UC%' OR FLD_ALG_ID LIKE 'UC%')
+          ) 
+] catch (-1403)
+|
+/* add ifd mappings */
+if (@ifd_typ_cd = 'I')
+{
+  [select * from sl_i_ifd_evt_map where ifd_id = @ifd_id and ifd_ver = @ifd_ver] catch (-1403)
+  |
+  if (@? = 0)
+    process usr issue base 
+      where uc_table_name = 'SL_I_IFD_EVT_MAP' 
+        and group = 'SL_I_IFD_EVT_MAP'
+        and uc_action = 'UPDATE'
+  ;
+  publish data where group = 'SL_I_IFD'
+}
+else
+{
+  [select * from sl_o_ifd_sys_map where ifd_id = @ifd_id and ifd_ver = @ifd_ver] catch (-1403)
+  |
+  if (@? = 0)
+    process usr issue base 
+      where uc_table_name = 'SL_O_IFD_SYS_MAP' 
+        and group = 'SL_O_IFD_SYS_MAP'
+        and uc_action = 'UPDATE'
+  ;
+  publish data where group = 'SL_O_IFD'
+}
+|
+if (@? = 0)
+process usr issue base where uc_table_name = 'SL_IFD_DEF'
+    and uc_action = 'UPDATE'
+}
+&
+{
+[select * from SL_EO_DEF def 
+where evt_id like 'UC%' 
+or eo_id like 'UC%' 
+or exists (select 1 
+             from sl_eo_seg seg 
+            where seg.eo_id = def.eo_id 
+              and seg.eo_ver = def.eo_ver 
+              and (seg.eo_seg_id like 'UC%' or seg.retr_mthd_id like 'UC%' or seg.BLK_ALG_ID like 'UC%')
+          )    
+or exists (select 1 
+             from sl_eo_fld f 
+            where f.eo_id = def.eo_id 
+              and f.eo_ver = def.eo_ver 
+              and f.eo_fld_id like 'UC%'
+          )  
+or exists (select 1 
+             from sl_eo_col f 
+            where f.eo_id = def.eo_id 
+              and f.eo_ver = def.eo_ver 
+              and (f.RETR_MTHD_IMPL_GENID like 'SYS_UC%' or f.RETR_MTHD_IMPL_GENID like 'SEG_UC%')
+          )                           
+] catch (-1403)
+|
+if (@? = 0)
+process usr issue base where uc_table_name = 'SL_EO_DEF'
+    and group = 'SL_EO'  
+    and uc_action = 'UPDATE'
+}
+&
+{
+[select * from SL_ALT_EVT_ARG_DEF where evt_id like 'UC%' or evt_arg_id like 'UC%' or ifd_id like 'UC%'] catch (-1403)
+|
+if (@? = 0)
+process usr issue base where uc_table_name = 'SL_ALT_EVT_ARG_DEF'
+    and group = 'SL_ALT_EVT_ARG'  
+    and uc_action = 'UPDATE'
+}
+&
+{
+[select * from SL_SYS_COMM where sys_id like 'UC%'] catch (-1403)
+|
+if (@? = 0)
+process usr issue base where uc_table_name = 'SL_SYS_COMM'
+    and group = 'SL_SYS_COMM'  
+    and uc_action = 'UPDATE' 
+}
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This command can be used to add user sl issue objects.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+<argument name="list_mode" datatype="string">1 to list instead of log</argument>
+</command>

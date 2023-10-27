@@ -1,0 +1,59 @@
+<command>
+<name>clear ossi moca cache</name>
+<description>This is to clear a named cache</description>
+<type>Local Syntax</type>
+
+<argument name="uc_cache_grp" required="yes" datatype="string"></argument>
+<argument name="uc_inhibit_infinispan_cache" required="yes" datatype="string"></argument>
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 11919 - Clear cache API
+ */
+publish data
+where uc_inhibit_infinispan_cache = nvl( @uc_inhibit_infinispan_cache, @@UC_INHIBIT_INFINISPAN_CACHE )
+|
+if ( @uc_inhibit_infinispan_cache = '1' )
+    noop
+else
+{
+    if ( @uc_cache_grp is null )
+        clear moca cache
+    else
+    {
+        [[
+        import com.redprairie.moca.cache.*;
+        import java.util.concurrent.*;
+        import com.redprairie.moca.cache.infinispan.*;
+        //
+        CacheManager.clearCache(uc_cache_grp);
+        ]]
+    }
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+This command will clear the specific moca cache
+</remarks>
+
+<retrows>0</retrows>
+
+<seealso cref="clear moca cache"></seealso>
+<seealso cref="ossi polval"></seealso>
+<seealso cref="execute ossi moca and cache core"></seealso>
+<seealso cref="execute ossi moca and cache"></seealso>
+<seealso cref="clear ossi cache for table update"></seealso>
+
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

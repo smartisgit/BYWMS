@@ -1,0 +1,51 @@
+#use $LESDIR/include
+#use $DCSDIR/include
+#use $MOCADIR/include
+#use $LESDIR/db/ddl/Indexes
+
+#include <dcsddl.h>
+#include <dcscolwid.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+
+mset command on
+[
+CREATE_TABLE(USR_OSSI_ISSUE_ASSIGN)
+(
+  uc_ossi_issue_assign_seq FIXED_INT_TY(12) not null,
+  uc_ossi_issue_id         STRING_TY(100)   not null,
+  uc_ossi_user_id          STRING_TY(40)    not null,
+  uc_ossi_stat_cd          STRING_TY(10)    not null,
+  uc_ossi_ins_dt           DATE_TY,
+  uc_ossi_ins_usr_id       STRING_TY(40),
+  uc_ossi_upd_dt           DATE_TY,
+  uc_ossi_upd_usr_id       STRING_TY(40),
+  uc_ossi_issue_descr      STRING_TY(100),
+  uc_ossi_obj_grp          STRING_TY(100),
+  uc_ossi_obj_name         STRING_TY(100)
+)
+
+] catch (ERR_TABLE_ALREADY_EXISTS)
+RUN_DDL
+mset command off
+
+#include <usr_ossi_issue_assign_pk.idx>
+
+mset command on
+create db documentation
+where table                   = "usr_ossi_issue_assign"
+and table_comment             = "This relates to our issue assignment functionality.  When users are workig on a change they add a row here and then via triggers the changes are tracked"
+and uc_ossi_issue_assign_seq  = "This is an arbitrary sequence number to make a unique row"
+and uc_ossi_issue_descr       = "Issue description"
+and uc_ossi_issue_id          = "This is an identifier for the issue externally.  For example if it is a bugzilla issue it will be that Id or a Jira Item number"
+and uc_ossi_user_id           = "This is the user.  One user should have a single active issue assignmnet"
+and uc_ossi_stat_cd           = "Status of the record. A is active C is complete I is inactive"
+and uc_ossi_ins_dt            = "Add Date/Time"
+and uc_ossi_ins_usr_id        = "Add User"
+and uc_ossi_upd_dt	      = "Update Date/Time"
+and uc_ossi_upd_usr_id        = "Add User Id"
+and uc_ossi_obj_grp           = "For future"
+and uc_ossi_obj_name          = "For Future"
+
+RUN_DDL
+mset command off

@@ -1,0 +1,60 @@
+<command>
+<name>create ossi auto wave rule detail</name>
+<description>This command will create an auto wave rule detail</description>
+
+<argument name="wh_id" required="yes"   datatype="string"></argument>
+<argument name="uc_auto_wave_rule_id"   required="yes" datatype="string">Auto wave rule id</argument>
+<argument name="uc_auto_wave_ctxt_cd"   required="no"  datatype="string">Auto wave detail context code</argument>
+<argument name="column_name"            required="no"  datatype="string">Auto wave detail column name</argument>
+<argument name="uc_rule_fld_value_expr" required="no"  datatype="string">Auto wave detail value expression</argument>
+
+ 
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+
+create record
+where table = 'usr_auto_wave_rule_def_fld'
+ 
+   
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This will create the auto wave rule detail of an autowave rule.
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+<retcol name="wh_id"                    type="COMTYP_CHAR"></retcol>
+<retcol name="uc_auto_wave_rule_id"     type="COMTYP_CHAR"></retcol>
+<retcol name="uc_auto_wave_ctxt_cd"     type="COMTYP_CHAR"></retcol>
+<retcol name="column_name"              type="COMTYP_CHAR"></retcol>
+<retcol name="uc_rule_fld_value_expr"   type="COMTYP_CHAR"></retcol>
+
+<example>
+<![CDATA[
+<p>
+</p>
+]]>
+
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+<seealso cref="list ossi auto wave rule details"></seealso>
+<seealso cref="remove ossi auto wave rule detail"></seealso>
+<seealso cref="change ossi auto wave rule detail"></seealso>
+
+
+</documentation>
+
+
+</command>

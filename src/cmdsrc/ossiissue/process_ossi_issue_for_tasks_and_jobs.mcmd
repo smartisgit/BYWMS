@@ -1,0 +1,54 @@
+<command>
+<name>process ossi issue for tasks and jobs</name>
+<description>Log job and task changes respecting the warehouse specific rules</description>
+<argument name="job_id" datatype="string"></argument>
+<argument name="task_id" datatype="string"></argument>
+<argument name="uc_pk_column_name" datatype="string"></argument>
+<argument name="uc_table_name" datatype="string"></argument>
+<argument name="uc_action" datatype="string"></argument>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ */
+publish data
+where uc_orig_grp_nam = ''
+|
+{
+   [
+   select grp_nam uc_orig_grp_nam
+   from @uc_table_name:raw
+   where @uc_pk_column_name:raw = decode ( @uc_pk_column_name, 'job_id', @job_id, @task_id )
+   ]
+   catch (-1403,510)
+   |
+   if ( @uc_orig_grp_nam like 'G%' or  @uc_orig_grp_nam is null )
+   {
+      process usr issue
+      ;
+      /* process usr issue changes group name so restore the value */
+      [
+      update  @uc_table_name:raw
+      set grp_nam = @uc_orig_grp_nam
+      where @uc_pk_column_name:raw = decode ( @uc_pk_column_name, 'job_id', @job_id, @task_id )
+      ]
+      catch (-1403,510)
+   }
+}
+
+
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This command process issue for tasks and jobs respecting the warehouse specific rules
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

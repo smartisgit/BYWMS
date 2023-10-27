@@ -1,0 +1,38 @@
+<command>
+<name>complete usr issue core</name>
+<description>Complete User Issue Core</description>
+<type>Java Method</type>
+<class>OSSICompleteIssue</class>
+<method>completeIssue</method>
+<package>com.redprairie.les.oracular.issue</package>
+<argument name="uc_ossi_issue_assign_seq" required="yes" datatype="string">
+</argument>
+<argument name="close_issue" datatype="string">
+</argument>
+<argument name="do_commit" datatype="string">
+</argument>
+<argument name="username" datatype="string">
+</argument>
+<argument name="password" datatype="string">
+</argument>
+<argument name="comment" datatype="string">
+</argument>
+<argument name="create_rollout" datatype="string">
+</argument>
+<documentation>
+<remarks>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20170711 ossi\saad.ahmad - 7026 - Bring the core Oracular components
+ */
+This command can be used to complete user issue
+]]>
+</remarks>
+
+<retrows>One</retrows>
+<retcol name="result" type="string">Result</retcol>
+<exception value="eOK">The command completed successfully.</exception>
+</documentation>
+</command>

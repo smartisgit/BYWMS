@@ -1,0 +1,47 @@
+<command>
+<name>ossi date</name>
+<description>Convert string to moca date, taking into account various inbound formats</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="moca_farg1">Date String</argument>
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+publish data
+where str = @moca_farg1
+|
+{
+   if ( @str is null )
+      publish data where ret = to_date('','YYYYMMDD')
+   else if ( instr(@str,'/' ) > 0 )
+      [
+      select cast(@str as datetime) ret
+      from dual
+      ]
+   else
+      publish data
+      where ret = date(@str)
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+Convert to a date
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

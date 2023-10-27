@@ -1,0 +1,73 @@
+<command>
+<name>transpose ossi resultset</name>
+<description>
+Transpose a resultset
+</description>
+
+<type>Local Syntax</type>
+<function>usrOssiTransposeResult</function>
+<argument name="res"       required="yes" datatype="res"></argument>
+<argument name="colnam"    required="yes" datatype="string">Column whose data forms column header</argument>
+<argument name="attr_expr" required="yes" datatype="string">Expression for the row that makes the resukt</argument>
+
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+
+publish data
+where uc_ossi_transpose_sess_var = 'uc_ossi_transpose_sess_var'
+|
+save session variable
+where name = @uc_ossi_transpose_sess_var
+and value = ''
+|
+{
+   publish data combination
+   where res = @res
+   |
+   {
+      execute server command
+      where cmd = "publish data where uc_colnam = @" || @colnam || " and uc_colval = @" || @attr_expr
+      |
+      if ( ossi__sess_var ( @uc_ossi_transpose_sess_var) = '' )
+         save session variable
+         where name = @uc_ossi_transpose_sess_var
+         and   value = "publish data where " || @uc_colnam || " = '" || @uc_colval || "'"
+      else
+         save session variable
+         where name = @uc_ossi_transpose_sess_var
+         and   value = ossi__sess_var ( @uc_ossi_transpose_sess_var) ||
+                       " and " || @uc_colnam || " = '" || @uc_colval || "'"
+   }
+   ;
+   execute server command
+   where cmd = ossi__sess_var ( @uc_ossi_transpose_sess_var )
+}
+
+]]>
+</local-syntax>
+
+
+
+<documentation>
+
+
+<remarks>
+<![CDATA[
+This command can be used to transpose a resultset.
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+<example>
+??
+</example>
+
+<exception value="eOK">Normal successful completion</exception>
+</documentation>
+</command>

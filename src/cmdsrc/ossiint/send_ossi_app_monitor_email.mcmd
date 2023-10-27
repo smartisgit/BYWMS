@@ -1,0 +1,68 @@
+<command>
+<name>send ossi app monitor email</name>
+<description>To send email from application monitor</description>
+
+<argument name="uc_monitor_id" required="yes" datatype="string"></argument>
+<argument name="uc_mon_data_res" required="yes" datatype="string"></argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+publish data
+where uc_temp_filename = 'email_recordset_' || @uc_monitor_id || '.csv'
+and uc_temp_file_dir = @@LESDIR || '/temp/'
+|
+publish data
+where uc_temp_file_path = @uc_temp_file_dir || '/' || @uc_temp_filename
+|
+if ( rowcount(@uc_mon_data_res) > 0 )
+{
+    try
+    {
+        convert ossi results to string
+        where res = @uc_mon_data_res
+        |
+        {
+            write output file
+            where filnam = @uc_temp_filename
+            and path = @uc_temp_file_dir
+            and mode = 'w'
+            and data = @result_string
+            ;
+            get ossi app monitor email settings
+            |
+            send ossi email
+            where attachments  = @uc_temp_file_path || ',' || @uc_temp_filename
+        }
+    } /* try */
+    finally
+    {
+        remove file
+        where filnam = @uc_temp_file_path
+        catch (@?)
+    }
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<remarks>
+This command may be used to send email from application monitor.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+<seealso cref="send ossi email"></seealso>
+<seealso cref="get ossi app monitor email settings"></seealso>
+
+</documentation>
+
+</command>

@@ -1,0 +1,96 @@
+<command>
+<name>create or replace sequence</name>
+<description>Create or replace the sequence</description>
+
+<argument name="sequence_name" required="yes" datatype="string"></argument>
+<argument name="min_value" required="yes" datatype="string"></argument>
+<argument name="increment_by" required="yes" datatype="string"></argument>
+<argument name="start_with" required="yes" datatype="string"></argument>
+<argument name="cache_size" required="yes" datatype="string"></argument>
+<argument name="max_value" required="yes" datatype="string"></argument>
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+if (dbtype = 'ORACLE')
+{
+    [select min_value old_min_value,
+            max_value old_max_value,
+            increment_by old_increment_by,
+            cache_size old_cache_size
+       from user_sequences
+      where sequence_name = upper(@sequence_name)
+    ]
+    catch (-1403)
+    |
+    if (@? = 0)
+    {
+       if (@old_min_value != @min_value)
+       {
+          [alter sequence @sequence_name:raw minvalue @min_value:raw] 
+       }
+       |
+       if (@old_max_value != @max_value)
+       {
+          [alter sequence @sequence_name:raw maxvalue @max_value:raw] 
+       }
+       |
+       if (@old_increment_by != @increment_by)
+       {
+          [alter sequence @sequence_name:raw increment by @increment_by:raw] 
+       }
+       |
+       if (@old_cache_size != @cache_size)
+       {
+          [alter sequence @sequence_name:raw cache @cache_size:raw] 
+       }
+    }
+    else 
+    {
+       create sequence
+         where sequence_name = @sequence_name
+           and min_value = @min_value
+           and increment_by = @increment_by
+           and start_with = @start_with
+           and cache_size = @cache_size
+           and max_value = @max_value
+    }
+}
+else
+{
+    [select incval inc, maxval max from @sequence_name:raw]
+    |
+    [/*NOCONV*/dbcc checkident(@sequence_name, reseed, @min_value:raw)]
+}
+   
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This command can be used to maintain a sequence. MOCA sequence implemented using database specific constructs.
+</p>
+]]>
+</remarks>
+
+<retrows>0</retrows>
+
+
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+<seealso cref="reseed sequence"></seealso>
+
+</documentation>
+
+
+</command>

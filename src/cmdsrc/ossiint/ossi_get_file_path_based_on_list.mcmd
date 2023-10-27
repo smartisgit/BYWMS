@@ -1,0 +1,60 @@
+<command>
+<name>ossi get_file_path_base_on_list</name>
+<description>Find a file in a list</description>
+
+<argument datatype="string" name="moca_farg1">File name</argument>
+<argument datatype="string" name="moca_farg2">List</argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+publish data
+where uc_filename = @moca_farg1
+and uc_dir_path_list = nvl(@moca_farg2, @@PATH )
+|
+{
+   sl_resolve string_from_env where i_string = @uc_dir_path_list
+   |
+   publish data
+   where uc_dir_path_list = @o_value
+   |
+   [[
+   String[] dirs = uc_dir_path_list.split(";");
+   String filepath;
+   for (String dir : dirs)
+   {
+      File file = new File(dir + System.getProperty("file.separator") + uc_filename );
+      if (file.exists())
+      {
+         filepath = file.getAbsolutePath();
+         break;
+      }
+   }
+   [uc_found_filepath:filepath]
+   ]] 
+}
+
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<remarks>
+This command may be used to get file path and file on the list.
+</remarks>
+
+<retcol name="uc_found_filepath" type="String">FilePath</retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

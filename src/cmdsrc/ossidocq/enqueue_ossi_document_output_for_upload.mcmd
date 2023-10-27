@@ -1,0 +1,158 @@
+<command>
+<name>enqueue ossi document output for upload</name>
+<description>Get an HTML that can be used for rule documentation
+</description>
+<type>Local Syntax</type>
+
+<argument name="page_data" required="yes" datatype="string">Page data coming in</argument>
+<argument name="uc_doc_upload_typ_cd" required="yes" datatype="string"></argument>
+<argument name="filename" required="yes" datatype="string"></argument>
+<argument name="rpt_id" required="yes" datatype="string">Report Id</argument>
+<argument name="label_name" required="yes" datatype="string">Label name</argument>
+<argument name="archive_id" required="yes" datatype="string">Label name</argument>
+
+
+
+<argument name="format_typ" required="yes" datatype="string"></argument>
+<argument name="dest_typ" required="yes" datatype="string"></argument>
+<argument name="dest" required="yes" datatype="string"></argument>
+<argument name="num_copies" required="yes" datatype="string"></argument>
+<argument name="dig_sig_req_flg" required="yes" datatype="string"></argument>
+<argument name="keywords_list" required="yes" datatype="string"></argument>
+
+
+
+<local-syntax>
+<![CDATA[
+
+publish data
+where wh_id = nvl(@wh_id, @@WH_ID)
+and devcod = nvl(@devcod, @@DEVCOD)
+and usr_id = nvl(@gen_usr_id, nvl(@usr_id, @@USR_ID))
+and locale_id = nvl(nvl(nvl(@gen_locale_id, @locale_id), @@LOCALE_ID), 'US_ENGLISH' )
+|
+publish data
+where gen_locale_id = @locale_id
+and gen_usr_id = @usr_id
+and keywords_list = substr(@keywords_list, 1, 4000)
+|
+if ( @label_name is not null )
+    publish data
+    where uc_doc_pgm_cd = 'LBL'
+else
+    publish data
+    where uc_doc_pgm_cd = 'RPT'
+|
+publish data
+where uc_doc_pgm_id = nvl(@label_name, @rpt_id)
+and uc_q_dt = sysdate
+and uc_upload_dt = null
+and uc_upload_stat_cd = 'U'
+and uc_rpt_archive_id = @archive_id
+and r_polval = null
+|
+{
+    sl_split filename where full_file_name = @filename
+    |
+    encode to base64
+    where bin_data = @page_data
+    |
+    {
+        {
+            get ossi result by evaluating policy
+            where uc_rule_grp_id = 'OSSI-DOC-UPLOAD-DOC-TYP-CATG'
+            and uc_rule_subgrp_id = 'UC_DOC_TYP_CD'
+            catch (-1403,510)
+            |
+            publish data
+            where uc_doc_typ_cd = @r_polval
+        }
+        |
+        {
+            get ossi result by evaluating policy
+            where uc_rule_grp_id = 'OSSI-DOC-UPLOAD-DOC-TYP-CATG'
+            and uc_rule_subgrp_id = 'UC_DOC_SUBTYP_CD'
+            catch (-1403,510)
+            |
+            publish data
+            where uc_doc_subtyp_cd = @r_polval
+        }
+        |
+        publish data
+        where uc_doc_upload_q_id = ossi__next_number ( 'uc_doc_upload_q_id' )
+        |
+        {
+            create record
+            where table = 'usr_ossi_doc_upload_q'
+            and   uc_doc_ext_cd = @s_ext
+            and   uc_contents_base64 = @base64_encoded
+            and   uc_doc_upload_typ_cd = @uc_doc_pgm_cd
+            ;
+            get ossi document context parameters >> uc_doc_q_ctxt
+            |
+            {
+                if ( rowcount(@uc_doc_q_ctxt) > 0 )
+                {
+                    publish data combination 
+                    where res = @uc_doc_q_ctxt
+                    |
+                    create record
+                    where table = 'usr_ossi_doc_upload_q_ctxt'
+                }
+                ;
+                publish data
+                where uc_doc_upload_q_id = @uc_doc_upload_q_id
+                and uc_doc_typ_cd = @uc_doc_typ_cd
+                and uc_doc_subtyp_cd = @uc_doc_subtyp_cd
+                and uc_doc_pgm_cd = @uc_doc_pgm_cd
+                and uc_doc_pgm_id = @uc_doc_pgm_id
+                and uc_q_dt = @uc_q_dt
+                and uc_upload_stat_cd = @uc_upload_stat_cd
+                and uc_doc_q_ctxt = @uc_doc_q_ctxt
+            }
+        }        
+    }
+}
+
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+   Purpose of this command is to queue the data to our table with output so that it can then later on be pushed to blob storage
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+<retcol name="uc_doc_upload_q_id" type="COMTYP_CHAR">Record created</retcol>
+<retcol name="uc_doc_typ_cd" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_doc_subtyp_cd" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_doc_pgm_cd" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_doc_pgm_id" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_q_dt" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_upload_stat_cd" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_doc_q_ctxt" type="COMTYP_RES">the context for this upload</retcol>
+
+
+
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+<seealso cref="generate moca report"></seealso>
+<seealso cref="generate label"></seealso>
+<seealso cref="get ossi document context parameters"></seealso>
+
+
+
+</documentation>
+
+
+
+</command>

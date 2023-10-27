@@ -1,0 +1,70 @@
+<command>
+<name>publish ossi values as row on stack</name>
+<description>Take a res where one column has field names and second has value and a 3rd tells if value is literal or expression.  Then show as 1 row</description>
+<type>Local Syntax</type>
+
+
+<argument datatype="string" name="res"></argument>
+<argument datatype="string" name="uc_parm_id_column"></argument>
+<argument datatype="string" name="uc_parm_value_column"></argument>
+<argument datatype="string" name="uc_parm_expr_flg_column"></argument>
+
+
+<local-syntax>
+<![CDATA[
+
+
+publish data
+where uc_parm_expr_flg_column = nvl(@uc_parm_expr_flg_column, '')
+|
+{
+    [[
+    Map<String,String> map = new HashMap<String,String>();
+    String raw_value;
+    String final_value;
+    Integer is_expr;
+    //
+    while (res.next())
+    {
+        if ( uc_parm_expr_flg_column == "" )
+            is_expr = 0
+        else
+            is_expr = res.getInt( uc_parm_expr_flg_column );
+        raw_value = res.getString ( uc_parm_value_column );
+        //
+        if ( is_expr == 0 )
+            final_value = raw_value;
+        else
+        {
+            res_tmp = moca.executeInline ( "publish data where vv = " + raw_value );
+            res_tmp.next();
+            final_value = res_tmp.getString ( "vv" );
+        }
+        //
+        map.put(res.getString(uc_parm_id_column), final_value);
+    }
+    map;
+    ]]
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+This command will take a resultset and flatten it such that columns become rows.  And while doing it, it can also evaluate the value
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+<retrows>1</retrows>
+
+<retcol name="variable" type="COMTYP_CHAR">Depends on the contents of res</retcol>
+<retcol name="values" type="COMTYP_CHAR">depends on passed in resultset</retcol>
+
+
+
+</documentation>
+
+
+</command>

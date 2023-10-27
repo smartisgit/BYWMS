@@ -1,0 +1,44 @@
+<command>
+<name>ossi get_clean_string</name>
+<description>
+FUNCTION: Replace some special characters that typically give issues with nothing</description>
+<type>Local Syntax</type>
+
+<argument name="moca_farg1" required="no" datatype="string">String to search</argument>
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+publish data
+where str = @moca_farg1
+|
+if ( @str is not null )
+{
+    [[
+    ret = str.replaceAll("['\"\r\n]", " ").trim()
+    ]]
+}
+else
+    publish data where ret = null
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<remarks>
+One place to clear up a string and return any special characters replaced with space and then whole string trimmed
+</remarks>
+
+<example>
+publish data where x=ossi__get_clean_string  ( 'xy"z')
+</example>
+
+<exception value="eOK">Normal successful completion</exception>
+</documentation>
+</command>

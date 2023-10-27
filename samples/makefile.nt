@@ -1,0 +1,39 @@
+all: install
+
+install:
+	cd "$(MAKEDIR)/src"
+	$(MAKE) -nologo -fmakefile.nt install
+
+config: FRC
+	cd "$(MAKEDIR)/config"
+	$(MAKE) -nologo -fmakefile.nt
+
+clean:
+	cd "$(MAKEDIR)/src"
+	$(MAKE) -nologo -fmakefile.nt clean
+
+deploy:
+!ifdef INSTALLDIR
+	-mkdir $(INSTALLDIR)
+	-mkdir $(INSTALLDIR)\bin
+	-copy bin $(INSTALLDIR)\bin
+	-mkdir $(INSTALLDIR)\lib
+	-copy lib $(INSTALLDIR)\lib
+	-mkdir $(INSTALLDIR)\scripts
+	-copy scripts $(INSTALLDIR)\scripts
+	-mkdir $(INSTALLDIR)\include
+	-copy include $(INSTALLDIR)\include
+	-xcopy samples $(INSTALLDIR)\samples /s /i
+!else
+	@echo INSTALLDIR NOT SET
+!endif
+
+superclean : clean
+	cd "$(MAKEDIR)"
+	-del /q /f include\*.*
+	-del /q /f bin\*.*
+	-del /q /f lib\*.*
+
+rebuild : clean install
+
+FRC:

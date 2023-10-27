@@ -1,0 +1,2 @@
+polcod,polvar,polval,wh_id_tmpl,srtseq,rtstr1,rtstr2,rtnum1,rtnum2,rtflt1,rtflt2,grp_nam
+USR-OSSI-DATA-CHANGE-HOOK,CMD_REGISTER_SHIPMENT_STAGED_POST,ENABLED,----,1,Set rtnum1=0 to disable and 2 to enabled,Set rtnum2=1 to also detect and process carrier move staged,2,1,0.0,0.0,OSSISVN_12539

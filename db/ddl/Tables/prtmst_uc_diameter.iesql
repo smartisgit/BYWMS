@@ -1,0 +1,24 @@
+#use $DCSDIR/include
+#include <dcsddl.h>
+#include <dcscolwid.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+
+#use $SALDIR/include
+#include <salcolwid.h>
+
+mset command on
+[
+ALTER_TABLE_TABLE_INFO(prtmst)
+ALTER_TABLE_ADD_COLUMN_START(uc_diameter) STRING_TY(10)
+ALTER_TABLE_ADD_COLUMN_END
+] catch (ERR_COLUMN_ALREADY_EXISTS)
+RUN_DDL
+
+create db column comment 
+where table_name   = 'prtmst' 
+and column_name    = 'uc_diameter'
+and column_comment = 'Lens Parameter Diameter'
+RUN_DDL
+
+mset command off

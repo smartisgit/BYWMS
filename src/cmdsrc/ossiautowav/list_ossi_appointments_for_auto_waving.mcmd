@@ -1,0 +1,126 @@
+<command>
+<name>list ossi appointments for auto waving</name>
+<description>List the appointments that we can plan</description>
+ 
+<argument name="wh_id" datatype="string"> </argument>
+<argument name="rule_nam" datatype="string"></argument>
+<argument name="uc_select_clause" datatype="string"> </argument>
+<argument name="uc_where_clause" datatype="string"> </argument>
+<argument name="uc_order_by_clause" datatype="string"> </argument>
+<argument name="uc_batcod_expr" datatype="string"> </argument>
+<argument name="uc_job_action_expr" datatype="string"> </argument>
+<argument name="uc_cm_regdte_secs_since" datatype="integer">If passed in this is how much carrier move age must mature</argument>
+
+
+
+<type>Local Syntax</type>
+
+<local-syntax>
+<![CDATA[
+
+publish data
+where wh_id = nvl(@wh_id, @@WH_ID )
+and uc_select_clause = nvl(@uc_select_clause, 
+                           'appt.wh_id, appt.appt_id, car_move.uc_regdte,'
+                           || 'moca_util.date_diff_days ( car_move.uc_regdte, sysdate)*24*3600 uc_cm_regdte_secs_since' )
+and uc_where_clause = nvl(@uc_where_clause, 'appt.appt_id is not null')
+and uc_order_by_clause = nvl(@uc_order_by_clause, 'appt_id' )
+and uc_batcod_expr = nvl(@uc_batcod_expr, '@appt_id' )
+and uc_job_action_expr = nvl(@uc_job_action_expr, '@appt_id')
+|
+{
+    {
+        if ( @uc_cm_regdte_secs_since is null ) 
+            publish data
+            where uc_regdte_secs_clause = "1=1"
+        else
+            publish data
+            where uc_regdte_secs_clause = "uc_cm_regdte_secs_since >= " || @uc_cm_regdte_secs_since
+        |
+        [
+        select x.*,
+               rank() over(order by @uc_order_by_clause:raw ) uc_ctxt_rownum
+        from
+        (
+            select distinct @uc_select_clause:raw
+            from ord_line
+                 join ord on ord.client_id = ord_line.client_id and ord.wh_id = ord_line.wh_id and ord.ordnum = ord_line.ordnum
+                 join shipment_line 
+                     on shipment_line.client_id = ord_line.client_id
+                     and shipment_line.wh_id = ord_line.wh_id
+                     and shipment_line.ordnum = ord_line.ordnum
+                     and shipment_line.ordlin = ord_line.ordlin
+                     and shipment_line.ordsln = ord_line.ordsln
+                     and shipment_line.linsts != 'B'
+                 join shipment on shipment.ship_id = shipment_line.ship_id
+                 join stop on stop.stop_id = shipment.stop_id
+                 join car_move on car_move.car_move_id = stop.car_move_id
+                 join trlr on trlr.trlr_id = car_move.trlr_id  /* we do this as inner join because appt comes from trlr */
+                 join appt on appt.appt_id = trlr.appt_id
+            where 1=1
+            and ord_line.wh_id = @wh_id
+            and ord.uc_regdte is not null
+            and car_move.uc_regdte is not null
+            and shipment_line.pckqty > 0
+            and shipment_line.schbat is null
+            and (@uc_where_clause:raw )
+            and rownum < 999999
+            order by @uc_order_by_clause:raw
+        ) x
+        where @uc_regdte_secs_clause:raw
+        ]
+        |
+        execute server command 
+        where cmd = "publish data where batcod = " || @uc_batcod_expr
+        and inline = 1
+        |
+        execute server command 
+        where cmd = "publish data where uc_ctxt_job_action = " || @uc_job_action_expr
+        and inline = 1
+        |
+        filter data
+        where moca_filter_level = 3
+        and uc_ctxt_batcod = @batcod
+        and uc_ctxt_job_action = @uc_ctxt_job_action
+    }
+    catch (-1403,510)
+    >> res
+    |
+    publish data
+    where uc_auto_wave_ctxt_rowcnt = rowcount(@res)
+    |
+    if ( @uc_auto_wave_ctxt_rowcnt > 0 )
+        publish data combination 
+        where res = @res 
+        and wh_id = nvl(@wh_id, @@WH_ID)
+        and uc_auto_wave_ctxt_rowcnt = @uc_auto_wave_ctxt_rowcnt
+}
+
+]]>
+</local-syntax>
+
+
+<documentation>
+<remarks>
+<![CDATA[
+  <p>
+  This command will push on stack some data to allow the auto waving to then plan wave for that input
+  </p>
+]]>
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+<retrows>n</retrows>
+<retcol name="@*" type="COMTYP_CHAR">Based in input select clause</retcol>
+<retcol name="uc_ctxt_batcod" type="COMTYP_CHAR">Based on batcod expression</retcol>
+<retcol name="uc_ctxt_rownum" type="COMTYP_CHAR">Row number</retcol>
+<retcol name="uc_ctxt_job_action" type="COMTYP_CHAR">What to put as action</retcol>
+<retcol name="uc_auto_wave_ctxt_rowcnt" type="COMTYP_CHAR">Total rows returned</retcol>
+
+
+<seealso cref="process usr auto wave"> </seealso>
+
+
+</documentation>
+</command>

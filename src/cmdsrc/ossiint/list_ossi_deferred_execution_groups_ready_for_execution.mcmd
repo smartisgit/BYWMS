@@ -1,0 +1,84 @@
+<command>
+<name>list ossi deferred execution groups ready for execution</name>
+<description>This command will list all the groups within deferred execution ready for execution</description>
+
+<argument name="exec_typ" datatype="string">Execution Type.</argument>
+<argument name="comflg" datatype="integer">Commit Flag.</argument>
+<argument name="delflg" datatype="integer">Delete Flag.</argument>
+
+<argument name="uc_thread_group_by_col" datatype="string">What column to group by.</argument>
+<argument name="uc_lock_deferred_exec" datatype="string">In process code, do we lock or not.  Default 0</argument>
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+publish data
+where uc_thread_group_by_col = nvl(@uc_thread_group_by_col, 'exec_kv3' )
+|
+{
+    [
+    select @uc_thread_group_by_col:raw uc_thread_group_by_val,
+           count(*) uc_cnt_execs
+    from deferred_exec
+    where 1=1
+    and exec_typ = @exec_typ
+    and nvl(deferred_dte, sysdate - /*=moca_util.days(*/ 1 /*=)*/ ) <= sysdate
+    and exec_sts is null
+    group by @uc_thread_group_by_col:raw
+    order by 1
+    ]
+    catch (-1403,510)
+    |
+    filter data
+    where moca_filter_level = 1
+    and uc_thread_group_by_col = @uc_thread_group_by_col
+    and delflg = @delflg
+    and exec_typ = @exec_typ
+    and uc_lock_deferred_exec = @uc_lock_deferred_exec
+}
+   
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This will list the rows grouped by a certain value in deferred_exec.  Idea is that within that group we will 
+execute in order
+</p>
+]]>
+</remarks>
+
+<retrows>n</retrows>
+
+<retcol name="uc_thread_group_by_val" type="COMTYP_CHAR">What was the value of the grouped data</retcol>
+<retcol name="uc_cnt_execs" type="COMTYP_CHAR">How many executions were there</retcol>
+<retcol name="delflg" type="COMTYP_CHAR">Input is echod</retcol>
+<retcol name="exec_typ" type="COMTYP_CHAR">Input is echod</retcol>
+<retcol name="uc_lock_deferred_exec" type="COMTYP_CHAR">Input is echod</retcol>
+
+
+
+<example>
+<![CDATA[
+<p>
+</p>
+]]>
+
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+<seealso cref="list ossi deferred execution groups ready for execution"></seealso>
+<seealso cref="process ossi one deferred execution group"></seealso>
+<seealso cref="execute ossi deferred commands async"></seealso>
+
+</documentation>
+
+
+</command>

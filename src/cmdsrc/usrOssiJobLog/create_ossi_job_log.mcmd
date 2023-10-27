@@ -1,0 +1,185 @@
+<command>
+<name>create ossi job log</name>
+<description>Create an entry into the job log</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+publish data
+where uc_ossi_who     = substr(@uc_ossi_who, 1, 300)
+and uc_ossi_module_id = substr(@uc_ossi_module_id, 1, 300)
+and uc_ossi_action_id = substr(@uc_ossi_action_id, 1, 300)
+and uc_ossi_data      = substr(@uc_ossi_data, 1, 4000)
+|
+if ( 1=0 )
+{
+   publish data 
+   where uc_ossi_start_ts = ossi__ts ( null ) and uc_ossi_start_dt = sysdate
+   |
+   {
+      [
+      declare 
+         pragma autonomous_transaction;
+         v_uc_ossi_job_id      usr_ossi_job_log.uc_ossi_job_id%type;
+         v_uc_ossi_module_id   usr_ossi_job_log.uc_ossi_module_id%type;
+         v_uc_ossi_action_id   usr_ossi_job_log.uc_ossi_action_id%type;
+         v_uc_ossi_job_seq     number;
+         v_uc_ossi_module_seq  number;
+         v_uc_ossi_action_seq  number;
+      begin
+         if ( @uc_ossi_get_new is not null ) then 
+         begin
+            select uc_ossi_job_seq
+            into v_uc_ossi_job_seq
+            from   usr_ossi_job_log
+            where  uc_ossi_job_seq = @uc_ossi_job_seq
+            and    uc_ossi_module_seq = 0
+            and    uc_ossi_action_seq = 0
+            for update
+            ;
+            select min(uc_ossi_job_id) uc_ossi_job_id
+            into v_uc_ossi_job_id
+            from   usr_ossi_job_log
+            where  uc_ossi_job_seq = @uc_ossi_job_seq
+            and    uc_ossi_module_seq = 0
+            and    uc_ossi_action_seq = 0
+            ;
+            if ( @uc_ossi_get_new = 'UC_OSSI_MODULE_SEQ' ) then
+            begin
+               select  nvl(max(uc_ossi_module_seq),0) + 1 uc_ossi_module_seq,
+                       0 uc_ossi_action_seq,
+                       @uc_ossi_module_id uc_ossi_module_id,
+                       @uc_ossi_action_id uc_ossi_action_id
+               into v_uc_ossi_module_seq,
+                    v_uc_ossi_action_seq,
+                    v_uc_ossi_module_id,
+                    v_uc_ossi_action_id
+               from   usr_ossi_job_log
+               where  uc_ossi_job_seq = @uc_ossi_job_seq
+               ;
+            end;
+            else
+            begin
+               select min(uc_ossi_module_id) uc_ossi_module_id
+               into v_uc_ossi_module_id
+               from   usr_ossi_job_log
+               where  uc_ossi_job_seq = @uc_ossi_job_seq
+               and    uc_ossi_module_seq = @uc_ossi_module_seq
+               ;
+               select nvl(max(uc_ossi_action_seq),0) + 1 uc_ossi_action_seq, 
+                      @uc_ossi_module_seq uc_ossi_module_seq,
+                      @uc_ossi_action_id uc_ossi_action_id
+               into v_uc_ossi_action_seq,
+                    v_uc_ossi_module_seq,
+                    v_uc_ossi_action_id
+               from   usr_ossi_job_log
+               where  uc_ossi_job_seq = @uc_ossi_job_seq
+               and    uc_ossi_module_seq = @uc_ossi_module_seq
+               ;
+            end;
+            end if;
+         end;
+         else 
+         begin
+            v_uc_ossi_job_id     := @uc_ossi_job_id;
+            v_uc_ossi_module_id  := @uc_ossi_module_id;
+            v_uc_ossi_action_id  := @uc_ossi_action_id;
+            v_uc_ossi_job_seq    := @uc_ossi_job_seq;
+            v_uc_ossi_module_seq := @uc_ossi_module_seq;
+            v_uc_ossi_action_seq := @uc_ossi_action_seq;
+         end;
+         end if;
+         --
+         insert into usr_ossi_job_log
+         (
+            uc_ossi_job_seq, uc_ossi_module_seq, uc_ossi_action_seq,
+            uc_ossi_who, uc_ossi_job_id,
+            uc_ossi_module_id, uc_ossi_action_id,
+            uc_ossi_data,
+            uc_ossi_start_dt, uc_ossi_start_ts,
+            uc_ossi_err_code,  uc_ossi_err_descr
+         )
+         values
+         (
+            v_uc_ossi_job_seq, v_uc_ossi_module_seq, v_uc_ossi_action_seq,
+            @uc_ossi_who, v_uc_ossi_job_id,
+            v_uc_ossi_module_id, v_uc_ossi_action_id,
+            @uc_ossi_data,
+            to_date(@uc_ossi_start_dt,'YYYYMMDDHH24MISS'), @uc_ossi_start_ts,
+            @uc_ossi_err_code,  @uc_ossi_err_descr
+         );
+         commit;
+      end;
+      ] 
+   } 
+   |
+   [
+   select x.*
+   from
+   (
+      select uc_ossi_job_seq, uc_ossi_module_seq, uc_ossi_action_seq
+      from usr_ossi_job_log
+      where 1=1
+      and uc_ossi_job_seq = @uc_ossi_job_seq
+      order by 2 desc, 3 desc
+   ) x
+   where rownum < 2
+   ]
+}
+else
+{
+   create ossi job log aut
+}
+
+]]>
+</local-syntax>
+
+<argument name="uc_ossi_get_new" required="no" datatype="String">
+Pass in UC_OSSI_MODULE_SEQ or UC_OSSI_ACTION_SEQ or blank.  Based on what is passed in, a new number is fetched
+</argument>
+<argument name="uc_ossi_job_seq" required="yes" datatype="Integer">Job Number</argument>
+<argument name="uc_ossi_module_seq" required="no" datatype="Integer">Default 0</argument>
+<argument name="uc_ossi_action_seq" required="no" datatype="Integer">Default 0</argument>
+
+
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+
+This component creates an entry into the uc_ossi_job_log table.  It finds the next module# or action# to use.
+it locks the job first to find the next number.
+
+Once it has the input, it gets the current date/time to mark the uc_ossi_start_dt and uc_ossi_start_ts fields.  The 
+uc_ossi_start_ts has milliseconds since an arbitrary start.  This is used to compute intervals in sub-second times.
+
+The work is done in a separate commit context.
+
+See "usr_ossi register_job" for more details
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+<retcol name="uc_ossi_job_seq" type="COMTYP_INT">Job Sequence Number</retcol>
+<retcol name="uc_ossi_module_seq" type="COMTYP_INT">Job Module Sequence Number</retcol>
+<retcol name="uc_ossi_action_seq" type="COMTYP_INT">Job Action Sequence Number</retcol>
+
+
+<exception value="eOK">The command completed successfully.</exception>
+<exception value="510">If variable was not passed and no default was passed.</exception>
+
+<argument name="uc_ossi_job_seq" required="yes" datatype="Integer">Job Number</argument>
+<argument name="uc_ossi_module_seq" required="no" datatype="Integer">Default 0</argument>
+<argument name="uc_ossi_action_seq" required="no" datatype="Integer">Default 0</argument>
+
+</documentation>
+
+</command>

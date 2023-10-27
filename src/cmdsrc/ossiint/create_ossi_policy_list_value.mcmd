@@ -1,0 +1,81 @@
+<command>
+<name>create ossi policy list value</name>
+<description>Create policy list value</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+
+publish data 
+  where wh_id = nvl(@wh_id, '----')
+|
+{
+  publish data where uc_polvar = @polvar
+  |
+  list ossi policy lists 
+    where polvar = @uc_polvar 
+  |
+  publish data 
+    where polcod = @polcod 
+      and polvar = @polvar 
+      and uc_polval = @polval
+      and uc_rtstr1_multi_flg = @uc_rtstr1_multi_flg 
+      and uc_valdt_cmd = @rtstr2
+      and uc_polvar = @uc_polvar
+}
+|
+publish data 
+  where polval = nvl(@polval, @uc_polval)
+|
+if (@uc_rtstr1_multi_flg = 1)
+{
+  [select nvl(max(srtseq), 0) + 1 srtseq
+     from poldat_view
+    where polcod = @polcod 
+      and polvar = @polvar 
+      and polval = @polval 
+      and wh_id = @wh_id
+  ]   
+}
+|
+if (@uc_valdt_cmd is not null)
+{
+  execute server command where cmd = @uc_valdt_cmd
+  ;
+  noop
+}
+|
+create policy 
+  where polcod = @polcod 
+    and polvar = @polvar 
+    and polval = @polval 
+    and srtseq = nvl(@srtseq, 1) 
+    and wh_id = @wh_id
+|
+publish data where cmd = ossi__polval('USR-POLMNT',@uc_polvar, 'POST-CREATE-CMD','','',@wh_id)
+|
+if(@cmd)
+{
+  execute server command where cmd = @cmd
+}
+]]>
+</local-syntax>
+<argument name="polvar" required="yes" datatype="string"></argument>
+<argument name="polval" required="yes" datatype="string"></argument>
+<argument name="srtseq" required="no" datatype="string"></argument>
+
+<documentation>
+
+<remarks>
+This command is used to create policy list values.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

@@ -1,0 +1,90 @@
+<command>
+<name>execute ossi les_cmd</name>
+<description>Execute a named command in les_cmd</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="les_cmd_id"></argument>
+<argument datatype="string" name="uc_les_cmd_inline"></argument>
+<argument datatype="string" name="uc_les_cmd_cust_lvl"></argument>
+<argument datatype="string" name="uc_les_cmd_exec_next_lvl"></argument>
+<argument datatype="string" name="exec_uc_les_cmd_cust_lvl">This is in scope only if called from within this component recursively</argument>
+<argument datatype="string" name="exec_les_cmd_id">This is in scope only if called from within this component recursively</argument>
+<argument datatype="string" name="uc_inhibit_return_extra_columns"></argument>
+
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+publish data
+where uc_les_cmd_inline = nvl(@uc_les_cmd_inline, 1 )
+and uc_les_cmd_cust_lvl = nvl(@uc_les_cmd_cust_lvl, -1 )
+and uc_les_cmd_exec_next_lvl = nvl(@uc_les_cmd_exec_next_lvl, 0 )
+and exec_uc_les_cmd_cust_lvl = nvl(@exec_uc_les_cmd_cust_lvl, -1)
+|    
+[
+select les_cmd_id,
+       cust_lvl    exec_uc_les_cmd_cust_lvl,
+       les_cmd_id  exec_les_cmd_id,
+       syntax
+from les_cmd
+where les_cmd_id = @les_cmd_id
+and cust_lvl = (
+                   select max(cust_lvl) 
+                   from les_cmd c2 
+                   where c2.les_cmd_id = les_cmd.les_cmd_id
+                   /*
+                    * WE are typically called without uc_les_cmd_cust_lvl but if someone wants to call explicitly they can
+                    */
+                   and ( @uc_les_cmd_cust_lvl < 0 or c2.cust_lvl = @uc_les_cmd_cust_lvl )
+                   /*
+                    * Typically uc_les_cmd_exec_next_lvl is not passed so it is 0 - so in that case following becomes noop
+                    * This kicks in when we create an les_cmd entry with higher customization level.  e.g. a cmd foo exists at 10.  
+                    * and we create another foo with 100.  The foo with 100 could be
+                    * execute ossi les_cmd where les_cmd_id = foo and uc_les_cmd_exec_next_lvl = 1 | something to enrich results
+                    * Now when called as execute ossi les_cmd where les_cmd_id = foo that will find the 100 and then within that
+                    * it can call the base one
+                    */
+                   and ( 
+                           @uc_les_cmd_exec_next_lvl != 1 or 
+                           @exec_uc_les_cmd_cust_lvl < 0 or
+                           c2.cust_lvl < @exec_uc_les_cmd_cust_lvl
+                       )
+               )
+]
+catch (-1403,510)
+|
+if ( @? = 0 )
+{
+    execute server command 
+    where cmd = @syntax
+    and inline = @uc_les_cmd_inline
+    |
+    if ( @uc_inhibit_return_extra_columns = 1 )
+        filter data
+        where moca_filter_level = 1
+    else
+        filter data
+        where moca_filter_level = 1
+        and exec_les_cmd_id = @exec_les_cmd_id
+        and exec_uc_les_cmd_cust_lvl = @exec_uc_les_cmd_cust_lvl
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+les_cmd is a general tabe provided by LES to store synatax.  We are making an alternate front end to allow users to store commands
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

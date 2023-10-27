@@ -1,0 +1,162 @@
+<command>
+<name>generate ossi map documentation</name>
+<description>Generate documentatkion for all maps
+</description>
+<type>Local Syntax</type>
+
+<argument name="map_grp_list" required="yes" datatype="string"></argument>
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20191003 saad.ahmad - 10291 - Generate docymentaion
+ */
+publish data
+where polcod = 'USR-GENERATED-DOCUMENTATION'
+and index_path = @@LESDIR || '/docs/uc_int_map'
+and index_filnam = 'index.html'
+and ref_main_index = 'index.html'
+|
+publish data
+where metadata_url = ossi__polval ( @polcod, 'SETUP', 'METADATA-URL', '', 'rtstr1', '----' )
+and my_maps_expr = ossi__polval ( @polcod, 'SETUP', 'MY-MAP-EXPR', '', 'rtstr1', '----' )
+|
+if ( @metadata_url is null )
+{
+    get server information
+    |
+    publish data
+    where metadata_url = @url
+}
+else
+{
+    execute server command 
+    where cmd = "publish data where metadata_url = " || @metadata_url
+    and inline = 1
+}
+|
+get ossi head for integration documentation
+where doc_title = 'Map Index'
+|
+try
+{
+    write output file
+    where filnam = @index_filnam and path = @index_path and mode = 'w'
+    and data = @uc_typical_file_header
+            ||     @uc_typical_table
+            ||         @uc_typical_tr_data
+            ||             ossi__html_data ( 'Map Group', 'th' )
+            ||             ossi__html_data ( 'Map Id',    'th' )
+            ||             ossi__html_data ( 'Map Data',    'th' )
+            ||         '</tr>'
+    ;
+    Remote ( @metadata_url )
+        [
+        select distinct polcod, polvar uc_table_name
+        from poldat
+        where polcod = @polcod
+        and wh_id_tmpl = '----'
+        and polval like @my_maps_expr
+        and polvar != 'SETUP'
+        order by 1,2
+        ]
+        catch (-1403,510)
+    |
+    if ( @? = 0 )
+    {
+        Remote ( @metadata_url )
+            [
+            select distinct polval uc_data_grp
+            from poldat
+            where polcod = @polcod
+            and polvar = @uc_table_name
+            and polval like @my_maps_expr
+            and wh_id_tmpl = '----'
+            and polvar != 'SETUP'
+            ]
+            catch (-1403,510)
+        |
+        if ( @? = 0 )
+        {
+            Remote ( @metadata_url )
+            {
+                publish data
+                where uc_filter_sql = ossi__polval_cat ( @polcod, @uc_table_name, @uc_data_grp, 'FILTER-SQL', 'rtstr2', '1=1', '', '----' )
+                and path_to_docs = nvl( ossi__polval ( @polcod, @uc_table_name, @uc_data_grp, 'PATH_TO_DOCS', 'rtstr2', '----' ), '../../docs' )
+                and uc_single_map_file = nvl(ossi__polval ( @polcod, @uc_table_name, @uc_data_grp, 'SINGLE-MAP-FILE', 'rtstr2', '----' ),'0')
+                and uc_map_grp_column = nvl(ossi__polval ( @polcod, @uc_table_name, @uc_data_grp, 'MAP-GRP-COLUMN-NAME', 'rtstr2', '----'), 'polcod' )
+            }
+            |
+            {
+                /* Catching 904 (column not found) and 942 (table not found) since this policy is used to generate version control data too */
+                [
+                select distinct @uc_map_grp_column:raw map_grp
+                from @uc_table_name:raw 
+                where @uc_filter_sql:raw
+                order by 1
+                ]
+                catch (-1403,510,-904,-942)
+                |
+                if ( @? = 0 )
+                {
+                    get ossi filename for map documentation
+                    where map_grp = @map_grp
+                    |
+                    generate ossi map documentation core
+                    where map_grp = @map_grp
+                    and map_id = '%'
+                    |
+                    filter data
+                    where moca_filter_level = 1
+                    and uc_table_name = @uc_table_name
+                    and uc_data_grp = @uc_data_grp
+                    and metadata_url = @metadata_url
+                    and my_maps_expr = @my_maps_expr
+                    and uc_filter_sql = @uc_filter_sql
+                    and uc_single_map_file = @uc_single_map_file
+                    and path_to_docs = @path_to_docs
+                }
+            } /* block with vars */
+        } /* found */
+    } /* found pol */
+} /* block */
+finally
+{
+    write output file
+    where filnam = @index_filnam and path = @index_path and mode = 'a'
+    and data = '</table>' || @uc_typical_file_footer
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This generates html documentation for a specifc set of maps
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+<retcol name="map_grp" type="COMTYP_CHAR"></retcol>
+<retcol name="map_id" type="COMTYP_CHAR"></retcol>
+<retcol name="filnam" type="COMTYP_CHAR"></retcol>
+
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+<seealso cref="get ossi documentation alg usage"></seealso>
+
+</documentation>
+
+
+
+</command>

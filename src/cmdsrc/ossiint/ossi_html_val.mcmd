@@ -1,0 +1,54 @@
+<command>
+<name>ossi html_val</name>
+<description>Function to put value in HTML</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161208 saad.ahmad - 10291 - Origial
+ */
+publish data
+where val = @moca_farg1
+and lower_case = @moca_farg2
+and translate_expr_src  = nvl(@moca_farg3, " |/" )
+and translate_expr_dest = nvl(@moca_farg4, "___" )
+|
+publish data
+where ret = ossi__translate ( @val, @translate_expr_src, @translate_expr_dest )
+|
+if ( @lower_case = 1 )
+    publish data
+    where ret = lower(@ret)
+else
+    publish data
+    where ret = @ret
+    
+]]>
+</local-syntax>
+
+<argument name="moca_farg1" required="yes" datatype="string">Value</argument>
+<argument name="moca_farg2" required="no" datatype="string">1 or 0.  1 means lowercase</argument>
+<argument name="moca_farg3" required="no" datatype="string">Oracle translate source</argument>
+<argument name="moca_farg4" required="no" datatype="string">oracle translate dest</argument>
+
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+To put data in an html
+</p>
+]]>
+</remarks>
+
+<retrows>MOCA Function - So one row is returned</retrows>
+
+<exception value="eOK">The command completed successfully.</exception>
+<exception value="510">If variable was not passed and no default was passed.</exception>
+
+<seealso cref="get session variable"></seealso>
+</documentation>
+
+</command>

@@ -1,0 +1,27 @@
+#use $DCSDIR/include
+#include <dcsddl.h>
+#include <dcscolwid.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+
+#use $SALDIR/include
+#include <salcolwid.h>
+
+mset command on
+[
+ALTER_TABLE_TABLE_INFO(rcvtrk)
+ALTER_TABLE_ADD_COLUMN_START(uc_tostock_send_date)
+    DATE_TY
+ALTER_TABLE_ADD_COLUMN_END
+] catch (ERR_COLUMN_ALREADY_EXISTS)
+RUN_DDL
+
+create db column comment 
+where table_name   = 'rcvtrk' 
+and column_name    = 'uc_tostock_send_date'
+and column_comment = 'To Stock Date'
+RUN_DDL
+
+
+mset command off
+

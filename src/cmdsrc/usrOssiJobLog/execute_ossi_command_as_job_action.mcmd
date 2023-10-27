@@ -1,0 +1,81 @@
+<command>
+<name>execute ossi command as job action</name>
+<description>Run the passed in command as an action within a job</description>
+<type>Local Syntax</type>
+
+<argument name="uc_ossi_job_seq"    required="no" datatype="Integer">Job Number</argument>
+<argument name="uc_ossi_module_id"  required="no" datatype="String">Default 0</argument>
+<argument name="uc_ossi_data"       required="no" datatype="String">Additional data </argument>
+<argument name="uc_ossi_who"        required="no" datatype="String">Additional data </argument>
+
+<argument name="cmd"                 required="no" datatype="String">Command to execute</argument>
+<argument name="uc_this_ossi_action_id"   required="no" datatype="String">Command to execute</argument>
+<argument name="uc_this_ossi_action_data"   required="no" datatype="String">Command to execute</argument>
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+if ( @cmd is not null )
+{
+    publish data   
+    where uc_this_ossi_action_id = nvl(@uc_this_ossi_action_id, substr(@cmd, 1, 60 ) )
+    |
+    publish data
+    where uc_ossi_action_seq = ossi__register_action ( @uc_ossi_job_seq, @uc_ossi_module_seq, @uc_this_ossi_action_id, @uc_this_ossi_action_data, @uc_ossi_who )
+    |
+    try
+    {
+        execute server command
+        where cmd = @cmd
+        and inline = 1
+        |
+        filter data
+        where moca_filter_level = 1
+        and uc_this_ossi_action_seq = @uc_ossi_action_seq
+        and uc_this_ossi_action_data = @uc_this_ossi_action_data
+    }
+    finally
+    {
+        if ( @? = 0 ) 
+            complete ossi job log
+        else
+            raise ossi job error 
+            where uc_ossi_err_code = @? 
+            and uc_ossi_err_descr = @! 
+            and is_job_flg = '0'
+    }
+}
+
+]]>
+</local-syntax>
+
+
+
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This will run a passed in command as an action within a job
+</p>
+]]>
+</remarks>
+
+<retrows>n</retrows>
+
+<retcol name="@*"                        type="COMTYP_INT">Whatever command returns</retcol>
+<retcol name="uc_this_ossi_action_seq"   type="COMTYP_INT">Action Sequence created for this</retcol>
+
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+</documentation>
+
+</command>

@@ -1,0 +1,26 @@
+#use $DCSDIR/include
+#include <dcsddl.h>
+#include <dcscolwid.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+
+#use $SALDIR/include
+#include <salcolwid.h>
+
+
+mset command on
+[
+ALTER_TABLE_TABLE_INFO(locmst)
+ALTER_TABLE_ADD_COLUMN_START(uc_alt_stoloc_02)
+     STRING_TY ( 30 )
+ALTER_TABLE_ADD_COLUMN_END
+] catch (ERR_COLUMN_ALREADY_EXISTS)
+RUN_DDL
+
+create db column comment 
+where table_name   = 'locmst' 
+and column_name    = 'uc_alt_stoloc_02'
+and column_comment = 'Alternate identifier for location.  We have two physical pick area but in WM there is one location.  WCS transaction may send any of the two alt ids.  No validation'
+RUN_DDL
+
+mset command off

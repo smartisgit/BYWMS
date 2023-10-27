@@ -1,0 +1,96 @@
+<command>
+<name>get ossi rules for policy based rules engine</name>
+<description>For the policy based rules engine - get the rules
+</description>
+<type>Local Syntax</type>
+
+<argument name="wh_id" required="yes" datatype="string"></argument>
+<argument name="polcod" required="yes" datatype="string"></argument>
+<argument name="polvar" required="yes" datatype="string"></argument>
+<argument name="uc_force_lookup_rules_from_poldat" required="yes" datatype="string"></argument>
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+
+publish data
+where wh_id = '----'
+and uc_force_lookup_rules_from_poldat = nvl(@uc_force_lookup_rules_from_poldat,'0')
+and polcod = nvl(@polcod, @uc_rule_grp_id)
+and polvar = nvl(@polvar, @uc_rule_subgrp_id)
+|
+{
+   /*
+    * See if this polvar has an alternate command to list the data
+    */
+   publish data
+   where uc_alt_get_command = ossi__polval ( @polcod, @polvar, '_COMMAND_', '', 'rtstr1', @wh_id )
+   |
+   {
+      /*
+       * rtstr1 has the condition and that can get longer than 150 allowed characters.  In that case
+       * rtflt2 will be used to specifiy additional lines.  So rtflt2 >= 1 only in that case.  In top level
+       * select we do not want to get data where rtflt2 > 1
+       */
+      if ( @uc_alt_get_command is not null and @uc_force_lookup_rules_from_poldat = '0' )
+         execute server command
+         where cmd = @uc_alt_get_command
+         and inline = 1
+      else
+      {
+         execute ossi moca and cache
+         where uc_cache_grp = 'OSSI__POLVAL'
+         and uc_moca_cmd = "[
+            select srtseq, uc_rule_value, uc_rule_value polval, uc_rule_expr, uc_rule_expr rtstr1, uc_rule_expr uc_condition_expr, uc_rule_parm_01 rtstr2, 0 rtnum2, 0 rtflt1, 0 rtflt2
+            from usr_rule_engine_expr
+            where uc_rule_grp_id = @polcod
+            and uc_rule_subgrp_id = @polvar
+            and ena_flg = 1
+            order by srtseq
+            ]"
+         and uc_inline = 1
+         and uc_force_ossi_cache1 = '1'  
+         and uc_cache_key = 'RES_BY_POL_' || @polcod || '_' || @polvar || '_' || @wh_id 
+      }
+   }
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This command will return the rule expressions needed to run the rules engine.  It supports the idea that we may need an alternate command to get the rules.  That can come in handy
+if the ordering of the rules is based on some other data elements.
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+<retcol name="srtseq" type="COMTYP_CHAR"></retcol>
+<retcol name="polval" type="COMTYP_CHAR"></retcol>
+<retcol name="rtstr1" type="COMTYP_CHAR"></retcol>
+<retcol name="rtstr2" type="COMTYP_CHAR"></retcol>
+<retcol name="rtnum2" type="COMTYP_CHAR"></retcol>
+<retcol name="rtflt1" type="COMTYP_CHAR"></retcol>
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+<seealso cref="get ossi result by evaluating policy"></seealso>
+
+</documentation>
+
+
+
+</command>

@@ -1,0 +1,85 @@
+<trigger>
+<name>execute ossi conditional commands</name>
+<on-command>register shipment staged</on-command>
+<fire-sequence>100000</fire-sequence>
+
+<argument name="ship_id" required="yes" datatype="string"></argument>
+
+<local-syntax>
+<![CDATA[
+
+if ( @ship_id is not null and @uc_inhibit_change_hook != '1' )
+{
+    if ( ossi__polval('USR-OSSI-DATA-CHANGE-HOOK', 'CMD_REGISTER_SHIPMENT_STAGED_POST', 'ENABLED', '', 'rtnum1', nvl(@wh_id,@@WH_ID) ) != 0 )
+    {
+        execute ossi les_cmd
+        where les_cmd_id = 'uc_ctxt_post_action_cmd_shipment_staged'
+        and uc_les_cmd_inline = 1
+        and exec_uc_les_cmd_cust_lvl = null
+        and uc_inhibit_return_extra_columns = 1
+        catch (-1403,510)
+        |
+        if ( @? = 0 )
+        {
+            execute ossi all conditional rules
+            where uc_rule_grp_id = 'OSSI-SHIPMENT-STAGED'
+            and uc_rule_subgrp_id ='GLOBAL-MAP'
+            and uc_cache_key= null
+            catch (-1403,510)
+            |
+            if ( @car_move_id is not null and 
+                 ossi__polval('USR-OSSI-DATA-CHANGE-HOOK', 'CMD_REGISTER_SHIPMENT_STAGED_POST', 'ENABLED', '', 'rtnum1', nvl(@wh_id,@@WH_ID) ) = 1 
+               )
+            {
+                /*
+                 * we are on stage of a shipment.  So now we are looking at all shipments in that car_move
+                 * If we find any unstaged then car_move is not considered staged.  Even if we found a cancelled
+                 * we will say the same that car_move is not staged.  Cancelled should have been removed from car_move
+                 */
+                [
+                select count(*) uc_cnt_unstaged
+                from ship_struct_view
+                where car_move_id = @car_move_id
+                and stgdte is null
+                ]
+                |
+                if ( @uc_cnt_unstaged = 0 )
+                {
+                    execute ossi les_cmd
+                    where les_cmd_id = 'uc_ctxt_post_action_cmd_car_move_staged'
+                    and uc_les_cmd_inline = 1
+                    and exec_uc_les_cmd_cust_lvl = null
+                    and uc_inhibit_return_extra_columns = 1
+                    catch (-1403,510)
+                    |
+                    if ( @? = 0 )
+                    {
+                        execute ossi all conditional rules
+                        where uc_rule_grp_id = 'OSSI-CARMOV-STAGED'
+                        and uc_rule_subgrp_id ='GLOBAL-MAP'
+                        and uc_cache_key= null
+                        catch (-1403,510)
+                    }
+                } /* all carrier move staged */
+            } /* have carrier move */
+        } /* got shipment */
+    } /* hook enabled */
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<seealso cref="execute ossi all conditional rules"></seealso>
+
+<policy
+    polcod="USR-OSSI-DATA-CHANGE-HOOK"
+    polvar="CMD_REGISTER_SHIPMENT_STAGED_POST"
+    polval="ENABLED"
+    rtnum1="0 disables the hook and 2 enables"
+    rtnum2="1 means that detect and process carrier move stage as well"
+></policy>
+</documentation>
+
+</trigger>

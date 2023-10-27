@@ -1,0 +1,103 @@
+<command>
+<name>get ossi rule documentation template</name>
+<description>This component returns some of the basic tags that we need for the rules.</description>
+<type>Local Syntax</type>
+
+<argument name="locale_id" required="yes" datatype="string"></argument>
+
+<local-syntax>
+<![CDATA[
+
+publish data
+where wh_id = '----'
+and uc_rule_help_style= ''
+and locale_id = nvl(nvl(@locale_id, @@LOCALE_ID), 'US_ENGLISH')
+|
+{
+    [
+    select uc_long_help uc_rule_help_style
+    from usr_rule_engine_help
+    where uc_rule_engine_table_name = '----'
+    and uc_rule_grp_id = 'STYLE'
+    and uc_rule_subgrp_id = '----'
+    and uc_rule_id = '----'
+    ]
+    catch (-1403,510)
+    |
+    publish data
+    where uc_main_head_tag = ossi__polval ( 'USR-GENERATED-DOCUMENTATION', 'RULE-HELP', 'TAG-MAIN-HEAD', '', 'rtstr1', @wh_id )
+    and uc_main_text_tag   = ossi__polval ( 'USR-GENERATED-DOCUMENTATION', 'RULE-HELP', 'TAG-MAIN-TEXT', '', 'rtstr1', @wh_id )
+    and uc_context_tag     = ossi__polval ( 'USR-GENERATED-DOCUMENTATION', 'RULE-HELP', 'TAG-MAIN-CONTEXT', '', 'rtstr1', @wh_id )
+    and uc_context_sub_tag = ossi__polval ( 'USR-GENERATED-DOCUMENTATION', 'RULE-HELP', 'TAG-HEAD-CONTXT', '', 'rtstr1', @wh_id )
+    and uc_add_style       = ossi__polval ( 'USR-GENERATED-DOCUMENTATION', 'RULE-HELP', 'ADD-STYLE', '', 'rtnum1', @wh_id )
+    |
+    filter data
+    where moca_filter_level = 1
+    and uc_rule_help_style = @uc_rule_help_style
+    and locale_id = @locale_id
+    and uc_main_head_tag_s = "<"  || @uc_main_head_tag || ">"
+    and uc_main_head_tag_e   = "</" || @uc_main_head_tag || ">"
+    and uc_main_text_tag_s   = "<"  || @uc_main_text_tag || ">"
+    and uc_main_text_tag_e   = "</" || @uc_main_text_tag || ">"
+    and uc_context_tag_s     = "<"  || @uc_context_tag   || ">"
+    and uc_context_tag_e     = "</" || @uc_context_tag   || ">"
+    and uc_context_sub_tag_s = "<"  || @uc_context_sub_tag || ">"
+    and uc_context_sub_tag_e = "</" || @uc_context_sub_tag || ">"
+}
+
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+   We show rule help on policy logic and conditional rule maint screens.  This component returns some basic style elements to be used there
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+<retcol name="uc_main_head_tag" type="COMTYP_CHAR">The main headings are displayed in this. For example h5</retcol>
+<retcol name="uc_main_text_tag" type="COMTYP_CHAR">The text under the main headings are shown within these tags, e.g. p</retcol>
+<retcol name="uc_context_tag" type="COMTYP_CHAR">For various rules we show context, i.e. what fields are available.  This is placed around those.  e.g. BLOCKQUOTE</retcol>
+<retcol name="uc_context_sub_tag" type="COMTYP_CHAR">Context is displayed a sa table.  That has headings, these are the tags for those headings</retcol>
+<retcol name="uc_rule_help_style" type="COMTYP_CHAR">We can store HTML snippet to be used as style for this help.  This is stored in usr_rule_engine_help.uc_long_help 
+where uc_rule_grp_id = 'STYLE' and other pk columns are dashes </retcol>
+<retcol name="locale_id" type="COMTYP_CHAR">locale.  Default to US_ENGLISH</retcol>
+<retcol name="uc_add_style" type="COMTYP_CHAR">Do we want to add the style to the generated HTML for rule help or not?</retcol>
+
+<retcol name="uc_main_head_tag_s" type="COMTYP_CHAR">Starting HTML tag based on corresponding tag value</retcol>
+<retcol name="uc_main_head_tag_e" type="COMTYP_CHAR">Ending HTML tag based on corresponding tag value</retcol>
+
+<retcol name="uc_main_text_tag_s" type="COMTYP_CHAR">Starting HTML tag based on corresponding tag value</retcol>
+<retcol name="uc_main_text_tag_e" type="COMTYP_CHAR">Ending HTML tag based on corresponding tag value</retcol>
+
+<retcol name="uc_context_tag_s" type="COMTYP_CHAR">Starting HTML tag based on corresponding tag value</retcol>
+<retcol name="uc_context_tag_e" type="COMTYP_CHAR">Ending HTML tag based on corresponding tag value</retcol>
+
+<retcol name="uc_context_sub_tag_s" type="COMTYP_CHAR">Starting HTML tag based on corresponding tag value</retcol>
+<retcol name="uc_context_sub_tag_e" type="COMTYP_CHAR">Ending HTML tag based on corresponding tag value</retcol>
+
+
+<example>
+</example>
+
+<policy
+    polcod="USR-GENERATED-DOCUMENTATION"
+    polvar="RULE-HELP"
+    polval="TAG-MAIN-HEAD or TAG-MAIN-TEXT or TAG-MAIN-CONTEXT or TAG-HEAD-CONTXT or ADD-STYLE"
+    rtnum1="1 or 0 for polval = ADD-STYLE"
+    rtstr1="HTML tag without angle brackets.  For all tags in polval"
+>
+</policy>
+<exception value="eOK">The command completed successfully.</exception>
+
+<seealso cref="get ossi rule documentation"></seealso>
+
+</documentation>
+
+
+
+</command>

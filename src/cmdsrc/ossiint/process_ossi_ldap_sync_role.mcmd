@@ -1,0 +1,188 @@
+<command>
+<name>process ossi ldap sync role</name>
+<description>Process LDAP Sync for a user</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="uc_ossi_job_seq"></argument>
+<argument datatype="string" name="uc_ossi_who"></argument>
+<argument datatype="string" name="uc_res_les_ath_role"></argument>
+<argument datatype="string" name="uc_ldap_role_group_prefix"></argument>
+
+
+
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+publish data
+where uc_ldap_sync_create_role_cmd = ossi__get_policy_data_as_var_list ( 'USR-OSSI-LDAP-SYNC', 'LES_ATH_ROLE', 'CREATE_ROLE_CMD', '----', ' and ' )
+and uc_row_count = rowcount(@uc_res_les_ath_role)
+and uc_ldap_role_group_prefix = nvl(@uc_ldap_role_group_prefix, @@UC_LDAP_SYNC_LES_ATH_ROLE_PREFIX )
+|
+publish data
+where uc_ossi_module_seq = ossi__register_module ( @uc_ossi_job_seq, 'LES_ATH_ROLE', 'rows='||@uc_row_count, @uc_ossi_who )
+|
+try
+{
+   if ( @uc_row_count > 0 )
+   {
+      /* Create user */
+      publish data combination
+      where res = @uc_res_les_ath_role
+      |
+      if ( @uc_ldap_role_id is not null )
+      {
+         publish data
+         where role_id = ossi__rp_role_from_ldap_role(@uc_ldap_role_id)
+         |
+         if ( @role_id is not null )
+         {
+            execute server command
+            where cmd = "list roles where role_id = '" || @role_id || "'"
+            and inline = 0
+            catch (-1403,510)
+            |
+            if ( @? = 0 )
+            {
+               if ( @uc_ena_flg != '1' and @ena_flg = 1 )
+               {
+                  [
+                  update les_ath_role
+                  set ena_flg = 0,
+                      uc_ldap_pk = @uc_ldap_pk
+                  where role_id = @role_id
+                  ]
+                  ;
+                  publish data
+                  where old_ena_flg = 1
+                  and new_ena_flg = 0
+                  and reacod = 'CHANGE'
+                  and uc_create_role_status = 0
+                  and uc_create_role_message = 'Success'
+               }
+               else if ( @uc_ena_flg = '1' and @ena_flg != 1 )
+               {
+                  [
+                  update les_ath_role
+                  set ena_flg = 1,
+                      uc_ldap_pk = @uc_ldap_pk
+                  where role_id = @role_id
+                  ]
+                  ;
+                  publish data
+                  where old_ena_flg = 0
+                  and new_ena_flg = 1
+                  and reacod = 'CHANGE'
+                  and uc_create_role_status = 0
+                  and uc_create_role_message = 'Success'
+               }
+            }
+            else if ( @uc_ena_flg = '1' )
+            {
+               if ( @uc_ldap_sync_create_role_cmd is not null )
+                  execute server command
+                  where cmd = "publish data where "||@uc_ldap_sync_create_role_cmd
+                  and inline = 1
+               |
+               create role
+               catch (@?)
+               |
+               publish data
+               where old_ena_flg = 0
+               and new_ena_flg = 1
+               and reacod = 'CREATE'
+               and uc_create_role_status = @?
+               and uc_create_role_message = @!
+            }
+            else
+               publish data
+               where reacod = ''
+            |
+            if ( @reacod is not null )
+               write daily transaction
+               where actcod = 'UC_LSYNCR'
+               and movref = substr(@role_id,1,20)
+               and traknm = string(@uc_ossi_job_seq)
+               and var_nam = 'ena_flg'
+               and fr_value = @old_ena_flg
+               and to_value = @new_ena_flg
+               and adj_ref1 = string(@uc_create_role_status)
+               and cmnt = 'Role was in LDAP results but different from RP.  Status=' || @uc_create_role_message
+               and wh_id = '----'
+         } /* role_id on stack */
+      } /* stack */
+      ;
+      /*
+       * Now go other way. All roles that were created by ldap must still be there
+       */
+      {
+         [
+         select role_id uc_les_ath_role_role_id
+         from les_ath_role
+         where uc_ldap_pk is not null  /* only ones created by LDAP */
+         and ena_flg = 1
+         order by 1
+         ]
+         catch (-1403,510)
+         |
+         if ( @? = 0 )
+         {
+            {
+               filter ossi rows with condition
+               where res = @uc_res_les_ath_role
+               and uc_condition = "ossi__rp_role_from_ldap_role(@uc_ldap_role_id) = @uc_les_ath_role_role_id and @uc_ena_flg = '1'"
+            }
+            >> res_filtered
+            |
+            /* If not found in ldap - disable it */
+            if ( rowcount(@res_filtered) = 0)
+            {
+               [
+               update les_ath_role
+               set ena_flg = 0
+               where role_id = @uc_les_ath_role_role_id
+               ]
+               ;
+               write daily transaction
+               where actcod = 'UC_LSYNCR'
+               and movref = substr(@uc_les_ath_role_role_id,1,20)
+               and traknm = string(@uc_ossi_job_seq)
+               and reacod = 'CHANGE'
+               and var_nam = 'ena_flg'
+               and fr_value = '1'
+               and to_value = '0'
+               and adj_ref1 = '0'
+               and cmnt = 'Role was not in LDAP results.  Status=Success'
+               and wh_id = '----'
+            } /* not in ldap query */
+         } /* all active users in ldap in our db */
+      } /* block for round 2 */
+   } /* found rows in resultset */
+   ;
+   complete ossi job log
+} /* module */
+catch (@?)
+{
+   raise ossi job error
+   where uc_ossi_err_code  = @?
+   and   uc_ossi_err_descr = @!
+   and   is_job_flg = '0'
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+This component syncs up rp les_ath_role to the result set passed in
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

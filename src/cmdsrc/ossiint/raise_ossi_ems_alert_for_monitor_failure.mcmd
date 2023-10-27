@@ -1,0 +1,84 @@
+<command>
+<name>raise ossi ems alert for monitor failure</name>
+<description>If monitor fails and we want to raise an EMS alert for it, do it</description>
+
+<argument name="monitor_id" required="yes" datatype="string"></argument>
+<argument name="uc_fix_stat" required="yes" datatype="string"></argument>
+<argument name="uc_fix_stat_msg" required="yes" datatype="string"></argument>
+<argument name="uc_mon_key_data" required="yes" datatype="string"></argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+
+publish data
+where evt_nam = 'UC_MONITOR_FIX_FAILURE'
+and   uc_raise_ems_alert  = 1
+|
+if ( @uc_raise_ems_alert = 1 )
+{
+   get ems source system
+   |
+   if (@primer_flg and @primer_flg = 1)
+   {
+      publish data
+      where evt_msg = "Fix of monitor failed:
+                       monitor_id:@monitor_id
+                       Key Data  :@uc_mon_key_data
+                       Error Code:@uc_fix_stat
+                       Error Text:@uc_fix_stat_msg"
+      and evt_subj = "Monitor Fix @monitor_id failed for @uc_mon_key_data"
+      and evt_qual = "monitor_id,uc_mon_key_data,uc_fix_stat,uc_fix_stat_msg"
+      and evt_grp = 'INVENTORY-CONTROL'
+      and evt_pri = '1'
+      and evt_nam = @evt_nam
+      and src_sys = @src_sys
+      and lngdsc = 'Monitor Fix Failed'
+   }
+   else
+   {
+      get ems event information
+      where evt_nam = @evt_nam
+      and @+wh_id
+      |
+      if (@enabled = 1)
+      {
+         log ems event
+         where evt_nam = @evt_nam
+         and key_val = @monitor_id
+                    || '|'
+                    || @uc_mon_key_data
+                    || '|'
+                    || @uc_fix_stat
+                    || '|'
+                    || @uc_fix_stat_msg
+         and src_sys = @src_sys
+         and monitor_id      = @monitor_id
+         and uc_mon_key_data = @uc_mon_key_data
+         and uc_fix_stat     = @uc_fix_stat
+         and uc_fix_stat_msg = @uc_fix_stat_msg
+      }
+   }
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<remarks>
+This command may be used in condition on which failure of monitor should raise ems alert.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+
+</documentation>
+
+</command>

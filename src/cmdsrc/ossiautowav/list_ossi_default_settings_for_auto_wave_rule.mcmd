@@ -1,0 +1,54 @@
+<command>
+<name>list ossi default settings for auto wave rule</name>
+<description>This command will list the default settings for auto wave rule</description>
+ 
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+
+    [
+    select polval uc_parm_id, 
+           rtstr1 uc_parm_val_expr, 
+           rtnum1 uc_parm_enabled
+    from poldat
+    where polcod = 'USR-WAVE-PLANNING'
+    and polvar = 'DEFAULT-AUTO-WAVE-ALLOC-PARAMS'
+    and wh_id_tmpl = '----'
+    order by polval
+    ]  catch (-1403,510)
+ 
+   
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This will list the default settings for auto wave rule
+</p>
+]]>
+</remarks>
+<retrows>n</retrows>
+<retcol name="uc_parm_id" type="COMTYP_CHAR">Parameter ID</retcol>
+<retcol name="uc_parm_val_expr" type="COMTYP_CHAR">Parameter Expression</retcol>
+<retcol name="uc_parm_enabled" type="COMTYP_CHAR">Parameter is enabled or disabled</retcol>
+
+<example>
+<![CDATA[
+<p>
+</p>
+]]>
+
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+<seealso cref="change ossi default settings for auto wave rule"></seealso>
+
+</documentation>
+
+
+</command>

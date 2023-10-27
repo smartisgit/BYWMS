@@ -1,0 +1,31 @@
+<trigger>
+<name>process usr issue</name>
+<on-command>create navigation bar tab</on-command>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ */
+process usr issue
+  where uc_table_name = 'LES_NAV_BAR_TAB'
+    and uc_action = 'ADD'
+;
+process usr issue
+  where uc_table_name = 'SYS_DSC_MST'
+    and uc_action = 'ADD'
+    and colnam = 'nav_bar_id'
+    and colval = @nav_bar_id
+]]></local-syntax>
+<fire-sequence>10000</fire-sequence>
+<documentation>
+
+<remarks>
+This trigger process issue for creating navigation bar tab.
+</remarks>
+
+<seealso cref="process usr issue"></seealso>
+
+</documentation>
+</trigger>

@@ -1,0 +1,45 @@
+<command>
+<name>reassign usr obj log</name>
+<description>Reassign object logs</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ */
+{
+  [select * 
+     from usr_ossi_issue_obj_log 
+    where uc_ossi_issue_assign_seq = @uc_ossi_issue_assign_seq 
+      and uc_ossi_issue_obj_log_seq = @uc_ossi_issue_obj_log_seq 
+  ] 
+  | 
+  [select nvl(max(uc_ossi_issue_obj_log_seq), 0) + 1 uc_ossi_issue_obj_log_seq 
+     from usr_ossi_issue_obj_log 
+    where uc_ossi_issue_assign_seq = @uc_ossi_new_issue_assign_seq
+  ] 
+  | 
+  sl_change gen_maint 
+    where table_name = 'usr_ossi_issue_obj_log' 
+      and uc_ossi_issue_assign_seq = @uc_ossi_new_issue_assign_seq 
+  ; 
+  remove usr obj log 
+}
+
+]]>
+</local-syntax>
+<argument name="uc_ossi_issue_assign_seq" required="yes" datatype="integer"></argument>
+<argument name="uc_ossi_new_issue_assign_seq" required="yes" datatype="integer"></argument>
+<argument name="uc_ossi_issue_obj_log_seq" required="yes" datatype="string"></argument>
+<documentation>
+
+<remarks>
+This command can be used to reassign object logs
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

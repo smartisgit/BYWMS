@@ -1,0 +1,73 @@
+<command>
+<name>ossi intnvl</name>
+<description>NVL function that is sensitive to the integrator rules for absent characters</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="moca_farg1">Value to check</argument>
+<argument datatype="string" name="moca_farg2">Alternate value</argument>
+<argument datatype="string" name="moca_farg3">Optioinal type.  Default C, N for numbers</argument>
+<argument datatype="string" name="moca_farg4">Coma separated list of additional null values</argument>
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161208 saad.ahmad - 7154 - Hub base
+ */
+publish data
+where value     = @moca_farg1
+and   alt_value = @moca_farg2
+and   data_type = nvl(@moca_farg3,'C')
+and   more_null_values = ',' || @moca_farg4 || ','
+|
+{
+   if ( @data_type = 'N' )
+   {
+      publish data 
+      where value = float(@value)
+      |
+      if ( @value is null or @value <= 0 )
+         publish data where res = float(@alt_value)
+      else
+         publish data where res = @value
+   }
+   else if ( @data_type = 'I' )
+   {
+      publish data 
+      where value = int(@value)
+      |
+      if ( @value is null or @value <= 0 )
+         publish data where res = int(@alt_value)
+      else
+         publish data where res = @value
+   }
+   else
+   {
+      if ( @value is null or 
+           sl_fmt__trim(@value, 'R', '/') is null or 
+           sl_fmt__trim(@value, 'R', '~') is null or 
+           sl_fmt__trim(@value, 'R', '*') is null or
+           sl_fmt__trim(@value, 'R', '+') is null or
+           instr(@more_null_values, ','||@value||',') > 0 )
+         publish data where res = @alt_value
+      else
+         publish data where res = @value
+   }
+}
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+MOCA Function to do NVL type logic where we consider integrator null/absent/nochg
+indicators as null
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

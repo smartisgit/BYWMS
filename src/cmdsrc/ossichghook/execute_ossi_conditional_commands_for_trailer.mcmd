@@ -1,0 +1,68 @@
+<command>
+<name>execute ossi conditional commands for trailer</name>
+<description>Execute the rules engine for a trailer</description>
+
+<argument name="trlr_id" required="yes" datatype="string">Data from list command is assumed to be on stack</argument>
+<argument name="uc_rule_grp_id" required="yes" datatype="string"></argument>
+<argument name="uc_rule_subgrp_id" required="yes" datatype="string"></argument>
+
+
+
+<type>Local Syntax</type>
+
+<local-syntax>
+<![CDATA[
+
+{
+    [
+    select trlr.*,
+           rcvtrk.trknum,
+           car_move.car_move_id,
+           trlr.stoloc_wh_id wh_id,
+           car_move.car_move_id uc_cm_car_move_id,
+           car_move.host_ext_id uc_cm_host_ext_id,
+           car_move.carcod      uc_cm_carcod,
+           car_move.srvlvl      uc_cm_srvlvl,
+           rcvtrk.trknum        uc_rt_trknum,
+           rcvtrk.trkref        uc_rt_trkref
+    from trlr
+         left outer join car_move on car_move.trlr_id = trlr.trlr_id
+         left outer join rcvtrk on rcvtrk.trlr_id = trlr.trlr_id
+    where trlr.trlr_id = @trlr_id
+    ]
+    catch (-1403,501)
+    |
+    if ( @? = 0 )
+    {
+        execute ossi all conditional rules
+        where uc_rule_grp_id = @uc_rule_grp_id
+        and uc_rule_subgrp_id =@uc_rule_subgrp_id
+        and uc_cache_key= null
+        catch (-1403,510)
+    }
+}
+  
+]]>
+
+</local-syntax>
+
+<documentation>
+
+<remarks>
+<![CDATA[
+  <p>
+   Execute the rules engine
+  </p>
+]]>
+</remarks>
+
+
+<retcol name="@*" type="(varies according to field type)">All order columns</retcol>
+<exception value="eOK">Normal successful completion</exception>
+
+
+<seealso cref="execute ossi all conditional rules"></seealso>
+
+
+</documentation>
+</command>

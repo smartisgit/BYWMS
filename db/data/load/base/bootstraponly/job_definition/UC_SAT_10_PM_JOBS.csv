@@ -1,0 +1,2 @@
+job_id,role_id,name,enabled,type,command,log_file,trace_level,overlap,schedule,start_delay,timer,grp_nam
+UC_SAT_10_PM_JOBS,,Jobs that run on Saturdays at 10 pm,1,cron,"execute ossi jobs using job manager where uc_exec_job_grp = 'SAT-10-PM-JOBS'",$LESDIR/log/JOB-UC_SAT_10_PM_JOBS.log,,0,0 0 22 ? * SAT,,,GK

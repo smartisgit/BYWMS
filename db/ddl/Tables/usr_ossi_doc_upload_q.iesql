@@ -1,0 +1,91 @@
+#use $LESDIR/include
+#use $DCSDIR/include
+#use $MOCADIR/include
+#use $LESDIR/db/ddl/Indexes
+
+
+#include <dcsddl.h>
+#include <dcscolwid.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+
+mset command on
+[
+CREATE_TABLE(usr_ossi_doc_upload_q)
+(
+    uc_doc_upload_q_id    STRING_TY(15) NOT NULL,
+    /**/
+    uc_doc_upload_typ_cd  STRING_TY(30),
+    uc_doc_ext_cd         STRING_TY(30),
+    uc_doc_pgm_cd         STRING_TY(30),
+    uc_doc_pgm_id         STRING_TY(30),
+    /**/
+    format_typ            STRING_TY(500),
+    dest_typ              STRING_TY(500),
+    dest                  STRING_TY(500),
+    num_copies            INTEGER_TY,
+    dig_sig_req_flg       FLAG_TY,
+    keywords_list         STRING_TY(4000),
+    /**/
+    uc_q_dt               DATE_TY,
+    uc_upload_dt          DATE_TY,
+    uc_upload_stat_cd     STRING_TY(30),
+    /**/
+    uc_rpt_archive_id     STRING_TY(100),
+    uc_contents_base64    CLOB_TY,
+    /*
+     * Context to save with the report.  These are header level.  There is a detail tag table as well.
+     */
+    uc_doc_typ_cd       STRING_TY(30),
+    uc_doc_subtyp_cd    STRING_TY(30),
+    wh_id               STRING_TY(WH_ID_LEN),
+    gen_usr_id          STRING_TY(USR_ID_LEN),
+    gen_locale_id       STRING_TY(LOCALE_ID_LEN),
+    devcod              STRING_TY(DEVCOD_LEN),
+    /**/
+    ins_dt        DATE_TY,
+    ins_user_id        STRING_TY(40),
+    last_upd_dt        DATE_TY,
+    last_upd_user_id    STRING_TY(40)
+                
+)
+] catch (ERR_TABLE_ALREADY_EXISTS)
+RUN_DDL
+
+#include <usr_ossi_doc_upload_q_pk.iesql>
+
+mset command on
+create db documentation
+where table             = "usr_ossi_doc_upload_q"
+and table_comment       = "This table is used to store data locally for generated reports so that they can be uploaded to a central document store"
+and uc_doc_upload_q_id  = "Primary Key of this table"
+and uc_doc_upload_typ_cd= "What is this object?  RPT for reorts LBL for labels"
+and uc_doc_ext_cd       = "Extension - so that we know how to read it.  jprint, pdf, out"
+and uc_doc_pgm_cd       = "What was the program id that generated it.  RPT or LBL"
+and uc_doc_pgm_id       = "Report Name or Label Name"
+and format_typ          = "Whatever was passed to generate moca report"
+and dest_typ            = "Whatever was passed to generate moca report"
+and num_copies          = "Whatever was passed to generate moca report"
+and keywords_list       = "Whatever was passed to generate moca report"
+and dest                = "Whatever was passed to generate moca report"
+and dig_sig_req_flg     = "Whatever was passed to generate moca report"
+and uc_q_dt             = "Date/Time when record is added to this table"
+and uc_upload_dt        = "Date/Time when record has been uploaded to central store"
+and uc_upload_stat_cd   = "Upload Status.  U means unprocessed.  E means error. C means complete"
+and uc_rpt_archive_id   = "If generate moca report returned an archive id, that is stored here"
+and uc_contents_base64  = "Contents as base64 string"
+and uc_doc_typ_cd       = "For categorization using rules engine a type for this report"
+and uc_doc_subtyp_cd    = "For categorization using rules engine a sub-type for this report"
+and wh_id               = "Whatever was nvl(@wh_id, @@WH_ID)"
+and gen_usr_id          = "Whateber was the user id when report was generated"
+and gen_locale_id       = "Whatever was the locale_id when report was generated"
+and devcod              = "Whatever was the devcod when report was generated"
+/**/
+and ins_dt              = "Add Date/time"
+and last_upd_dt            = "Update Date/Time"
+and ins_user_id         = "Add User Id"
+and last_upd_user_id    = "Update user Id"
+
+
+RUN_DDL
+mset command off

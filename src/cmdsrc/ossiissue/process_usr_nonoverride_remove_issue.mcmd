@@ -1,0 +1,26 @@
+<command>
+<name>process usr nonoverride remove issue</name>
+<description>Process nonoverride remove issue</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+/* If overridden, this was already logged in the pre-trigger */
+if (ossi__override_table_name(@uc_table_name) != 1)
+{
+  process usr issue
+    where uc_action = 'REMOVE'
+}
+
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This command can be used to process nonoverride remove issue.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

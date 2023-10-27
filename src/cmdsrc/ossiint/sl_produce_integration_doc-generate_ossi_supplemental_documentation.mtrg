@@ -1,0 +1,24 @@
+<trigger>
+<name>generate ossi supplemental documentation</name>
+<on-command>sl_produce integration doc</on-command>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20191003 saad.ahmad - 10291 - Generate docymentaion
+ * 20191003 saad.ahmad - 10330 - Generate docymentaion
+ */
+generate ossi algorithm documentation
+where modify_integration_index = 1
+catch (-1403,510)
+;
+generate ossi map documentation
+catch (-1403,510)
+;
+generate ossi retrieve method documentation
+catch (-1403,510)
+
+]]></local-syntax>
+<fire-sequence>10000</fire-sequence>
+</trigger>

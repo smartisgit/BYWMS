@@ -1,0 +1,21 @@
+LESDIR=..\..\..
+
+TARGET=ossiint
+TARGETTYPE=.dll
+
+EXTRALIBS=MOCA.lib
+
+OFILES=MOCAinitialize.obj \
+MOCAversion.obj \
+ossiExecuteMOCAAndCache.obj \
+ossiExecuteRemoteRetrieve.obj \
+ossiExpandVarsInString.obj \
+ossiTransposeResult.obj \
+ossiURLDecode.obj \
+ossiURLEncode.obj \
+usrOssiConvertPointerToType.obj \
+usrOssiGetErrorCode.obj \
+usrOssiGetTimestamp.obj \
+usrOssiTransposeResult.obj 
+
+!include $(LESDIR)\makefiles\ntstd.mk

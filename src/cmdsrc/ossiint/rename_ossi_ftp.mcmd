@@ -1,0 +1,94 @@
+<command>
+<name>rename ossi ftp</name>
+<description>rename a file via ftp.</description>
+<type>Local Syntax</type>
+<argument name="host" required="yes" datatype="string">
+</argument>
+<argument name="port" default-value="21" datatype="string">
+</argument>
+<argument name="user" datatype="string">
+</argument>
+<argument name="pass" datatype="string">
+</argument>
+<argument name="targetdir" datatype="string">
+</argument>
+<argument name="targetfile" datatype="string">
+</argument>
+<argument name="newfile" datatype="string">
+</argument>
+<argument name="use_sftp" default-value="0" datatype="integer">
+</argument>
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+
+[[
+  import java.io.File;
+
+  import com.jscape.inet.ftp.Ftp;
+  import com.jscape.inet.sftp.Sftp;
+  import com.jscape.inet.ssh.util.SshParameters;
+
+  String error = null;
+  if (use_sftp == 0)
+  {
+    Ftp ftp = new Ftp(host, user, pass, port);
+    Enumeration items = null;
+    try {
+      ftp.connect();
+      ftp.setDir(targetdir);
+      ftp.renameFile(targetfile, newfile);
+      ftp.disconnect();
+    }
+    catch (Exception e) {
+      error = e.getMessage();
+    }
+  }
+  else
+  {
+    if (port == 21) {
+      port = 22;
+    }
+    SshParameters params = new SshParameters(host, port, user, pass)
+    Sftp ftp = new Sftp(params);
+    try {
+      ftp.connect();
+      ftp.setDir(targetdir);
+      ftp.renameFile(targetfile, newfile);
+      ftp.disconnect();
+    } catch (Exception e) {
+      error = e.getMessage();
+    }
+  }
+  [error:error]
+]]
+|
+if (@error != null)
+{
+  set return status where status = 97050
+                      and action = 'rename'
+                      and err_msg = @error
+}
+
+]]>
+</local-syntax>
+<documentation>
+<remarks>
+<![CDATA[
+ This command renames a file from another host via ftp or sftp.
+]]>
+</remarks>
+<retrows>One</retrows>
+<retcol name="status" type="string">A string describing the number of bytes transferred.</retcol>
+<exception value="eOK">The command completed successfully.</exception>
+<exception value="eMOCA_FTP_COM_FAILURE">An FTP communication failure occurred.</exception>
+<seealso cref="get ossi ftp">
+</seealso>
+<seealso cref="put ossi ftp">
+</seealso>
+</documentation>
+</command>

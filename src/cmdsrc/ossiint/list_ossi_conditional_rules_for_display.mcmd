@@ -1,0 +1,64 @@
+<command>
+<name>list ossi conditional rules for display</name>
+<description>Get the data for conditional rules</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20200512- Haseeb.Ahmed- 11118- Create a new web screen to maintain rules engine where we have condition and action
+ */
+list ossi conditional rules
+|
+publish data
+  where uc_rule_grp_id = @uc_rule_grp_id
+    and uc_rule_subgrp_id = @uc_rule_subgrp_id
+    and uc_rule_id = @uc_rule_id
+    and seqnum = @seqnum
+    and srtseq = @srtseq
+    and ena_flg = @ena_flg
+    and uc_condition_expr = @uc_condition_expr
+    and uc_execute_cmd = @uc_execute_cmd
+    and uc_rule_catg_cd = @uc_rule_catg_cd
+    and uc_rule_comment = @uc_rule_comment
+    and uc_cust_flg = @uc_cust_flg
+    and ins_dt = @ins_dt
+    and ins_user_id = @ins_user_id
+    and last_upd_dt = @last_upd_dt
+    and last_upd_user_id = @last_upd_user_id
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This command is used to display the conditional rules data
+</p>
+]]>
+</remarks>
+
+<retrows>n</retrows>
+
+<retcol name="uc_rule_grp_id" type="String">Rule Group Id</retcol>
+<retcol name="uc_rule_subgrp_id" type="String">Rule Subgroup ID</retcol>
+<retcol name="uc_rule_id" type="String">Rule ID</retcol>
+<retcol name="seqnum" type="String">Sequence Number</retcol>
+<retcol name="srtseq" type="String">SRT Sequence</retcol>
+<retcol name="ena_flg" type="flag">Enabled</retcol>
+<retcol name="uc_condition_expr" type="String">Conditional Expression</retcol>
+<retcol name="uc_execute_expr" type="String">Execute Command</retcol>
+<retcol name="uc_rule_catg_cd" type="String">Rule Category</retcol>
+<retcol name="uc_rule_comment" type="String">Rule Comment</retcol>
+<retcol name="uc_cust_flg" type="flag">Cust Flag</retcol>
+<retcol name="ins_dt" type="String"></retcol>
+<retcol name="ins_user_id" type="String"></retcol>
+<retcol name="last_upd_dt" type="date">Last Update Date</retcol>
+<retcol name="last_upd_user_id" type="String">Last Update User ID</retcol>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+</documentation>
+</command>

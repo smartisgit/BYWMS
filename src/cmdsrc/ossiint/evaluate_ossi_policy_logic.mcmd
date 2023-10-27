@@ -1,0 +1,70 @@
+<command>
+<name>evaluate ossi policy logic</name>
+<description>Evaluate policy logic, i.e. rules engine</description>
+
+<argument name="uc_rule_grp_id" required="yes" datatype="string"></argument>
+<argument name="uc_rule_subgrp_id" required="yes" datatype="string"></argument>
+
+<argument name="uc_context_set_command" required="yes" datatype="string">Sometimes it may be easier to pass in a command to execute to set context</argument>
+
+<argument name="@*" required="yes" datatype="string">All variables on stack are availabel for rule making</argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+publish data
+where comflg = 0
+|
+{
+    if ( @uc_context_set_command is not null )
+    {
+        {
+            try
+            {
+                execute server command
+                where cmd = @uc_context_set_command
+                and inline = 1
+            }
+            finally
+            {
+                rollback
+            }        
+        }
+        catch (-1403,510)
+        >> res1
+        |
+        if ( @? = 0 and rowcount(@res1) > 0 )
+            publish top rows
+            where resultset = @res1
+            and rows = 1
+    }
+    |
+    get ossi result by evaluating policy
+    |
+    filter data
+    where value = @r_polval
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+This will be called from front-end screens where we can evaluate a rule to see what is to be done
+</remarks>
+
+<retrows>1</retrows>
+<retcol name="value" type="COMTYP_CHAR">Frontend should use this only</retcol>
+
+<example>
+evaluate ossi policy logic where uc_def_min_shelf_hrs = '13' and uc_rt_min_shelf_hrs = '0' and uc_rule_grp_id = 'USR-DEFAULT' and uc_rule_subgrp_id = 'PLN-ORD_LINE-MIN_SHELF_HRS'
+</example>
+
+
+<exception value="eOK">The command completed successfully.</exception>
+
+</documentation>
+
+
+</command>

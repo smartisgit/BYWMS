@@ -1,0 +1,48 @@
+#use $DCSDIR/include
+
+#include <dcsddl.h>
+
+#include <dcscolwid.h>
+
+#include <dcstbldef.h>
+
+#include <sqlDataTypes.h>
+
+
+#use $SALDIR/include
+
+#include <salcolwid.h>
+
+mset command on
+
+[
+DROP_VIEW(UCDM_LOC_00800_MOV_ZONE_NXTMOV)
+] catch (ERR_CANNOT_DROP_TABLE_NOT_FOUND)
+RUN_DDL
+
+mset command off
+
+CREATE_VIEW(UCDM_LOC_00800_MOV_ZONE_NXTMOV)
+select mov_zone_nxtmov.*,
+       mov_zone.mov_zone_cod src_mov_zone_cod,
+	   mov_zone.wh_id src_mov_zone_wh_id,
+       mov_zone1.mov_zone_cod dst_mov_zone_cod,
+	   mov_zone1.wh_id dst_mov_zone_wh_id,
+       d1.lngdsc src_mov_zone_cod_desc,
+       case  WHEN (mov_zone_nxtmov.dst_mov_zone_id = -10000) THEN 'Any zone' else d2.lngdsc end dst_mov_zone_cod_desc
+  from mov_zone_nxtmov
+  left join mov_zone
+    on (mov_zone.mov_zone_id = mov_zone_nxtmov.src_mov_zone_id)
+  left join mov_zone mov_zone1
+    on (mov_zone1.mov_zone_id = mov_zone_nxtmov.dst_mov_zone_id)
+  left join dscmst d1
+    on (d1.colnam = 'mov_zone_cod|wh_id'
+   and d1.colval = mov_zone.mov_zone_cod || '|' || mov_zone.wh_id
+   and d1.locale_id = 'US_ENGLISH')
+  left join dscmst d2
+    on (d2.colnam = 'mov_zone_cod|wh_id'
+   and d2.colval = mov_zone1.mov_zone_cod || '|' || mov_zone1.wh_id
+   and d2.locale_id = 'US_ENGLISH')
+RUN_DDL
+
+mset command on

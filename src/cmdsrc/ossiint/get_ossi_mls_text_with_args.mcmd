@@ -1,0 +1,86 @@
+<command>
+<name>get ossi mls text with args</name>
+<description>Get MLS text and replace args
+</description>
+<type>Local Syntax</type>
+ 
+<argument datatype="string" name="mls_id"></argument>
+<argument datatype="string" name="locale_id"></argument>
+
+
+<local-syntax>
+<![CDATA[
+
+ 
+publish data
+where locale_id = nvl(nvl(@locale_id, @@LOCALE_ID ), 'US_ENGLISH' )
+|
+{
+    publish data 
+    where uc_return_value = ossi__mls_text ( @mls_id, '', @locale_id )
+    |
+    if ( @uc_return_value is null )
+        publish data
+        where mls_text = ""
+    else
+    {
+        [[
+        ret = new StringBuffer("");
+        Integer carotPosEnd = -1;
+        Integer carotPosStart = -1;
+        Integer thisIterStart;
+        //
+        while ( true )
+        {  
+            thisIterStart = carotPosEnd+1;
+            if ( (carotPosStart = uc_return_value.indexOf ( "^", thisIterStart )) >= 0 )
+            {
+                if ( (carotPosEnd = uc_return_value.indexOf ( "^",carotPosStart+1 )) >= 0 )
+                {
+                    myStrTillToken = uc_return_value.substring( thisIterStart, carotPosStart );
+                    myToken = uc_return_value.substring( carotPosStart+1, carotPosEnd );
+                    ret.append ( myStrTillToken );
+                    if ( moca.getStackVariable ( myToken ) != null )
+                    {
+                        ret.append ( moca.getStackVariable ( myToken ).asString() );
+                    }
+                }
+                else
+                    break;
+            }
+            else
+            {
+                ret.append ( uc_return_value.substring ( thisIterStart ) );
+                break;
+            }
+        }
+        [ret_str:ret.toString()]
+        ]]
+    }
+    |
+    publish data
+    where mls_text = @ret_str
+    and uc_mls_text_without_replace = @uc_return_value
+}
+
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+Get mls text and replace place holder values
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+<retrows>1</retrows>
+
+
+<retcol name="mls_text" type="string">With values replaced</retcol>
+<retcol name="uc_mls_text_without_replace" type="string">Text as received from the mls catalog</retcol>
+
+</documentation>
+
+
+</command>

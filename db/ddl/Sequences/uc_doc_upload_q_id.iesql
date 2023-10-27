@@ -1,0 +1,26 @@
+#use $LESDIR/include
+
+#include <usrddl.h>
+#include <usrcolwid.h>
+#include <sqlDataTypes.h>
+
+#define SEQ  uc_doc_upload_q_id
+#define SEED 1
+#define INC  1
+#define MAX  99999999999999
+
+mset command on
+[
+CREATE_SEQUENCE(SEQ, SEED, INC, MAX)
+] catch (ERR_TABLE_ALREADY_EXISTS)
+RUN_DDL
+
+[insert into sysctl (numcod, prefix, prelen, prlflg, seqlen,
+         suflen, btsflg, lstseq, seqflg)
+    values ('uc_doc_upload_q_id', 'DU', 2, 0, 15,
+             0, 1, 0, 0)
+]
+catch (-1)
+RUN_DDL
+
+mset command off

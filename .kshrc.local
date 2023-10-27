@@ -1,0 +1,12 @@
+#-------------------------------------------------------------------------------
+#
+# SOURCE FILE: .kshrc.local
+#
+# DESCRIPTION: Local LES environment's ksh options.
+#
+# NOTE(S): This script is called by the local LES environment's setup script.
+#          Any customzations to this LES environment should be made in 
+#          this script.
+#
+#-------------------------------------------------------------------------------
+

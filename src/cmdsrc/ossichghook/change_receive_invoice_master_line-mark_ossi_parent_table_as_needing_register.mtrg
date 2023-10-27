@@ -1,0 +1,36 @@
+<trigger>
+<name>mark ossi parent table as needing register</name>
+<on-command>change receive invoice master line</on-command>
+<fire-sequence>100000</fire-sequence>
+
+<local-syntax>
+<![CDATA[
+
+/*
+ * We need to mark order header only when it is a real change - and not when it is being called
+ * for cases like setting shpqty etc.
+ * We know that when it is one of these things being changed that in those cases nothing significant is changeing on order line
+ */
+if (
+       nvl(@orig_shpqty,0) != nvl(@shpqty,0) or
+       nvl(@orig_pckqty,0) != nvl(@pckqty,0)
+   )
+    noop
+else
+    mark ossi parent table as needing register
+    where table_name = 'RIMHDR'
+    and uc_reg_reacod = 'DC'
+    and uc_parent_update_clause = null
+    
+]]>
+</local-syntax>
+
+<documentation>
+
+<seealso cref="mark ossi parent table as needing register"></seealso>
+<seealso cref="change receive invoice master line">It publishes the orig* fields and all other fields being used in if statement above</seealso>
+
+
+</documentation>
+
+</trigger>

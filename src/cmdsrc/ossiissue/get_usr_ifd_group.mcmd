@@ -1,0 +1,33 @@
+<command>
+<name>get usr ifd group</name>
+<description>Get IFD group</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ */
+[select ifd_typ_cd from sl_ifd_def where ifd_id = @ifd_id and ifd_ver = @ifd_ver]
+|
+if (@ifd_typ_cd = 'I')
+  publish data where group = 'SL_I_IFD'
+else
+  publish data where group = 'SL_O_IFD'
+
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This command may be used to get IFD groups.
+</remarks>
+
+<retcol name="ifd_typ_cd" type="String"></retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

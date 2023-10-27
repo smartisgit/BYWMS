@@ -1,0 +1,120 @@
+<command>
+<name>list ossi object instances for create registration</name>
+<description>List the carrier moves that need to be registerd for creation</description>
+
+<argument name="uc_reg_table_name" required="yes" datatype="string"></argument>
+<argument name="uc_get_context_cmd" required="yes" datatype="string"></argument>
+<argument name="uc_rule_grp_id" required="yes" datatype="string"></argument>
+<argument name="uc_rule_subgrp_id" required="yes" datatype="string"></argument>
+
+
+<argument name="uc_table_list_set_defaults" required="yes" datatype="string">Passed in from register ossi one object instance as created</argument>
+<argument name="uc_set_default_rule_grp_id" required="yes" datatype="string">Passed in from register ossi one object instance as created</argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+{
+    [[
+    boolean first = true;
+    StringBuffer expr_uc_ossi_log_pk_value = new StringBuffer("''");
+    StringBuffer expr_uc_ossi_reg_sql_where= new StringBuffer("");
+    res = moca.executeCommand ( "list ossi primary key for table where table_name = @table_name", [table_name:uc_reg_table_name] );
+    while ( res.next() )
+    {
+        if ( !first )
+        {
+            expr_uc_ossi_log_pk_value.append ( "||'__'" );
+            expr_uc_ossi_reg_sql_where.append ( " and " );
+        }
+        
+        expr_uc_ossi_log_pk_value.append ( "|| @" + res.getString("column_name") );
+        expr_uc_ossi_reg_sql_where.append ( res.getString("column_name") + " = @" + res.getString("column_name") );
+        first = false;
+    }
+    [expr_uc_ossi_log_pk_value:expr_uc_ossi_log_pk_value.toString(),
+     expr_uc_ossi_reg_sql_where:expr_uc_ossi_reg_sql_where.toString()
+    ]
+    ]]
+    |
+    [
+    select ff.*
+    from
+    (
+        select oo.*
+        from
+        (
+            select tt.*
+            from @uc_reg_table_name:raw tt
+            where 1=1
+            /*#nobind*/
+            and tt.uc_reg_stat_cd = 'P'
+            /*#bind*/
+        ) oo
+    ) ff
+    where 1=1
+    order by 1,2,3
+    ]
+    |
+    execute server command
+    where cmd = " publish data "
+             || " where uc_ossi_log_pk_value=" || @expr_uc_ossi_log_pk_value
+    and inline = 1
+    |
+    filter data
+    where moca_filter_level = 2
+    and uc_ossi_log_pk_value = @uc_ossi_log_pk_value
+    and expr_uc_ossi_reg_sql_where = @expr_uc_ossi_reg_sql_where
+    and uc_reg_table_name = @uc_reg_table_name
+    and uc_get_context_cmd = @uc_get_context_cmd
+    and uc_rule_grp_id = @uc_rule_grp_id
+    and uc_rule_subgrp_id = @uc_rule_subgrp_id
+    and uc_table_list_set_defaults = @uc_table_list_set_defaults
+    and uc_set_default_rule_grp_id = @uc_set_default_rule_grp_id
+}    
+   
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This lists all the rows of the object that should be registered as created
+</p>
+]]>
+</remarks>
+
+<retrows>n - based on rows in table uc_reg_table_name (passed in) that are in P status for uc_reg_stat_cd  column</retrows>
+
+<retcol name="@*" type="COMTYP_CHAR">All columns from uc_reg_table_name table passed in</retcol>
+<retcol name="uc_ossi_log_pk_value" type="COMTYP_CHAR">Determined by evaluating expr_uc_ossi_log_pk_value passed in</retcol>
+<retcol name="expr_uc_ossi_reg_sql_where" type="COMTYP_CHAR">Based on PK of table passed in</retcol>
+<retcol name="uc_reg_table_name" type="COMTYP_CHAR">echoed</retcol>
+<retcol name="uc_get_context_cmd" type="COMTYP_CHAR">echoed if passed in</retcol>
+<retcol name="uc_rule_grp_id" type="COMTYP_CHAR">echoed if passed in</retcol>
+<retcol name="uc_rule_subgrp_id" type="COMTYP_CHAR">echoed if passed in</retcol>
+<retcol name="uc_table_list_set_defaults" type="COMTYP_CHAR">echoed if passed in</retcol>
+<retcol name="uc_set_default_rule_grp_id" type="COMTYP_CHAR">echoed if passed in</retcol>
+
+<example>
+<![CDATA[
+<p>
+</p>
+]]>
+
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+<seealso cref="register ossi object instances created"></seealso>
+<seealso cref="register ossi one object instance as created"></seealso>
+<seealso cref="register ossi object created core"></seealso>
+
+</documentation>
+
+
+</command>

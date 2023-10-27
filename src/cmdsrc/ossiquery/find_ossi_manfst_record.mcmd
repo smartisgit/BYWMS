@@ -1,0 +1,159 @@
+<command>
+<name>find ossi manfst record</name>
+<description>Try to locate a manfst record based on what is on the stack</description>
+
+<argument name="crtnid" alias="carton_id" datatype="string"></argument>
+<argument name="invtid" datatype="string"></argument>
+<argument name="wh_id" datatype="string"></argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20170830 ossi\saad.ahmad - 12613 - do development for web service for Puurs parcel
+ */
+publish data 
+where wh_id = nvl(@wh_id, @@WH_ID) 
+and uc_pw_wrkref = ''
+and uc_data_src = null
+|
+{
+    if ( @crtnid is not null )
+    {
+        [
+        select count(*) cnt_manfst
+        from manfst
+        where crtnid = @crtnid
+        ]
+        |
+        /* some pieces of code incorrectly pass ctnnum as crtnid */
+        if ( @cnt_manfst = 0 )
+        {
+            [
+            select x.*
+            from
+            (
+                select crtnid
+                from manfst
+                where subnum = @crtnid
+                and rownum < 999999
+                order by 1 desc
+            ) x
+            where rownum < 2
+            ]
+            catch (-1403,510)
+            |
+            if ( @? = 0 )
+                publish data
+                where crtnid = @crtnid
+                and uc_data_src = 'manfst.subnum'
+            else
+            {
+                [
+                select x.*
+                from
+                (
+                    select pckwrk_dtl.wrkref,
+                           manfst.crtnid
+                    from pckwrk_dtl
+                         join manfst on manfst.wrkref = pckwrk_dtl.wrkref
+                    where (pckwrk_dtl.subnum = @crtnid or pckwrk_dtl.subucc = @crtnid)
+                    and rownum < 999999
+                    order by 2 desc
+                ) x
+                where rownum < 2
+                ]
+                catch (-1403)
+                |
+                publish data
+                where crtnid = @crtnid
+                and uc_data_src = 'manfst.wrkref'
+                and uc_pw_wrkref = @wrkref
+            }
+        }
+        else
+            publish data
+            where crtnid = @crtnid
+            and uc_data_src = 'manfst.crtnid'
+    } /* crtnid passed */
+    |
+    /*
+     * If we have data_src set it means we found it 
+     */
+    if ( @uc_data_src is not null )
+        publish data
+        where crtnid = @crtnid
+        and uc_data_src = 'manfst.crtnid'
+        and uc_pw_wrkref = @wrkref
+    else if ( @invtid is not null )
+    {
+        get translated inventory identifier
+        where id = @invtid
+        and wh_id = @wh_id
+        |
+        if ( @subnum is null ) hide stack variable where name = 'subnum'
+        |
+        {
+            {
+                [
+                select distinct 
+                       nvl(pckwrk_dtl_k.wrkref, invdtl.wrkref ) wrkref,
+                       pckwrk_hdr.ctnnum 
+                from invlod
+                     join invsub on invsub.lodnum = invlod.lodnum
+                     join invdtl on invdtl.subnum = invsub.subnum
+                     left outer join pckwrk_dtl on pckwrk_dtl.wrkref = invdtl.wrkref
+                     left outer join pckwrk_hdr on pckwrk_hdr.wrkref = pckwrk_dtl.wrkref
+                     left outer join pckwrk_dtl pckwrk_dtl_k on pckwrk_dtl_k.subnum = pckwrk_hdr.ctnnum
+                where invlod.lodnum = @lodnum
+                and @+invsub.subnum
+                ]
+                catch (-1403,510)
+                |
+                if ( @? = 0 )
+                    [
+                    select crtnid
+                    from manfst
+                    where wh_id = @wh_id
+                    and (subnum = @ctnnum or subnum = @subnum or wrkref = @wrkref)
+                    ]
+                    catch (-1403,510)
+            }
+            >> res
+            |
+            publish data
+            where uc_inv_matched_res_rowcount = rowcount(@res)
+            |
+            publish top rows 
+            where res = @res 
+            and rows = '1'
+            |
+            filter data 
+            where moca_filter_level = '1' 
+            and uc_inv_matched_res_rowcount = @uc_inv_matched_res_rowcount
+            and uc_data_src = 'invdtl'
+        } /* scipe */
+    } /* have invid */
+} /* scope */
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<remarks>
+<![CDATA[
+    <p>
+    Find a manfst record.  This is used in other components where we need to do something for a manfst crtnid
+    </p>
+]]>
+</remarks>
+
+
+<seealso cref="produce pm package label"></seealso>
+
+</documentation>
+
+</command>

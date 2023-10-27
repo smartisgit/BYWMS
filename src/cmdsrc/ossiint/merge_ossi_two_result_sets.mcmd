@@ -1,0 +1,157 @@
+<command>
+<name>merge ossi two result sets</name>
+<description>Merges resultset 2 into result set one if key matches. 
+You can also send in list of keys and list of columns and its target columns. 
+Example shows how it works.</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+if(@res2 is not null)
+{
+  publish data
+    where uc_add_non_matches = iif(@uc_add_non_matches is null, 1, @uc_add_non_matches)
+  |
+  [[
+      boolean found = false;
+      String[] keyArray = keylist.split(",");
+      String[] colArray = collist.split(","); 
+      String[] targetArray = targetlist.split(","); 
+      moca.trace("merging " + res.getRowCount() + " rows in res with " + res2.getRowCount() + " rows in res2");
+      moca.trace("Adding non-matching rows? " + uc_add_non_matches);
+      moca.trace("Remove non-matching rows? " + uc_remove_non_matches);
+      int originalRows = res.getRowCount();
+      Set<Integer> matches = new HashSet<Integer>();
+      while ( res2.next() )
+      {
+        int n = 0;
+        res.reset();
+        int row = 0;
+        while( res.next())
+        {
+          n = 0;
+          while(n < keyArray.length)
+          {
+            if ( res2.getValue(keyArray[n]) == res.getValue(keyArray[n]))
+            {
+              found = true; 
+            }
+            else
+            {
+              found = false;
+              break;
+            }
+            n++;
+          }
+          if(found)
+          {
+            matches.add(row);
+            break;
+          }
+          row++;
+        }
+        if(!found)
+        {
+          if (uc_add_non_matches != 1)
+          {
+            continue;
+          }
+          res.addRow();
+          n = 0;
+          while(n < keyArray.length)
+          {
+            res.setValue ( keyArray[n], res2.getValue (keyArray[n]));
+            n++;
+          }
+          res.setRow(res.getRowCount() - 1);
+        }
+        n = 0;
+        while (n < colArray.length)
+        {
+          Object value = res2.getValue(colArray[n]);
+          /* If add flag set, add the original value to the value in res2 */
+          if (uc_add_flg == 1)
+          {
+            Object prevVal = res.getValue(targetArray[n]);         
+            if (value == null)
+            {
+              value = prevVal;
+            }
+            else if (prevVal != null)
+            {    	
+              if (value.getClass() != prevVal.getClass())
+              {
+                moca.trace("Type mismatch: " + value.getClass() + " != " + prevVal.getClass());
+              }
+              value += prevVal;
+            }
+          }
+          try {
+            res.setValue(targetArray[n], value);
+          } catch (IllegalArgumentException e) {
+            moca.trace("Type mismatch. Column type is " + 
+              res.getColumnType(targetArray[n]) + ". Value class is " + 
+              (value == null ? null : value.getClass()));
+            throw(e);
+          }
+          n++;
+        }
+      }
+      if (uc_remove_non_matches == 1)
+      {
+        for (int row=originalRows-1; row>=0; row--)
+        {
+          if (!matches.contains(row))
+          {
+            res.setRow(row);
+            res.removeRow();
+          }
+        }
+      }
+  [res:res]
+  ]]
+}
+|
+publish data combination where res = @res 
+
+
+]]>
+</local-syntax>
+<documentation>
+<remarks>
+This command is used to merges resultset 2 into result set one if key matches.
+</remarks>
+<example>
+/* If Wh_id matches then put data2 into avgqty. 
+   DATA TYPES FOR RESPECTIVE COLUMNS MUST MATCH
+ */
+publish data where data = 3 and wh_id = 'DCN1' and avgqty = 0 >> res
+|
+publish data where data2 = 2 and wh_id = 'DCN1' >> res2
+|
+merge ossi two result sets where collist = 'data2' 
+                             and targetlist = 'avgqty' 
+                             and keylist = 'wh_id'
+/*ANS
+data    wh_id    avg_qty
+-------------------------
+3       DCN1     2
+*/
+
+</example>
+<argument name="keylist" required="yes" datatype="string">Comma-separated list. These values in these columns must match in both result sets.</argument>
+<argument name="collist" required="yes" datatype="string">Comma-separated list. These are the columns to copy from res2.</argument>
+<argument name="targetlist" required="yes" datatype="string">Comma-separated list. These are the columns to fill in res.</argument>
+<argument name="res" required="yes" datatype="resultset">Main result set</argument>
+<argument name="res2" required="yes" datatype="resultset">Secondary result set</argument>
+<argument name="uc_add_flg" required="no" datatype="integer">If set, add the value in res2 to the value already in res</argument>
+<argument name="uc_add_non_matches" required="no" datatype="integer">By default, rows in res2 that do not match any row in res are added to res</argument>
+<argument name="uc_remove_non_matches" required="no" datatype="integer">If set, rows in res that do not match res2 are removed</argument>
+</documentation>
+</command>

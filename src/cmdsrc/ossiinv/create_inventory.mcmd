@@ -1,0 +1,72 @@
+<command>
+<name>create inventory</name>
+<description>Override core to call rules engine</description>
+
+<argument name="@*" required="yes" datatype="string">Data from list command is assumed to be on stack</argument>
+<argument name="uc_inhibit_change_hook" required="yes" datatype="string">if we pass this as '1' then all change hook logic is bypassed
+useful in testing and assessing overhead</argument>
+
+
+<type>Local Syntax</type>
+
+<local-syntax>
+<![CDATA[
+
+/*
+ * Revision Log
+ * 2021-11-30 saad.ahmad 12608 - Initial
+ */
+
+if ( @uc_inhibit_change_hook = '1' )
+   ^create inventory
+   where @*
+else
+{
+    process ossi pre tasks for crud action using rules
+    where uc_transaction_action = 'A'
+    and table_name = 'CMD_CREATE_INVENTORY'
+    and uc_rule_grp_id = 'OSSI-CREATE-INVENTORY-PRE'
+    and uc_rule_subgrp_id = null
+    and uc_rule_grp_id_set= null
+    and uc_set_default_mode = null
+    and uc_column_prefix_old = null
+    and uc_crud_pre_tasks_les_cmd = 'uc_ctxt_table_data_cmd_create_inventory'
+    |
+    ^create inventory 
+    where @*
+}
+
+]]>
+
+</local-syntax>
+
+<documentation>
+
+<remarks>
+<![CDATA[
+  <p>
+   This is an override of standard create inventoy command.  it invokes rules engines:
+   - rule_grp_id = OSSI-CREATE-INVENTORY-PRE for pre trigger
+   - rule_grp_id = OSSI-CREATE-INVENTORY-PRE for usr_rule_engine_expr in order to default certain data
+
+   The context is established via les_cmd uc_ctxt_table_data_cmd_create_inventory
+  </p>
+]]>
+</remarks>
+
+<retcol name="@*" type="(varies according to field type)">All order columns</retcol>
+<exception value="eOK">Normal successful completion</exception>
+
+
+<seealso cref="process ossi pre tasks for crud action using rules"></seealso>
+
+<policy
+    polcod="USR-OSSI-DATA-CHANGE-HOOK"
+    polvar="CMD_CREATE_INVENTORY"
+    polval="ENABLED"
+    rtnum1="0 disables create inventory triggers.  Set to 2 for enabled"
+></policy>
+
+
+</documentation>
+</command>

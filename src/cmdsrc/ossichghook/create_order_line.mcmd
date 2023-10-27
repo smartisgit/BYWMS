@@ -1,0 +1,65 @@
+<command>
+<name>create order line</name>
+<description>Override core to pass in registeration status of P</description>
+
+<argument name="@*" required="yes" datatype="string">Data from list command is assumed to be on stack</argument>
+<argument name="uc_inhibit_change_hook" required="yes" datatype="string">if we pass this as '1' then all change hook logic is bypassed
+useful in testing and assessing overhead</argument>
+
+
+
+
+
+<type>Local Syntax</type>
+
+<local-syntax>
+<![CDATA[
+
+if ( @uc_inhibit_change_hook = '1' )
+   ^create order line where @*
+else
+{
+    process ossi pre tasks for crud action using rules
+    where uc_transaction_action = 'A'
+    and table_name = 'ord_line'
+    and uc_smart_reghook_data_set = 'ord'
+    and uc_rule_grp_id = null
+    and uc_rule_subgrp_id = null
+    and uc_rule_grp_id_set= null
+    and uc_set_default_mode = null
+    and uc_column_prefix_old = null
+    |
+    ^create order line
+    where @*
+    |
+    filter data
+    where moca_filter_level = 1
+    and uc_transaction_action = @uc_transaction_action
+}
+
+
+]]>
+
+</local-syntax>
+
+<documentation>
+
+<remarks>
+<![CDATA[
+  <p>
+   This is create order line override to call a rule engine before the action and a way to default fields.
+  </p>
+]]>
+</remarks>
+
+<retcol name="@*" type="(varies according to field type)">All order columns</retcol>
+<exception value="eOK">Normal successful completion</exception>
+
+
+<seealso cref="process ossi pre tasks for crud action using rules"></seealso>
+
+
+
+
+</documentation>
+</command>

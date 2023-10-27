@@ -1,0 +1,37 @@
+#use $DCSDIR/include
+
+#include <dcsddl.h>
+
+#include <dcscolwid.h>
+
+#include <dcstbldef.h>
+
+#include <sqlDataTypes.h>
+
+
+#use $SALDIR/include
+
+#include <salcolwid.h>
+
+mset command on
+
+[
+DROP_VIEW(UCDM_SCONFIG_00200_STO_CON_CRI)
+] catch (ERR_CANNOT_DROP_TABLE_NOT_FOUND)
+RUN_DDL
+
+mset command off
+
+CREATE_VIEW(UCDM_SCONFIG_00200_STO_CON_CRI)
+select sto_config_criteria.*,
+        dscmst.lngdsc,
+		sto_config.wh_id
+   from sto_config_criteria
+   join sto_config
+     on sto_config.sto_config_id = sto_config_criteria.sto_config_id
+   left outer join dscmst
+     on dscmst.colnam = 'sto_config_id'
+    and dscmst.colval = sto_config.sto_config_id
+RUN_DDL
+
+mset command on

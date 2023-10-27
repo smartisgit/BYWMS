@@ -1,0 +1,272 @@
+<command>
+<name>get ossi rule context</name>
+<description>Get the context for a rule
+</description>
+<type>Local Syntax</type>
+
+<argument name="uc_rule_engine_table_name" required="yes" datatype="string">
+Pass in usr_rule_engine_expr or usr_rule_engine_cond_expr</argument>
+<argument name="uc_rule_grp_id" required="yes" datatype="string"></argument>
+<argument name="uc_rule_subgrp_id" required="yes" datatype="string"></argument>
+<argument name="uc_rule_id" required="yes" datatype="string">This should be passed in only for usr_rule_engine_cond_expr</argument>
+
+<argument name="uc_sort_arg_clause" required="yes" datatype="string">For command arguments, how to sort args</argument>
+<argument name="uc_add_component_level_to_descr" required="yes" datatype="string">If 1 then description of command argument will include component level</argument>
+<argument name="uc_fetch_ctxt_typ_list" required="no" datatype="string">Which context types to process</argument>
+
+
+
+
+<local-syntax>
+<![CDATA[
+
+hide stack variable where name ='res'
+|
+publish data
+where uc_rule_engine_table_name = nvl(@uc_rule_engine_table_name, 'usr_rule_engine_expr' ) 
+and uc_rule_grp_id = nvl(@uc_rule_grp_id, '----')
+and uc_rule_subgrp_id = nvl(@uc_rule_subgrp_id, '----')
+and uc_rule_id = nvl(@uc_rule_id, '----')
+and uc_fetch_ctxt_typ_list = ','||nvl(@uc_fetch_ctxt_typ_list, 'A,E,C,CA')||','
+|
+{
+    if ( instr(@uc_fetch_ctxt_typ_list, ',A,') > 0 )
+    {
+        [
+        select uc_ctxt_var,
+               uc_ctxt_var_descr
+        from usr_rule_engine_help_ctxt
+        where uc_rule_engine_table_name = @uc_rule_engine_table_name
+        and uc_rule_grp_id = @uc_rule_grp_id
+        and (
+                uc_rule_subgrp_id in ( @uc_rule_subgrp_id, '----')
+                or
+                @uc_rule_subgrp_id like uc_rule_subgrp_id
+            )
+        and (
+                uc_rule_id in ( @uc_rule_id, '----' )
+                or
+                @uc_rule_id like uc_rule_id
+            )
+        and uc_fetch_ctxt_typ = 'A'
+        order by srtseq
+        ]
+        catch (-1403,510)
+        >> res_actual
+        |
+        if ( @? = 0 and rowcount(@res_actual) > 0 )
+            publish data
+            where uc_fetch_ctxt_typ = 'A'
+            and uc_ctxt_command = null
+            and uc_command_descr = null
+            and uc_command_syntax = null
+            and uc_command_cmplvl = null
+            and uc_ctxt_evt_id = null
+            and uc_ctxt_var_grp = 'LITERAL'
+            and uc_ctxt_var_res = @res_actual
+    } /* literal parameters for context */
+    &
+    if ( instr(@uc_fetch_ctxt_typ_list, ',E,') > 0 )
+    {
+        [
+        select uc_fetch_ctxt_expr
+        from usr_rule_engine_help_ctxt
+        where uc_rule_engine_table_name = @uc_rule_engine_table_name
+        and uc_rule_grp_id = @uc_rule_grp_id
+        and (
+                uc_rule_subgrp_id in ( @uc_rule_subgrp_id, '----')
+                or
+                @uc_rule_subgrp_id like uc_rule_subgrp_id
+            )
+        and (
+                uc_rule_id in ( @uc_rule_id, '----' )
+                or
+                @uc_rule_id like uc_rule_id
+            )
+        and uc_fetch_ctxt_typ = 'E'
+        order by srtseq
+        ]
+        catch (-1403,510)
+        |
+        if ( @? = 0 )
+        {
+            resolve ossi rules engine return value
+            where uc_rules_engine_value = @uc_fetch_ctxt_expr 
+            catch(@?)
+            |
+            if ( @? = 0 and @use_uc_rules_engine_value is not null )
+            {
+                [
+                select evt_arg_id    uc_ctxt_var,
+                       evt_arg_descr uc_ctxt_var_descr
+                from sl_evt_arg_def
+                where evt_id = @use_uc_rules_engine_value
+                order by evt_arg_id
+                ]
+                catch (-1403,510)
+                >> res_evt_arg
+                |
+                if ( @? = 0 and rowcount(@res_evt_arg) > 0 )
+                {
+                    publish data
+                    where uc_fetch_ctxt_typ = 'E'
+                    and uc_ctxt_command = null
+                    and uc_command_descr = null
+                    and uc_command_syntax = null
+                    and uc_command_cmplvl = null
+                    and uc_ctxt_evt_id = @use_uc_rules_engine_value
+                    and uc_ctxt_var_grp = @use_uc_rules_engine_value
+                    and uc_ctxt_var_res = @res_evt_arg
+                }
+            } /* got an event */
+        } /* found some Events */
+    } /* group for events */
+    &
+    {
+        [
+        select uc_fetch_ctxt_expr,
+               uc_fetch_ctxt_typ,
+               decode ( uc_fetch_ctxt_typ, 'C', 'retcol', 'argument') uc_search_1_tag
+        from usr_rule_engine_help_ctxt
+        where uc_rule_engine_table_name = @uc_rule_engine_table_name
+        and uc_rule_grp_id = @uc_rule_grp_id
+        and (
+                uc_rule_subgrp_id in ( @uc_rule_subgrp_id, '----')
+                or
+                @uc_rule_subgrp_id like uc_rule_subgrp_id
+            )
+        and (
+                uc_rule_id in ( @uc_rule_id, '----' )
+                or
+                @uc_rule_id like uc_rule_id
+            )
+        and uc_fetch_ctxt_typ in ( 'C', 'CA', 'ACT' )
+        order by srtseq
+        ]
+        catch (-1403,510)
+        |
+        if ( @? = 0 and instr( @uc_fetch_ctxt_typ_list, ','||@uc_fetch_ctxt_typ||',') > 0 )
+        {
+            resolve ossi rules engine return value
+            where uc_rules_engine_value = @uc_fetch_ctxt_expr 
+            catch(@?)
+            |
+            if ( @? = 0 and @use_uc_rules_engine_value is not null )
+            {
+                /* First get the command description */
+                {
+                    list active commands 
+                    where command = @use_uc_rules_engine_value
+                    catch(@?)
+                    >> res_cmd
+                    |
+                    if ( @? = 0 and rowcount(@res_cmd) > 0 )
+                    {
+                        publish top rows
+                        where res = @res_cmd
+                        and rows = 1
+                        |
+                        publish data
+                        where command = @command
+                        and uc_command_descr = @desc
+                        and uc_command_syntax = @syntax
+                        and uc_command_cmplvl = @cmplvl
+                    }
+                } /* end of getting command level data */
+                |
+                {
+                    list ossi command output information
+                    where command = @use_uc_rules_engine_value
+                    catch (@?)
+                    |
+                    if ( @? = 0 )
+                    {
+                        publish data
+                        where uc_ctxt_var = @uc_variable
+                        and uc_ctxt_var_descr = nvl(@uc_variable_descr, @uc_variable_default_descr)
+                        and cmplvl = @cmplvl
+                        and cmplvlseq = @cmplvlseq
+                    }
+                } /* command output or arg data */
+                >> res_cmd_out
+                |
+                {
+                    if ( rowcount(@res_cmd_out) > 0  )
+                    {
+                        {
+                            if ( @uc_sort_arg_clause is not null )
+                            {
+                                sort result set 
+                                where result_set = @res_cmd_out
+                                and sort_list = @uc_sort_arg_clause
+                                |
+                                publish data
+                                where uc_ctxt_var = @uc_ctxt_var
+                                and uc_ctxt_var_descr = decode ( @uc_add_component_level_to_descr, 1, '(' || @cmplvl || ')', '' ) || @uc_ctxt_var_descr
+                            }
+                            else
+                            {
+                                publish data combination
+                                where res = @res_cmd_out
+                                |
+                                publish data
+                                where uc_ctxt_var = @uc_ctxt_var
+                                and uc_ctxt_var_descr = decode ( @uc_add_component_level_to_descr, 1, '(' || @cmplvl || ')', '' ) || @uc_ctxt_var_descr
+                            }
+                        }
+                        >> res_cmd_out
+                    }
+                    |
+                    publish data
+                    where uc_fetch_ctxt_typ = @uc_fetch_ctxt_typ
+                    and uc_ctxt_command = @command
+                    and uc_command_descr = @uc_command_descr
+                    and uc_command_syntax = @uc_command_syntax
+                    and uc_command_cmplvl = @uc_command_cmplvl
+                    and uc_ctxt_evt_id = null
+                    and uc_ctxt_var_grp = @use_uc_rules_engine_value
+                    and uc_ctxt_var_res = @res_cmd_out
+                } /* scope of having output */
+            } /* resolved command */
+        } /* found some commnds */
+    } /* group for commands */    
+} /* main scope */
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+   This command returns the context of the rule.  It returns daya that is eventually displayed for help
+</p>
+]]>
+</remarks>
+
+<retrows>n</retrows>
+<retcol name="uc_fetch_ctxt_typ" type="COMTYP_CHAR">A C or E</retcol>
+<retcol name="uc_ctxt_var_grp" type="COMTYP_CHAR">For E it is event name.  For C it is command</retcol>
+
+<retcol name="uc_ctxt_command" type="COMTYP_CHAR">The command name if applicable</retcol>
+<retcol name="uc_command_descr" type="COMTYP_CHAR">Command description if applicable</retcol>
+<retcol name="uc_command_syntax" type="COMTYP_CHAR">Code of command if applicable</retcol>
+<retcol name="uc_command_cmplvl" type="COMTYP_CHAR">Command level of top most command</retcol>
+<retcol name="uc_ctxt_evt_id" type="COMTYP_CHAR">Event id if applicable</retcol>
+
+
+<retcol name="uc_ctxt_var_res" type="COMTYP_CHAR">This is a resultset that contains two filds uc_ctxt_var and uc_ctxt_var_descr </retcol>
+
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+<seealso cref="get ossi rule documentation"></seealso>
+
+</documentation>
+
+
+
+</command>

@@ -1,0 +1,451 @@
+<command>
+<name>analyze ossi rule engine performance</name>
+<description>This component provides </description>
+
+<argument name="cnt_orders" required="no" datatype="Integer">How many orders to create.  Default is 1</argument>
+<argument name="cnt_order_create_loop" required="no" datatype="Integer">How many times to do the order creation loop, i.e we create
+cnt_orders and then rollback.  How many times do we do that?  Default is 1</argument>
+
+<argument name="wh_id" required="no" datatype="String">Warehouse Id for the test.  Default to WMD1</argument>
+<argument name="client_id" required="no" datatype="String">Client Id for the test.  Default to ----</argument>
+
+<argument name="template_ordnum" required="no" datatype="String">This is the order we will copy.  default to INTTEST0001.  We put the order
+and lines of this order in a resultset upfront and use that to create the orders later on</argument>
+<argument name="new_ordnum_prefix" required="no" datatype="String">The orders we create, what is their prefix  Default to TSTORD</argument>
+
+
+<argument name="overhead_per_call_ms_list" required="yes" datatype="String">This is a coma-separated list of integer (in milliseconds)
+of artificial overhead.  This forms the outer most loop of test - so that we can see how performance of rules engine is affected
+if the core API becomes more expensive.</argument>
+
+
+<argument name="publish_order_data" required="yes" datatype="Integer">OUTPUT:  Default 0.  If 1 then the output is the actual order data.
+This option is useful to see how the order got created.
+</argument>
+
+<argument name="show_summary" required="yes" datatype="Integer">OUTPUT:  If publish_order_data is 1 then this becomes 0.  Else what is passed in.
+Else default value is 1
+</argument>
+
+<argument name="show_raw_summary" required="yes" datatype="Integer">OUTPUT:  Only applicable when show_summary is 1.  If then this is 1, 
+it will show raw data.  If 0 (default) then we show a single row with various times in each iteration
+</argument>
+
+<argument name="final_summary_uses_elapsed_per" required="no" datatype="Integer">OUTPUT:  Default is 1.  Idea is that we create multiple orders
+in each run.  And for final analysis should be divide it with #iterations and then show that or show time for all.  It makes more sense
+to use elapsed per so that we can measure the overhead of rules engine easily
+</argument>
+
+
+
+<argument name="uc_ord_col_list" required="no" datatype="String">When publish_order_data = 1 show these columns from ord.  Idea is to show
+what our rules engine sets.  Default is deptno, dest_num, csr_email_adr
+</argument>
+
+<argument name="uc_ord_line_col_list" required="no" datatype="String">When publish_order_data = 1 show these columns from ord_line.  Idea is to show
+what our rules engine sets.  Default is pckgr3, prjnum
+</argument>
+
+<argument name="uc_rule_grp_id_list_sql_in" required="no" datatype="String">List of rule group list.  We need this to disable and enable the rules
+during our testing.  default should be fine for most cases i.e. 'OSSI-ORD_LINE-BEFORE-CRUD','OSSI-ORD-BEFORE-CRUD','OSSI-ORDER-CREATED'
+</argument>
+
+
+
+<type>Local Syntax</type>
+
+<local-syntax>
+<![CDATA[
+
+publish data
+where cnt_orders = nvl(@cnt_orders, 10 )
+and   cnt_order_create_loop = nvl(@cnt_order_create_loop, 1 )
+and   publish_order_data = nvl (@publish_order_data, 0 )
+and   show_summary = nvl(@show_summary, 1 )
+and   show_raw_summary = nvl(@show_raw_summary, 0)
+and   final_summary_uses_elapsed_per = nvl(@final_summary_uses_elapsed_per, 1 )
+and   overhead_per_call_ms_list = nvl(@overhead_per_call_ms_list, '0')
+and   template_ordnum = nvl(@template_ordnum, 'INTTEST0001' )
+and   new_ordnum_prefix = nvl(@new_ordnum_prefix, 'TSTORD' )
+and   uc_rule_grp_id_list_sql_in = nvl(@uc_rule_grp_id_list_sql_in, "'OSSI-ORD_LINE-BEFORE-CRUD','OSSI-ORD-BEFORE-CRUD','OSSI-ORDER-CREATED'" )
+and   uc_ord_col_list = nvl(@uc_ord_col_list, 'deptno, dest_num, csr_email_adr' )
+and   uc_ord_line_col_list = nvl(@uc_ord_line_col_list, 'pckgr3, prjnum')
+and   wh_id = nvl(@wh_id, 'WMD1')
+and   client_id = nvl(@client_id, '----')
+|
+if ( @publish_order_data = 1 )
+    publish data
+    where show_summary = 0
+    and show_raw_summary = 1
+|
+publish data
+where uc_iter = @cnt_orders
+and   uc_outer_iter = @cnt_order_create_loop
+and   uc_publish_order_data = nvl(@publish_order_data, 0) /* If 1 we publish the orders */
+and   uc_show_summary = @show_summary
+and   uc_final_show_raw = @show_raw_summary
+|
+{
+    convert list 
+    where string = @overhead_per_call_ms_list 
+    and type = 'L' and separator = ','
+    |
+    publish data
+    where overhead_per_call_ms = int(@retstr)
+    |
+    {
+        publish data 
+        where orig_ordnum = @template_ordnum
+        and new_ord_prefix = @new_ordnum_prefix 
+        and my_rule_grp_list = @uc_rule_grp_id_list_sql_in
+        |
+        [select * from ord where ordnum = @orig_ordnum] >> res_orig_ord
+        |
+        [select * from ord_line where ordnum = @orig_ordnum] >> res_orig_ord_line
+        |
+        try
+        {
+            {
+                do loop where count = 7 /* this 7 is hard-coded because there are 7 types of tests we do */
+                |
+                publish data 
+                where test_typ = @i
+                |
+                {
+                    if ( @test_typ = 1 ) /* we turn off policy completely - so similar to passing flag to bypass hooks */
+                    {
+                        [
+                        update poldat
+                        set rtnum1 = 0
+                        where polcod = 'USR-OSSI-DATA-CHANGE-HOOK' 
+                        and polvar in ('ORD', 'ORD_LINE') 
+                        and polval = 'ENABLED'
+                        ]
+                    }
+                    else if ( @test_typ = 2 ) /* this says that we have rules logic but all rules are disabled */
+                    {
+                        [
+                        update poldat
+                        set rtnum1 = 2
+                        where polcod = 'USR-OSSI-DATA-CHANGE-HOOK' 
+                        and polvar in ('ORD', 'ORD_LINE') 
+                        and polval = 'ENABLED'
+                        ]
+                        ;
+                        [update usr_rule_engine_cond_expr set ena_flg = 0 where uc_rule_grp_id in ( @my_rule_grp_list:raw )]
+                        ;
+                        [update usr_rule_engine_expr set ena_flg = 0 where uc_rule_grp_id in ( @my_rule_grp_list:raw )]
+                    }
+                    else if ( @test_typ = 3 ) /* all rules are enabled but a job will process them */
+                    {
+                        [
+                        update poldat
+                        set rtnum1 = 1
+                        where polcod = 'USR-OSSI-DATA-CHANGE-HOOK' and polvar in ('ORD') and polval = 'ENABLED'
+                        ]
+                        ;
+                        [update usr_rule_engine_cond_expr set ena_flg = 1 where uc_rule_grp_id in ( @my_rule_grp_list:raw )]
+                        ;
+                        [update usr_rule_engine_expr set ena_flg = 1 where uc_rule_grp_id in ( @my_rule_grp_list:raw )]
+                    }
+                    else if ( @test_typ = 4 ) /* rules are enabled from above, and we have inline processing */
+                    {
+                        [
+                        update poldat
+                        set rtnum1 = 2
+                        where polcod = 'USR-OSSI-DATA-CHANGE-HOOK' and polvar in ('ORD') and polval = 'ENABLED'
+                        ]
+                    }
+                    else if ( @test_typ = 6 ) /* only use pre hook to set based on context and not SET hook */
+                    {
+                        [update usr_rule_engine_cond_expr set ena_flg = 0 where uc_rule_grp_id in ( 'OSSI-ORDER-CREATED' )]
+                        ;
+                        [update usr_rule_engine_expr set ena_flg = 0 where uc_rule_grp_id in ( 'OSSI-ORDER-CREATED' )]
+                    }
+                    ;
+                    [commit] catch(@?)
+                    ;
+                    clear moca cache
+                    ;
+                    if ( @test_typ = 0 )
+                        publish data 
+                        where uc_inhibit_change_hook = '1' /* 0 means no rule engine overhead at all - 1 means rules engines are in play */
+                    else
+                        publish data 
+                        where uc_inhibit_change_hook = '0' /* 0 means no rule engine overhead at all - 1 means rules engines are in play */
+                    |
+                    if ( @test_typ = 5 ) /* this will mimic the ointegrator flow */
+                        publish data
+                        where uc_force_consider_called_from_int = '1'
+                    |
+                    do loop where count = @uc_outer_iter
+                    |
+                    publish data where uc_outer_iter = @i
+                    |
+                    {
+                        {
+                            {
+                                {
+                                    do loop where count = @uc_iter
+                                    |
+                                    publish data 
+                                    where new_ordnum = @new_ord_prefix || to_char(@i,'09999' )
+                                    |
+                                    /*
+                                     * loop starts at 0 but first time will load some cache.  So we dont want to have that overhead counted
+                                     */
+                                    if ( @i = 1 )
+                                    {
+                                        save session variable
+                                        where name = 'this_start_ts'
+                                        and value = string( ossi__ts() )
+                                    }
+                                    |
+                                    try
+                                    {
+                                        publish data combination where res = @res_orig_ord and deptno = null and dest_num = null and csr_email_adr = null
+                                        |
+                                        create order where ordnum = @new_ordnum
+                                        ;
+                                        publish data combination where res = @res_orig_ord_line and pckgr3 = null and prjnum = null
+                                        |
+                                        create order line where ordnum = @new_ordnum
+                                        ;
+                                        if ( @uc_force_consider_called_from_int = '1' )
+                                            sl_send ifd_data_kw where mode_cd = 'I'
+                                        ;
+                                        if ( @overhead_per_call_ms > 0 )
+                                            [[Thread.sleep (overhead_per_call_ms)]]
+                                        ;
+                                        if ( @uc_publish_order_data = 1 )
+                                        {
+                                            [
+                                            select 'ord' table_name, 
+                                                   ordnum, 
+                                                   null ordlin, 
+                                                   null ordsln, 
+                                                   @uc_ord_col_list:raw,
+                                                   uc_reg_stat_cd, uc_reg_reacod, uc_regdte 
+                                            from ord 
+                                            where ordnum = @new_ordnum 
+                                            and client_id =@client_id
+                                            and wh_id = @wh_id
+                                            ]
+                                            catch (-1403,510)
+                                            &
+                                            [
+                                            select 'ord_line' table_name, 
+                                                   ordnum, ordlin, ordsln, 
+                                                   @uc_ord_line_col_list:raw
+                                            from ord_line 
+                                            where ordnum = @new_ordnum 
+                                            and client_id =@client_id
+                                            and wh_id = @wh_id
+                                            order by ordlin, ordsln
+                                            ]
+                                            catch (-1403,510)
+                                        } /* publish order data */
+                                    } /* try */
+                                    finally 
+                                    {
+                                        [rollback] catch(@?)
+                                    }
+                                } /* scope to create resultset */
+                                >> res_loop
+                                |
+                                publish data
+                                where test_typ_info = decode ( @test_typ, 
+                                                               0, 'No hook', 
+                                                               1, 'hook policy disabled',
+                                                               2, 'all hooks disabled',
+                                                               3, 'hooks enabled reg by job',
+                                                               4, 'hooks enabled inline process', 
+                                                               5, 'int emulation',
+                                                               6, 'only pre hook',
+                                                               'else' 
+                                                             )
+                                and elapsed_sec = (ossi__ts() - float(ossi__sess_var('this_start_ts', '0', 'Y' )) )/1000
+                                |
+                                /*
+                                 * Now we control the output.  If we are interested in summary data then start building it here at summary
+                                 * level.  So that we can then summarize it again at the end.
+                                 * For detail level we will show the order data in its raw form that we have in res_loop
+                                 */
+                                if ( @uc_show_summary = 1 )
+                                {
+                                    [select count(*) uc_cnt_cond_ena from usr_rule_engine_cond_expr where uc_rule_grp_id in ( @my_rule_grp_list:raw ) and ena_flg = 1]
+                                    |
+                                    [select count(*) uc_cnt_other_ena from usr_rule_engine_expr where uc_rule_grp_id in ( @my_rule_grp_list:raw ) and ena_flg = 1]
+                                    |
+                                    if ( @uc_iter = 1 )
+                                        publish data
+                                        where div_by_per = 1
+                                    else
+                                        publish data
+                                        where div_by_per = @uc_iter-1 /* because we ignore the firts time */
+                                    |
+                                    publish data
+                                    where overhead_per_call_ms = @overhead_per_call_ms
+                                    and test_typ = @test_typ
+                                    and test_typ_info = @test_typ_info
+                                    and uc_inhibit_change_hook = @uc_inhibit_change_hook
+                                    and uc_force_consider_called_from_int = @uc_force_consider_called_from_int
+                                    and ord_hook_enabled = ossi__polval ( 'USR-OSSI-DATA-CHANGE-HOOK', 'ORD', 'ENABLED', '', 'rtnum1', '----' )
+                                    and ol_hook_enabled = ossi__polval ( 'USR-OSSI-DATA-CHANGE-HOOK', 'ORD_LINE', 'ENABLED', '', 'rtnum1', '----' )
+                                    and cnt_cond_rule_ena = @uc_cnt_cond_ena
+                                    and cnt_other_rule_ena = @uc_cnt_other_ena
+                                    and uc_outer_iter = @uc_outer_iter
+                                    and elapsed_sec = @elapsed_sec
+                                    and elapsed_per_sec = @elapsed_sec / @div_by_per
+                                    and elapsed_per_denom = @div_by_per
+                                    and my_rule_grp_list = @my_rule_grp_list
+                                    |
+                                    filter data
+                                    where moca_filter_level = 1
+                                    and use_elapsed_sec_for_summ = decode ( @final_summary_uses_elapsed_per, 1, @elapsed_per_sec, @elapsed_sec )
+                                }
+                                else
+                                    publish data combination 
+                                    where res = @res_loop
+                                    and  test_typ = @test_typ
+                                    and test_typ_info = @test_typ_info
+                            } /* scope of start_ts */
+                        } /* scoping only */
+                    } /* uc_outer_iter loop */
+                } /* test type */
+            } /* scope to create a result set */
+            >> res_final
+            |
+            /*
+             * We captured raw data above.  Which may be summariezed or have order and line data
+             * if we are showig raw format then simply include here.  If not then we use internal tables to condense it
+             */
+            if ( @uc_final_show_raw = 1 )
+                publish data combination 
+                where res = @res_final 
+            else
+            {
+                create internal table
+                where results = @res_final
+                and table_name = 'uc_rule_test_final'
+                ;
+                select from internal table
+                where select_stmt = "select f_nohook.use_elapsed_sec_for_summ base_tim"
+                                 || ",f_pol_dis.use_elapsed_sec_for_summ   - f_nohook.use_elapsed_sec_for_summ ovh_dis_pol"
+                                 || ",f_hook_dis.use_elapsed_sec_for_summ  - f_nohook.use_elapsed_sec_for_summ ovh_dis_hook"
+                                 || ",f_hook_job.use_elapsed_sec_for_summ  - f_nohook.use_elapsed_sec_for_summ ovh_job_hook"
+                                 || ",f_hook_inl.use_elapsed_sec_for_summ  - f_nohook.use_elapsed_sec_for_summ ovh_inl_hook"
+                                 || ",f_int.use_elapsed_sec_for_summ       - f_nohook.use_elapsed_sec_for_summ ovh_int_mode"
+                                 || ",f_pre.use_elapsed_sec_for_summ       - f_nohook.use_elapsed_sec_for_summ ovh_pre_only"
+                                 || ",f_pol_dis.use_elapsed_sec_for_summ  tim_dis_pol"
+                                 || ",f_hook_dis.use_elapsed_sec_for_summ tim_dis_hook"
+                                 || ",f_hook_job.use_elapsed_sec_for_summ tim_job_hook"
+                                 || ",f_hook_inl.use_elapsed_sec_for_summ tim_inl_hook"
+                                 || ",f_int.use_elapsed_sec_for_summ      tim_int_mode"
+                                 || ",f_pre.use_elapsed_sec_for_summ      tim_pre_only"
+                and table_name = 'uc_rule_test_final f_nohook'
+                              || ' join uc_rule_test_final f_pol_dis on f_pol_dis.test_typ = 1 and f_pol_dis.uc_outer_iter = f_nohook.uc_outer_iter'
+                              || ' join uc_rule_test_final f_hook_dis on f_hook_dis.test_typ = 2 and f_hook_dis.uc_outer_iter = f_nohook.uc_outer_iter'
+                              || ' join uc_rule_test_final f_hook_job on f_hook_job.test_typ = 3 and f_hook_job.uc_outer_iter = f_nohook.uc_outer_iter'
+                              || ' join uc_rule_test_final f_hook_inl on f_hook_inl.test_typ = 4 and f_hook_inl.uc_outer_iter = f_nohook.uc_outer_iter'
+                              || ' join uc_rule_test_final f_int on f_int.test_typ = 5 and f_int.uc_outer_iter = f_nohook.uc_outer_iter'
+                              || ' join uc_rule_test_final f_pre on f_pre.test_typ = 6 and f_pre.uc_outer_iter = f_nohook.uc_outer_iter'
+                and where_clause= 'where f_nohook.test_typ = 0'
+            }
+        } /* scope for the whole test for one cycle */
+        finally
+        {
+            /* Revert values to default setting when done with the test */
+            [
+            update poldat
+            set rtnum1 = 2
+            where polcod = 'USR-OSSI-DATA-CHANGE-HOOK' and polvar in ('ORD', 'ORD_LINE') and polval = 'ENABLED'
+            ]
+            ;
+            [update usr_rule_engine_cond_expr set ena_flg = 1 where uc_rule_grp_id in ( @my_rule_grp_list:raw )]
+            ;
+            [update usr_rule_engine_expr set ena_flg = 1 where uc_rule_grp_id in ( @my_rule_grp_list:raw )]
+        }
+    } /* loop on overhead_per_call_ms_list.  overhead_per_call_ms in scope */
+} /* main outer scope */
+  
+]]>
+
+</local-syntax>
+
+<documentation>
+
+<remarks>
+<![CDATA[
+  <p>
+   Loop on the overhead list passed in 
+   {
+       do loop 7 times (each test case setup is listed below)
+       {
+           change policies and rules as needed for the test
+           commit and clear moca cache
+
+           if ( test = 0 (see below - no hook) )
+               publish uc_inhibit_change_hook = '1'
+           else if ( test = 5 (see below - simulate integrator) )
+               publish uc_force_consider_called_from_int = 1
+
+           do loop cnt_order_create_loop times (as passed in).  Idea is to repeat the same test
+           {
+               do loop cnt_orders times (as passed in indicating how many ordes we create)
+               {
+                   copy the passed in order and lines to the new order number with prefix passed in.
+                   If test = 5 (integrator) we call [sl_send ifd_data_kw where mode_cd = 'I'].  This simulates logic to fire hooks after order creation
+                   based on outermost loop (overhead list) do a sleep.  So this is adding an overhead per call
+                   and then rollback
+               } // loop on cnt_orders
+           } // loop on cnt_order_create_loop
+       } // loop 7 times fo reach test
+   } // loop on list of overheads passed in
+   
+   WE do 7 types of tests that are listed a
+   0.  We do the create order and line without any hooks.  Our CRUD overrides allow for a special input to bypass these so it establishes a baseline
+   1.  Turn off the hook by policy for ORD and ORD_LINE.  So this should give almost the smae peformance as #0.
+   2.  We set the policy to 2 (meaning inline hook) but then disable all rules.  So this is complete overhead of framework but no rules in play
+   3.  We enable the rules but set policy to 1 - which says that create components simply put the data and a registration job will handle the rules.
+       So this performance is close to 0 and 1 - but the overhad will be shifted to the register job then
+   4.  All rules are enabled and the pokicy is now 2 (inline processing).  So this is eveyrthing and all overhead is included.
+   5.  Same as #4 but we use special hook to simulate being called from integrator.  In that case the SET hooks 
+       for OSSI-ORDER-CREATED fire once at the ned.
+   6.  SET hooks are more expensive when they fire for OSSI-ORDER-CREATED.  But OSSI-ORD-BEFORE-CRUD and OSSI-ORD_LINE-BEFORE-CRUD are less expensive
+       but they also offer less flexibility since these can only use what is on stack.  But this test disables all rules for OSSI-ORDER-CREATED
+       but keeps OSSI-ORD-BEFORE-CRUD and OSSI-ORD_LINE-BEFORE-CRUD
+  </p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+<retcol name="@*" type="(varies according to field type)">What core returned</retcol>
+<retcol name="uc_old_@*" type="(varies according to field type)">All old values</retcol>
+<retcol name="uc_transaction_action*" type="String">Action done</retcol>
+
+
+
+
+<exception value="eOK">Normal successful completion</exception>
+
+
+<seealso cref="process ossi pre tasks for crud action using rules"></seealso>
+
+
+<example>
+    // call to simply see how rules engine fire and set value.
+    // so we create one order and publish raw data.  
+    // All 7 tests will run and we will see the columns set in various ways based on the test.
+    analyze ossi rule engine performance where cnt_orders = 1 and publish_order_data = 1  
+
+    // Typical run for seeing the summarized peformance
+    //     no overhead emulation.  See the default value setup above
+    analyze ossi rule engine performance
+</example>
+
+
+
+
+</documentation>
+</command>

@@ -1,0 +1,28 @@
+<command>
+<name>ossi override_table_name</name>
+<description>Override Table name</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+[select 1
+   from poldat
+  where poldat.polcod = 'USR-OSSI-VERSION-CONTROL'
+    and upper(poldat.polvar) = upper('OBJECT-TABLE-' || @moca_farg1)
+    and upper(poldat.polval) = 'OVERRIDE-TABLE-NAME'
+    and poldat.rtnum1 = 1
+    and poldat.wh_id_tmpl = '----'
+] catch (-1403,510)
+
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This command can be used override table name.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

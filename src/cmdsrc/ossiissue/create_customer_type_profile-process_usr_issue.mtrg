@@ -1,0 +1,20 @@
+<trigger>
+<name>process usr issue</name>
+<on-command>create customer type profile</on-command>
+<local-syntax>
+<![CDATA[
+process usr issue
+  where uc_table_name = 'csttyp_pfl'
+    and uc_action = 'ADD'
+]]></local-syntax>
+<fire-sequence>10000</fire-sequence>
+<documentation>
+
+<remarks>
+This trigger process issue for creating customer type profile.
+</remarks>
+
+<seealso cref="process usr issue"></seealso>
+
+</documentation>
+</trigger>

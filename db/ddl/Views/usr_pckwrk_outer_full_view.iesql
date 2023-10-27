@@ -1,0 +1,260 @@
+#use $DCSDIR/include
+#include <dcsddl.h>
+#include <dcscolwid.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+#use $SALDIR/include
+
+#include <salcolwid.h>
+
+mset command on
+
+/*
+ * This view provides pckwrk data and its outer con data.  it is called from [list ossi outer container pick header data] via les_cmd
+ * it has richer columns than usr_pckwrk_outer_view
+ */
+[drop view usr_pckwrk_outer_full_view] catch(@?)
+;
+/*get ossi table column list for default logic
+where table_name = 'vc_drp_cde_mst'
+and uc_output_col_select_clause = 'uc_ctxt_clause_vc_drp_cde_mst_sel'
+and uc_output_col_group_clause = 'uc_ctxt_clause_vc_drp_cde_mst_group'
+and column_source_prefix = 'vc_drp_cde_mst.'
+and column_name_prefix = ''
+|*/
+[
+create view usr_pckwrk_outer_full_view
+as
+            select pckwrk_hdr.wrkref uc_pw_hdr_wrkref,
+                   pckwrk_hdr.wrktyp uc_pw_hdr_wrktyp,
+                   pckwrk_hdr.prtnum uc_pw_hdr_prtnum,
+                   pckwrk_hdr.ftpcod uc_pw_hdr_ftpcod,
+                   pckwrk_hdr.revlvl uc_pw_hdr_revlvl,
+                   pckwrk_hdr.lodlvl uc_pw_hdr_lodlvl,
+                   pckwrk_hdr.lodnum uc_pw_hdr_lodnum,
+                   pckwrk_hdr.pck_uom uc_pw_hdr_pck_uom,
+                   pckwrk_hdr.pckqty  uc_pw_hdr_pckqty,
+                   pckwrk_hdr.appqty  uc_pw_hdr_appqty,
+                   pckwrk_hdr.adddte  uc_pw_hdr_adddte,
+                   pckwrk_hdr.lotnum  uc_pw_hdr_lotnum,
+                   pckwrk_dtl.subucc  uc_pw_hdr_subucc,
+                  -- pckwrk_hdr.vc_capnum uc_pw_hdr_vc_capnum,
+                   pckwrk_dtl.subucc  uc_pw_dtl_subucc,
+                   '(00) '|| substr(pckwrk_dtl.subucc, 3,1) || ' ' || substr(pckwrk_dtl.subucc,4,7) || ' ' || substr(pckwrk_dtl.subucc,11,9) || ' ' || substr(pckwrk_dtl.subucc,20,1)  uc_pw_dtl_ucc128_display,
+                   pckwrk_dtl.subnum  uc_pw_dtl_subnum,
+                   pckwrk_dtl.cmbcod  uc_pw_hdr_cmbcod,
+                   pckwrk_dtl.prt_client_id   uc_pw_hdr_prt_client_id,
+                   pckwrk_hdr.wh_id,
+                   ctry_mst_wh.iso_2_ctry_name  uc_pw_hdr_wh_ctry_iso2,
+                   ctry_mst_wh.iso_3_ctry_name  uc_pw_hdr_wh_ctry_iso3,
+                   nvl(adrmst_wh.locale_id,'US_ENGLISH') uc_pw_hdr_locale_id,
+                   pckwrk_dtl.cur_cas     uc_pw_hdr_cur_cas,
+                   pckwrk_dtl.tot_cas_cnt uc_pw_hdr_tot_cas_cnt,
+                   pckwrk_dtl.ship_id     uc_pw_hdr_ship_id,
+                   pckwrk_dtl.client_id   uc_pw_hdr_client_id,
+                   pckwrk_dtl.ordnum      uc_pw_hdr_ordnum,
+                   ord.ordnum ||'-'||shipment.ship_id    uc_pw_hdr_wms_pick_list_id,
+                   ord.ordtyp             uc_pw_hdr_ordtyp,
+                   to_char(ord.cpodte, 'Mon DD YYYY HH12:MIAM') uc_pw_hdr_order_date,
+                   ord.cponum             uc_pw_hdr_cponum,
+                   ord.payment_type       uc_pw_hdr_py_typ,
+                   ord.ord_frtrte         uc_pw_hdr_uc_ord_frtrte, 
+                   ord.rtcust             uc_pw_hdr_uc_rtcust,
+                   ord.stcust             uc_pw_hdr_uc_stcust,
+                   ord.adddte             uc_pw_hdr_uc_adddte,
+                   ord.cpotyp             uc_pw_hdr_uc_cpotyp, 
+                   --ord.uc_group_code      uc_pw_hdr_uc_group_code,
+                   --ord.uc_csttyp          uc_pw_hdr_uc_csttyp,
+                   pckwrk_hdr.ctncod      uc_pw_hdr_ctncod,
+                   dscmst_ctnmst.lngdsc    uc_pw_hdr_ctn_lngdsc,
+                   dscmst_ctnmst.short_dsc uc_pw_hdr_ctn_short_dsc,
+                   ctnmst.ctnlen          uc_pw_hdr_ctnlen,
+                   ctnmst.ctnwid          uc_pw_hdr_ctnwid,
+                   ctnmst.ctnhgt          uc_pw_hdr_ctnhgt,
+                   ctnmst.ctnlen * ctnmst.ctnwid * ctnmst.ctnhgt  uc_pw_hdr_ctnvol,
+                   ctnmst.ctnwgt          uc_pw_hdr_ctnwgt,
+                   prtftp_dtl.len         uc_pw_hdr_prtftp_len,
+                   prtftp_dtl.wid         uc_pw_hdr_prtftp_wid,
+                   prtftp_dtl.hgt         uc_pw_hdr_prtftp_hgt,
+                   prtftp_dtl.len*prtftp_dtl.wid*prtftp_dtl.hgt  uc_pw_hdr_prtftp_vol,
+                   /*
+                    * If it is a K pick then len/wid/hgt is the carton.  Else it is the prtftp_dtl
+                    */
+                   decode ( pckwrk_hdr.wrktyp, 'K', ctnmst.ctnlen, prtftp_dtl.len)  uc_use_caslen,
+                   decode ( pckwrk_hdr.wrktyp, 'K', ctnmst.ctnwid, prtftp_dtl.wid)  uc_use_caswid,
+                   decode ( pckwrk_hdr.wrktyp, 'K', ctnmst.ctnhgt, prtftp_dtl.hgt)  uc_use_cashgt,
+                   decode ( pckwrk_hdr.wrktyp, 'K', ctnmst.ctnlen * ctnmst.ctnwid * ctnmst.ctnhgt, 
+                   (prtftp_dtl.len*prtftp_dtl.wid*prtftp_dtl.hgt) * (cast(pckwrk_hdr.pckqty as float) / prtftp_dtl.untqty ))  uc_use_casvol,
+                   prtftp_dtl.grswgt                        uc_pw_hdr_grswgt,
+                   prtftp_dtl.netwgt                        uc_pw_hdr_netwgt,
+                   prtftp_dtl.cas_flg                       uc_pw_hdr_cas_flg,
+                   shipment_line.ship_line_id               uc_pw_hdr_ship_line_id,
+                   shipment_line.cons_batch  uc_pw_hdr_cons_batch,
+                   shipment.carcod           uc_pw_hdr_carcod,
+                   shipment.srvlvl           uc_pw_hdr_srvlvl,
+                   shipment.track_num        uc_pw_hdr_track_num,
+                   pckwrk_hdr.schbat         uc_pw_hdr_schbat,
+                   pckbat.adddte             uc_pw_hdr_schbat_adddte,
+                   pckwrk_hdr.srcloc         uc_pw_hdr_srcloc,
+                   locmst.aisle_id           uc_pw_hdr_aisle_id,
+                   loc_typ.loc_typ           uc_pw_hdr_loc_typ,
+                   pck_zone.pck_zone_cod     uc_pw_hdr_src_pck_zone_cod,
+                   sto_zone.sto_zone_cod     uc_pw_hdr_src_sto_zone_cod,
+                   mov_zone.mov_zone_cod     uc_pw_hdr_src_mov_zone_cod,
+                   adrmst_sfr.host_ext_id    uc_pw_hdr_sfr_host_ext_id,
+                   adrmst_sfr.adrnam         uc_pw_hdr_sfr_adrnam,
+                   adrmst_sfr.adrln1         uc_pw_hdr_sfr_adrln1,
+                   adrmst_sfr.adrln3         uc_pw_hdr_sfr_adrln3,
+                   adrmst_sfr.adrcty         uc_pw_hdr_sfr_adrcty,
+                   adrmst_sfr.adrstc         uc_pw_hdr_sfr_adrstc,
+                   adrmst_sfr.adrpsz         uc_pw_hdr_sfr_adrpsz,
+                   rpad(adrmst_sfr.adrcty  ,20,' ') || ' ' ||  rpad(substr(adrmst_sfr.adrstc,1,2),2,' ') || ' ' ||adrmst_sfr.adrpsz  uc_pw_hdr_sfr_adrln4,
+                   decode(adrmst.ctry_name,'USA',NULL,adrmst.ctry_name) uc_pw_hdr_sto_ctry_name,
+                   adrmst.rgncod             uc_pw_hdr_rt_rgncod,
+                   adrmst.ctry_name          uc_pw_hdr_rt_ctry_name,
+                   ctry_mst.iso_2_ctry_name  uc_pw_hdr_rt_ctry_iso2,
+                   ctry_mst.iso_3_ctry_name  uc_pw_hdr_rt_ctry_iso3,
+                   adrmst.adr_id             uc_pw_hdr_rt_adr_id,
+                   adrmst.adrnam             uc_pw_hdr_rt_adrnam,
+                   adrmst.cont_name          uc_pw_hdr_rt_cont_name,
+                   adrmst.first_name         uc_pw_hdr_rt_first_name,
+                   adrmst.last_name          uc_pw_hdr_rt_last_name,
+                   adrmst.adrstc             uc_pw_hdr_rt_adrstc,
+                   adrmst.adrpsz             uc_pw_hdr_rt_adrpsz,
+                   adrmst.adrcty             uc_pw_hdr_rt_adrcty,
+                   adrmst.adrln1             uc_pw_hdr_rt_adrln1,
+                   adrmst.adrln2             uc_pw_hdr_rt_adrln2,
+                   adrmst.adrln3             uc_pw_hdr_rt_adrln3,
+                   adrmst.attn_tel           uc_pw_hdr_rt_attn_tel,
+                   adrmst.phnnum             uc_pw_hdr_rt_phnnum,
+                   adrmst.faxnum             uc_pw_hdr_rt_faxnum,
+                   adrmst.adr_district       uc_pw_hdr_rt_district,
+                   adrmst_st.adr_id          uc_pw_hdr_st_adr_id,
+                   adrmst_st.adrnam          uc_pw_hdr_st_adrnam,
+                   adrmst_st.attn_name       uc_pw_hdr_st_attn_name,
+                   adrmst_st.first_name      uc_pw_hdr_st_first_name,
+                   adrmst_st.last_name       uc_pw_hdr_st_last_name,
+                   adrmst_st.honorific       uc_pw_hdr_st_honorific,
+                   adrmst_st.adrln1          uc_pw_hdr_st_adrln1,
+                   adrmst_st.adrln2          uc_pw_hdr_st_adrln2,
+                   adrmst_st.adrln3          uc_pw_hdr_st_adrln3,
+                   adrmst_st.adrcty          uc_pw_hdr_st_adrcty,
+                   adrmst_st.adrstc          uc_pw_hdr_st_adrstc,
+                   adrmst_st.adrpsz          uc_pw_hdr_st_adrpsz,
+                   rpad(adrmst_st.adrcty,20,' ') || ' ' ||  rpad(substr(adrmst_st.adrstc,1,2),2,' ') || ' ' ||adrmst_st.adrpsz   uc_pw_hdr_st_adrln4,
+                   adrmst_st.phnnum          uc_pw_hdr_st_phnnum,
+                   adrmst_st.attn_tel        uc_pw_hdr_st_attn_tel,
+                   adrmst_st.ctry_name       uc_pw_hdr_st_ctry_name,
+                   --adrmst_st.uc_adrtyp       uc_pw_hdr_uc_adrtyp,
+                   adrmst_wh.adrnam          uc_pw_hdr_wh_adrnam, 
+                   adrmst_wh.adrln1          uc_pw_hdr_wh_adrln1, 
+                   adrmst_wh.adrln2          uc_pw_hdr_wh_adrln2,
+                   adrmst_wh.adrln3          uc_pw_hdr_wh_adrln3,
+                   adrmst_wh.adrcty          uc_pw_hdr_wh_adrcty,
+                   adrmst_wh.adrstc          uc_pw_hdr_wh_adrstc,
+                   adrmst_wh.adrpsz          uc_pw_hdr_wh_adrpsz,
+                   adrmst_wh.ctry_name       uc_pw_hdr_wh_ctry_name,
+                   adrmst_wh.first_name      uc_pw_hdr_wh_first_name,
+                   adrmst_wh.phnnum          uc_pw_hdr_wh_phnnum,
+                   adrmst_wh.faxnum          uc_pw_hdr_wh_faxnum,
+                   adrmst_wh.attn_tel        uc_pw_hdr_wh_attn_tel,
+                   adrmst_wh.email_adr       uc_pw_hdr_wh_email_adr,
+                   adrmst_wh.rgncod          uc_pw_hdr_wh_rgncod,
+                   adrmst.adrcty || ' ' || adrmst.adrstc || ' ' || adrmst.adrpsz uc_pw_hdr_st_cty_st_zip,
+                   carhdr.carnam             uc_pw_hdr_carnam,
+                   carhdr.scacod             uc_pw_hdr_scacod,
+                   carhdr.accnum             uc_pw_hdr_accnum,
+                   pckmov.stoloc             uc_pw_hdr_stg_stoloc,
+                   mov_zone_lst.mov_zone_cod uc_pw_hdr_dst_mov_zone_cod,
+                   ord_line.deptno           uc_pw_hdr_ol_deptno,
+                   ord_line.early_dlvdte     uc_pw_hdr_ol_early_dlvdte,
+                   ord_line.early_shpdte     uc_pw_hdr_ol_early_shpdte,
+                   ord_line.late_dlvdte      uc_pw_hdr_ol_late_dlvdte,
+                   ord_line.late_shpdte      uc_pw_hdr_ol_late_shpdte,
+                   ord_line.prjnum           uc_pw_hdr_ol_prjnum,
+                   ord_line.cstprt           uc_pw_hdr_cstprt,
+                   shipment.early_dlvdte     uc_pw_hdr_sh_early_dlvdte,
+                   shipment.early_shpdte     uc_pw_hdr_sh_early_shpdte,
+                   shipment.late_dlvdte      uc_pw_hdr_sh_late_dlvdte,
+                   shipment.late_shpdte      uc_pw_hdr_sh_late_shpdte,
+                   pckwrk_hdr.ctncod         uc_use_ctncod,
+                   shipment.alcdte           uc_pw_hdr_alcdte,
+                   to_char(to_date(shipment.doc_num),'mmddyyyy')  uc_pw_hdr_sh_bol_num,
+                   shipment.track_num        uc_pw_hdr_sh_track_num,
+                   shipment.mst_waybill      uc_pw_hdr_sh_cons_id,
+                   car_move.doc_num          uc_pw_hdr_cm_doc_num,
+                   car_move.ctry_track_num   uc_pw_hdr_cm_track_num,
+                   stop.doc_num              uc_pw_hdr_stop_doc_num,
+                   stop.track_num            uc_pw_hdr_stop_track_num,
+                   sysdate                   uc_pw_hdr_print_date,
+                   prtmst.uc_base_curve      uc_pw_hdr_uc_base_curve,
+                   prtmst.uc_cylinder        uc_pw_hdr_uc_cylinder,
+                   prtmst.uc_diameter        uc_pw_hdr_uc_diameter,
+                   prtmst.uc_power           uc_pw_hdr_uc_power,
+                   prtmst.uc_axis            uc_pw_hdr_uc_axis,
+                   prtmst.dsp_prtnum         uc_pw_hdr_uc_dsp_prtnum
+        
+                   
+            from pckwrk_dtl
+                 join pckwrk_hdr on pckwrk_hdr.wrkref = pckwrk_dtl.wrkref
+                 left outer join pckbat on pckbat.schbat = pckwrk_hdr.schbat
+                 left outer join prtmst_view prtmst 
+                     on prtmst.prt_client_id = pckwrk_hdr.prt_client_id 
+                     and prtmst.prtnum = pckwrk_hdr.prtnum 
+                     and prtmst.wh_id = pckwrk_hdr.wh_id
+                 left outer join prtftp 
+                     on prtftp.prt_client_id = pckwrk_hdr.prt_client_id 
+                     and prtftp.prtnum = pckwrk_hdr.prtnum 
+                     and prtftp.wh_id = pckwrk_hdr.wh_id
+                     and prtftp.ftpcod = pckwrk_hdr.ftpcod
+                 left outer join prtftp_dtl
+                     on prtftp_dtl.prt_client_id = pckwrk_hdr.prt_client_id
+                     and prtftp_dtl.prtnum = pckwrk_hdr.prtnum
+                     and prtftp_dtl.ftpcod = pckwrk_hdr.ftpcod
+                     and prtftp_dtl.wh_id = pckwrk_hdr.wh_id
+                     and prtftp_dtl.uomcod = pckwrk_hdr.pck_uom
+                 left outer join ord
+                     on ord.wh_id = pckwrk_dtl.wh_id
+                     and ord.client_id = pckwrk_dtl.client_id
+                     and ord.ordnum = pckwrk_dtl.ordnum
+                 --left outer join vc_drp_cde_mst on vc_drp_cde_mst.wh_id = ord.wh_id and vc_drp_cde_mst.vc_drpcde = ord.ordtyp
+                 left outer join ord_line
+                    on ord_line.wh_id = pckwrk_dtl.wh_id
+                     and ord_line.client_id = pckwrk_dtl.client_id
+                     and ord_line.ordnum = pckwrk_dtl.ordnum
+                     and ord_line.ordlin = pckwrk_dtl.ordlin
+                     and ord_line.ordsln = pckwrk_dtl.ordsln
+                left outer join shipment_line on shipment_line.ship_line_id = pckwrk_dtl.ship_line_id
+                 left outer join shipment  on shipment.ship_id = pckwrk_dtl.ship_id
+                 left outer join stop  on stop.stop_id = shipment.stop_id
+                 left outer join car_move  on car_move.car_move_id = stop.car_move_id
+                 left outer join locmst on locmst.wh_id = pckwrk_hdr.wh_id and locmst.stoloc = pckwrk_hdr.srcloc
+                 left outer join loc_typ on loc_typ.loc_typ_id = locmst.loc_typ_id
+                 left outer join pck_zone on pck_zone.pck_zone_id = locmst.pck_zone_id
+                 left outer join mov_zone on mov_zone.mov_zone_id = locmst.mov_zone_id
+                 left outer join sto_zone on sto_zone.sto_zone_id = locmst.sto_zone_id
+                 left outer join adrmst on adrmst.adr_id = shipment.rt_adr_id
+                 left outer join adrmst adrmst_st on adrmst_st.adr_id = ord.st_adr_id
+                 left outer join ctry_mst on ctry_mst.ctry_name = adrmst.ctry_name
+                 left outer join wh on wh.wh_id = pckwrk_hdr.wh_id
+                 left outer join adrmst adrmst_wh on adrmst_wh.adr_id = wh.adr_id
+                 left outer join ctnmst on ctnmst.wh_id = pckwrk_hdr.wh_id and ctnmst.ctncod = pckwrk_hdr.ctncod
+                 left outer join dscmst dscmst_ctnmst
+                     on dscmst_ctnmst.colnam = 'ctncod|wh_id'
+                     and dscmst_ctnmst.colval = ctnmst.ctncod || '|' || ctnmst.wh_id
+                    and dscmst_ctnmst.locale_id = 'US_ENGLISH'
+                 left outer join ctry_mst ctry_mst_wh on ctry_mst_wh.ctry_name = adrmst_wh.ctry_name
+                 left outer join carhdr on carhdr.carcod = shipment.carcod
+                left outer join bldg_mst bldg_mst on bldg_mst.bldg_id = sto_zone.bldg_id and bldg_mst.wh_id = sto_zone.wh_id
+                 left outer join adrmst adrmst_sfr on adrmst_sfr.adr_id = bldg_mst.adr_id 
+                 /*
+                  * Get last hop
+                  */
+                 join pckmov 
+                     on pckmov.cmbcod = pckwrk_dtl.cmbcod
+                     and pckmov.seqnum = ( select max(seqnum) from pckmov pm2 where pm2.cmbcod = pckmov.cmbcod)
+                 left outer join mov_zone mov_zone_lst on mov_zone_lst.mov_zone_id = pckmov.mov_zone_id
+]
+RUN_DDL
+
+mset command on

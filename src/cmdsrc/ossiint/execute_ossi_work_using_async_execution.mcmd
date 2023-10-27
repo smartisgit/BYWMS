@@ -1,0 +1,282 @@
+<command>
+<name>execute ossi work using async execution</name>
+<description>Execute a piece of defined work using async execution</description>
+
+<argument name="uc_ossi_job_id" required="yes" datatype="string">name of the job</argument>
+<argument name="uc_ossi_who" required="yes" datatype="string">who field of job</argument>
+<argument name="uc_get_work_cmd" required="yes" datatype="string"></argument>
+<argument name="uc_num_concurrent_calls" required="yes" datatype="string"></argument>
+<argument name="uc_do_work_cmd" required="yes" datatype="string"></argument>
+<argument name="uc_update_status_cmd" required="yes" datatype="string"></argument>
+<argument name="uc_pk_col" required="yes" datatype="string">Which column for resultset is considered PK for logging</argument>
+<argument name="uc_data_col" required="yes" datatype="string">Which column for resultset is considered data for logging</argument>
+<argument name="comflg" required="yes" datatype="string"></argument>
+<argument name="uc_cnt_sig_cols" required="yes" datatype="string">How many columns from start of result set to push to submit</argument>
+<argument name="uc_exec_status_col" required="no" datatype="string">Execution Status column</argument>
+<argument name="uc_exec_message_col" required="no" datatype="string">Execution message column</argument>
+
+<type>Local Syntax</type>
+
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+publish data
+where uc_ossi_job_id = nvl(@uc_ossi_job_id, 'OSSI_ASYNC')
+and uc_ossi_who  = @uc_ossi_who
+and comflg = iif(@comflg is null, 0, @comflg)
+and uc_cnt_sig_cols = nvl(@uc_cnt_sig_cols, 8)
+and uc_update_status_cmd_passed = iif ( @uc_update_status_cmd is null, '0', '1' )
+|
+publish data
+where uc_update_status_cmd = nvl(@uc_update_status_cmd, 'noop' )
+|
+/*
+ * If explicitly say dont commit that implies no multi threading
+ */
+if ( @comflg = 0 )
+    publish data
+    where uc_num_concurrent_calls = 0
+|
+if ( @uc_num_concurrent_calls is null or @uc_num_concurrent_calls < 0)
+    publish data
+    where uc_num_concurrent_calls = ossi__polval_nc ( upper(@uc_ossi_job_id), 'SETUP', 'NUM-CONCURRENT-CALLS', '', 'rtnum1', @wh_id )
+|
+{
+    register ossi job or module
+    where uc_ossi_module_id = @uc_ossi_job_id
+    |
+    try
+    {
+        {
+            publish data
+            where uc_ossi_module_seq = ossi__register_module( @uc_ossi_job_seq, 'GET_WORK', '', @uc_ossi_who )
+            |
+            try
+            {
+                execute server command 
+                where cmd = @uc_get_work_cmd
+                and inline = 1
+                catch (-1403,510)
+                >> res
+            }
+            finally
+            {
+                complete ossi job log
+            }
+            |
+            publish data 
+            where res = @res
+        } /* get the work */
+        |
+        publish data
+        where uc_work_count = rowcount(@res)
+        |
+        if ( @uc_work_count > 0 )
+        {
+            [[
+            import java.util.concurrent.*;
+            import com.redprairie.moca.*;
+            //
+            List<Future<MocaResults>> results = new ArrayList<Future<MocaResults>>();
+            AsynchronousExecutor async = MocaUtils.asyncExecutor();
+            MocaResults retRes = null;
+            boolean isComplete = false;
+            Integer rownum = 0;
+            while (!isComplete)
+            {
+                isComplete = true;
+                //
+                MocaResults modRes = moca.executeCommand(" publish data " +
+                                                         " where uc_ossi_module_seq = ossi__register_module( @uc_ossi_job_seq, 'DO_WORK', 'concur=' || @uc_num_concurrent_calls, @uc_ossi_who )",
+                                                         [uc_ossi_job_seq:uc_ossi_job_seq,
+                                                          uc_num_concurrent_calls:uc_num_concurrent_calls,
+                                                          uc_ossi_who:uc_ossi_who] );
+                if (modRes.next())
+                {
+                    uc_ossi_module_seq = modRes.getInt("uc_ossi_module_seq");
+                }
+                while (res.next())
+                {
+                    rownum++;
+                    // 
+                    // In loop get all the columns from res for 1 row  construct a where clause
+                    // with that data for the do_work command.  
+                    // Also I want to have a register action around the full execution of the n calls
+                    // action will be SUBMIT.  And data will be 5-<from>-<to>.  uc_pk_col is passed in
+                    // above for e.g. ship_id so I should see that 5 were submitted at 12:00:00 and 
+                    // this was the range for 5.  Then that submission was complete on 12:00:10 or something
+                    // 
+                    //
+                    String uc_pk_data = res.getString(uc_pk_col);
+                    String uc_data;
+                    //
+                    if (uc_data_col != null && uc_data_col != "" )
+                        uc_data = res.getString(uc_data_col);
+                    else
+                        uc_data = "";
+                    //
+                    StringBuilder cmdBuf = new StringBuilder();
+                    StringBuilder updateStatusCmdBuf = new StringBuilder();
+                    //
+                    for (int i=0; i<res.getColumnCount(); i++)
+                    {
+                        if (i<=uc_cnt_sig_cols)
+                        {
+                            moca.trace(res.getColumnName(i) + " = " + res.getString(i));
+                        }
+                        if (cmdBuf.length() == 0 )
+                        {
+                            cmdBuf.append(uc_do_work_cmd ); 
+                            updateStatusCmdBuf.append ( uc_update_status_cmd );
+                        }
+
+                        // If already have where append and else append where
+                        if ( cmdBuf.toString().indexOf ("where") >= 0 )
+                        {
+                            cmdBuf.append( " and " );
+                            updateStatusCmdBuf.append ( " and " );
+                        }
+                        else
+                        {
+                            cmdBuf.append( " where " );
+                            updateStatusCmdBuf.append ( " where " );
+                        }
+                        //
+                        if ( res.getString(i) == null || res.getString(i).length() == 0 )
+                            this_value = "";
+                        else
+                            this_value = res.getString(i);
+                        //
+                        cmdBuf.append( res.getColumnName(i) + " = '" + this_value + "'");
+                        updateStatusCmdBuf.append ( res.getColumnName(i) + " = '" +this_value + "'");
+                        //
+                    } // next i column
+                    // ossi__register_module is NOT thread-safe, so get the module sequence in this thread
+                    int uc_ossi_module_seq_do;
+                    MocaResults actRes = moca.executeCommand(" publish data " +
+                                                             " where uc_ossi_module_seq = ossi__register_module( @uc_ossi_job_seq, 'DO-' || @uc_pk_data, @rownum || ' of ' || @uc_work_count || '-' || @uc_data, @uc_ossi_who )",
+                                                             [uc_ossi_job_seq:uc_ossi_job_seq,
+                                                              uc_pk_data:uc_pk_data,
+                                                              rownum:rownum,
+                                                              uc_work_count:uc_work_count,
+                                                              uc_data:uc_data,
+                                                              uc_ossi_who:uc_ossi_who] );
+                    if (actRes.next())
+                    {
+                        uc_ossi_module_seq_do = actRes.getInt("uc_ossi_module_seq");
+                    }
+                    // create this new command.  Idea here is that this command can call an existing command
+                    // and do commit/rollback if needed
+                    // ALSO HANDLE THE CASE THAT IF I AM CALLING WITH uc_num_concurrent_calls = 0 or 1 then do a straight
+                    // call to the uc_do_work_cmd.  I want to be able to do that for testing  
+                    Callable<MocaResults> callable = MocaUtils.mocaCommandCallable(" execute ossi one row for async execution " +
+                                                                                   " where uc_ossi_job_seq = '" + uc_ossi_job_seq + "'" +
+                                                                                   " and uc_ossi_module_seq = '" + uc_ossi_module_seq_do + "'" +
+                                                                                   " and uc_ossi_who = '" + uc_ossi_who + "'" +
+                                                                                   " and comflg = '" + comflg + "'" +
+                                                                                   " and uc_exec_status_col = '" + uc_exec_status_col + "'" +
+                                                                                   " and uc_exec_message_col= '" + uc_exec_message_col+ "'" +
+                                                                                   " and uc_update_status_passed = '" + uc_update_status_cmd_passed + "'" +
+                                                                                   " and uc_update_status_cmd = \"" + updateStatusCmdBuf + "\"" +
+                                                                                   " and uc_full_moca_cmd = \"" + cmdBuf + "\"");
+                    // The callback handles the results
+                    if (uc_num_concurrent_calls <= 1)
+                    {
+                        retRes = callable.call();
+                        isComplete = false;
+                        break;
+                    }
+                    else
+                    {
+                        results.add(async.executeAsynchronously(callable));
+                    }
+                    //
+                    if (results.size() >= uc_num_concurrent_calls)
+                    {
+                        isComplete = false;
+                        break;
+                    }
+                }
+                //
+                if (results.size() > 0)
+                {
+                    moca.trace("Process " + results.size() + " results");
+                    for (Future<MocaResults> future : results) 
+                    {
+                        try 
+                        {
+                            MocaResults futureRes = future.get();
+                            if (futureRes != null)
+                            {
+                                if (retRes == null)
+                                {
+                                    retRes = futureRes;
+                                }
+                                else if (futureRes.next())
+                                {
+                                    retRes.addRow();
+                                    for (int j=0; j<futureRes.getColumnCount(); j++)
+                                    {
+                                        retRes.setValue(j, futureRes.getValue(j));
+                                    }
+                                }
+                            }
+                        }
+                        catch (InterruptedException e) 
+                        {
+                            // The least we should do is rethrow
+                            throw new MocaInterruptedException(e);
+                        }
+                        catch (ExecutionException e) 
+                        {
+                            moca.trace("EXCEPTION: " + e.getMessage());
+                        }
+                    } // next future
+                    results.clear();
+                } // result > 0
+                moca.executeInline(" complete ossi job log " +
+                                   " where uc_ossi_module_seq = '" + uc_ossi_module_seq + "'");
+            } // !complete
+            [retRes:retRes]
+            ]]
+            |
+            publish data combination
+            where res = @retRes
+        } 
+        >> retRes
+        |
+        complete ossi job or module
+        |
+        if (rowcount(@retRes) > 0)
+        {
+            publish data combination
+            where res = @retRes
+        }
+    }
+    catch (@?)
+    {
+        raise ossi job error
+        where uc_ossi_err_code  = @?
+        and   uc_ossi_err_descr = @!
+        and   is_job_flg = '0'
+    }
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+If we have anything where we get a queue of work and want to process each row.  This will do that work
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+</documentation>
+</command>

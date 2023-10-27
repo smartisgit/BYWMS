@@ -1,0 +1,178 @@
+<command>
+<name>list ossi version control information for data core</name>
+<description>Core component to extract the version control information for reporting purposes.</description>
+
+<argument name="uc_table_name" required="yes" datatype="string">Which table</argument>
+<argument name="uc_svn_env_id" required="no" datatype="string">First part of the checked in object name that tells the environment</argument>
+
+<argument name="uc_data_version_control_lookup_expr" required="no" datatype="string">Expression for looking up chcked in data</argument>
+<argument name="uc_data_version_control_rpt_object_expr" required="no" datatype="string">How do we extract the part of file name that is checked in to report</argument>
+
+<argument name="uc_data_version_control_get_all_keys_suffix_expr" required="no" datatype="string">How do we extract the part of file name that is checked in to report</argument>
+
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+publish data
+where uc_table_name = lower(@uc_table_name)
+and uc_data_version_control_lookup_expr = lower(@uc_data_version_control_lookup_expr)
+|
+publish data
+where uc_data_version_control_path = '/trunk/db/data/load/base/%/' || @uc_table_name
+|
+publish data
+where uc_data_version_control_lookup_expr_full = @uc_svn_env_id || @uc_data_version_control_path || '/' || @uc_data_version_control_lookup_expr
+and uc_data_version_control_get_all_keys_suffix_expr = nvl(@uc_data_version_control_get_all_keys_suffix_expr, "\_\_%" )
+|
+{
+    release internal tables
+    ;
+    /*
+     * Extract the whole bug ckin data into internal table
+     */
+    execute ossi bugzilla select
+    where uc_select_stmt = " select ckin.bug_id, "
+                        || "        ckin.ossi_seqnum,"
+                        || "        ckin.ossi_action,"
+                        || "        ckin.ossi_file_path,"
+                        || "        ckin.ossi_author,"
+                        || "        ckin.ossi_rev,"
+                        || "        ckin.ossi_ckin_dt,"
+                        || "        bugs.short_desc,"
+                        || "        bugs.cf_rollout,"
+                        || "        bugs.cf_customer_issue_number,"
+                        || "        bugs.cf_release_notes"
+                        || " from ossi_bug_ckin_data ckin"
+                        || "      join bugs on bugs.bug_id = ckin.bug_id"
+                        || " where lower(ckin.ossi_file_path) like @uc_data_version_control_lookup_expr_full "
+                        || " and ckin.ossi_file_path not like '%/'"
+    >> res_all_vc_data
+    |
+    {
+        create internal table where table_name = 'uc_all_vc_data' and res = @res_all_vc_data
+    }
+    ;
+    select from internal table
+    where select_stmt = " select distinct " || @uc_data_version_control_rpt_object_expr || " uc_file_path_part"
+    and table_name = 'uc_all_vc_data'
+    |
+    {
+        [
+        select substr(@uc_file_path_part,instr(@uc_file_path_part, '/', -1)+1) uc_rev_log_filnam,
+               substr(@uc_file_path_part,1,instr(@uc_file_path_part, '/', -1)-1) uc_rev_log_dirnam
+        from dual
+        ]
+        |
+        publish data
+        where lk_uc_file_path_part = ossi__replace( @uc_file_path_part, '_', '\_' )
+        |
+        /*
+         * Get summarized list of bugs that affect this
+         */
+        select from internal table
+        where select_stmt = " select bug_id, cf_customer_issue_number, short_desc, cf_release_notes, cf_rollout, ossi_author, max(ossi_ckin_dt) ossi_ckin_dt, min(ossi_rev) min_rev, max(ossi_rev) max_rev"
+        and where_clause = "where ossi_file_path like '" || @lk_uc_file_path_part || @uc_data_version_control_get_all_keys_suffix_expr || "' escape '\'"
+        and table_name = 'uc_all_vc_data'
+        and group_by_clause = "group by bug_id, cf_customer_issue_number, short_desc, cf_release_notes, cf_rollout, ossi_author"
+        and order_by_clause = "order by ossi_ckin_dt desc, bug_id"
+        catch (-1403,510)
+        |
+        if ( @? = 0 )
+        {
+            {
+                {
+                    /* Now get the PKs within this bug */
+                    select from internal table
+                    where select_stmt = " select ossi_file_path, substr(max(ltrim(to_char(ossi_rev,'099999999')) || ossi_action),10) ossi_action"
+                    and where_clause = " where ossi_file_path like '" || @lk_uc_file_path_part || @uc_data_version_control_get_all_keys_suffix_expr || "%' escape '\'"
+                                    || " and bug_id = " || @bug_id || " "
+                    and group_by_clause = "group by ossi_file_path"
+                    and table_name = 'uc_all_vc_data'
+                    and order_by_clause = "order by 1"
+                    catch (-1403,510)
+                    |
+                    if ( @? = 0 )
+                        publish data
+                        where ossi_file_path = @ossi_file_path
+                        and ossi_action = @ossi_action
+                        /*
+                         * For stuff where we want to report the full PK here, e.g. serv_mst uc_data_version_control_get_all_keys_suffix_expr will be %
+                         * vs when we are reporting maps we group them in here
+                         */
+                        and uc_ossi_file_path_pk_part = iif 
+                                                        (
+                                                            @uc_data_version_control_get_all_keys_suffix_expr = '%',
+                                                            ossi__replace ( ossi__replace( @ossi_file_path, @uc_rev_log_dirnam, ''),  '.csv', '' ),
+                                                            ossi__replace ( ossi__replace( @ossi_file_path, @uc_file_path_part, '' ), '.csv', '' )
+                                                        )
+                }
+                >> uc_res_pks_affected
+            }
+            |
+            filter data 
+            where moca_filter_level = 3
+            and uc_file_path_part = @uc_file_path_part
+            and uc_rev_log_filnam = @uc_rev_log_filnam
+            and uc_rev_log_dirnam = @uc_rev_log_dirnam
+            and uc_res_pks_affected = @uc_res_pks_affected
+            and uc_data_version_control_get_all_keys_suffix_expr = @uc_data_version_control_get_all_keys_suffix_expr
+            and use_uc_rev_log_filnam = ossi__html_val ( @uc_rev_log_filnam, 1 ) || '.html'
+        }
+    } /* part of file path */
+
+} /* main */
+
+
+    
+]]>
+</local-syntax>
+
+
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This returns the rows as indicated below for data that is checked in.  Data is checked in at PK level but this makes it at a higher level
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+
+<retcol name="bug_id" type="COMTYP_CHAR"></retcol>
+<retcol name="cf_customer_issue_number" type="COMTYP_CHAR"></retcol>
+<retcol name="short_desc" type="COMTYP_CHAR"></retcol>
+<retcol name="cf_release_notes" type="COMTYP_CHAR"></retcol>
+<retcol name="cf_rollout" type="COMTYP_CHAR"></retcol>
+<retcol name="ossi_author" type="COMTYP_CHAR"></retcol>
+<retcol name="ossi_ckin_dt" type="COMTYP_CHAR"></retcol>
+<retcol name="min_rev" type="COMTYP_CHAR"></retcol>
+<retcol name="max_rev" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_file_path_part" type="COMTYP_CHAR">This is the part of the checked in file name</retcol>
+<retcol name="uc_rev_log_filnam" type="COMTYP_CHAR">This is the file name in revision log</retcol>
+<retcol name="use_uc_rev_log_filnam" type="COMTYP_CHAR">This is the filename to use.  Replaces spaces and special chars</retcol>
+<retcol name="uc_rev_log_dirnam" type="COMTYP_CHAR">This is the directory</retcol>
+<retcol name="uc_res_pks_affected" type="COMTYP_CHAR">
+    This is the recordset of base objects within.  It has miultiple rows.  Columns are 
+    ossi_file_path (full file path), ossi_action (action done) uc_ossi_file_path_pk_part (just the PK level part)
+</retcol>
+
+
+<exception value="eOK">The command completed successfully.</exception>
+<exception value="510">If variable was not passed and no default was passed.</exception>
+
+<seealso cref="filter data"></seealso>
+</documentation>
+
+</command>

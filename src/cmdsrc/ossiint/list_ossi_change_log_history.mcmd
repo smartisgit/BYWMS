@@ -1,0 +1,134 @@
+<command>
+<name>list ossi change log history</name>
+<description>This command will list the history of data change.  It is used by frontend screens to show the history</description>
+
+<argument datatype="string" name="uc_log_table_name"></argument>
+<argument datatype="string" name="uc_rule_grp_id"></argument>
+<argument datatype="string" name="uc_rule_subgrp_id"></argument>
+<argument datatype="string" name="uc_rule_id"></argument>
+<argument datatype="string" name="seqnum"></argument>
+<argument datatype="string" name="uc_show_blank_for_repeat">If 1 we dont show the value for T on a change for key fields</argument>
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+publish data
+where uc_show_blank_for_repeat = nvl(@uc_show_blank_for_repeat, 1 )
+|
+if ( @uc_rule_grp_id is null ) hide stack variable where name = 'uc_rule_grp_id'
+|
+if ( @uc_rule_subgrp_id is null ) hide stack variable where name = 'uc_rule_subgrp_id'
+|
+if ( @uc_rule_id is null ) hide stack variable where name = 'uc_rule_id'
+|
+if ( @seqnum is null ) hide stack variable where name = 'seqnum'
+|
+{
+    if(@uc_log_table_name='usr_rule_engine_expr') 
+    {
+        publish data
+        where select_clause =''
+              || decode ( @uc_rule_grp_id,    null, ',hh.uc_rule_grp_id', '' )
+              || decode ( @uc_rule_subgrp_id, null, ',hh.uc_rule_subgrp_id', '' )
+              || decode ( @seqnum,            null, ',hh.seqnum','' )
+              || ",hh.srtseq"
+              || ",ena_flg"
+              || ",uc_rule_expr"
+              || ",uc_rule_value"
+              || ",uc_rule_parm_01"
+              || ",uc_cust_flg"
+              || ",uc_rule_comment"
+              || ",uc_rule_parm_02"
+              || ",uc_rule_catg_cd"
+    }
+    else if(@uc_log_table_name='usr_rule_engine_cond_expr') 
+    {
+        publish data 
+        where select_clause =''
+              || decode ( @uc_rule_grp_id,    null, ',hh.uc_rule_grp_id', '' )
+              || decode ( @uc_rule_subgrp_id, null, ',hh.uc_rule_subgrp_id', '' )
+              || decode ( @uc_rule_id,        null, ',hh.uc_rule_id', '' )
+              || decode ( @seqnum,            null, ',hh.seqnum','' )
+              || ",hh.srtseq"
+              || ",ena_flg"
+              || ",uc_condition_expr"
+              || ",uc_execute_cmd"
+              || ",uc_cust_flg"
+              || ",uc_rule_comment"
+    }
+    |
+    [
+    select dense_rank() over (order by dd.dlytrn_id ) uc_change_seq,
+           dd.trndte,
+           dd.usr_id,
+           dd.devcod,
+           hh.uc_log_oper_cd,
+           hh.uc_data_change_typ_cd
+           @select_clause:raw
+    from usr_data_change_hist_log hh
+         join dlytrn dd
+             on dd.trndtl_id = hh.uc_data_change_hist_id
+    where 1=1
+    and dd.actcod = 'UC_HISLOG' 
+    and hh.uc_log_table_name = @uc_log_table_name
+    and @+hh.uc_rule_grp_id
+    and @+hh.uc_rule_subgrp_id
+    and @+hh.uc_rule_id
+    and @+hh.seqnum
+    order by  /*#nobind*/
+        dd.dlytrn_id,
+        decode ( hh.uc_data_change_typ_cd, 'F', 1, 2 )
+    ]
+    |
+    publish data
+    where my_uc_log_oper_cd = @uc_log_oper_cd
+    and my_data_change_typ_cd = @uc_data_change_typ_cd
+    |
+    filter data
+    where moca_filter_level = 2
+    and uc_change_seq         = iif ( @uc_show_blank_for_repeat = 1 and @my_uc_log_oper_cd = 'C' and @my_data_change_typ_cd = 'T', null, @uc_change_seq )
+    and usr_id                = iif ( @uc_show_blank_for_repeat = 1 and @my_uc_log_oper_cd = 'C' and @my_data_change_typ_cd = 'T', null, @usr_id )
+    and trndte                = iif ( @uc_show_blank_for_repeat = 1 and @my_uc_log_oper_cd = 'C' and @my_data_change_typ_cd = 'T', null, @trndte )
+    and devcod                = iif ( @uc_show_blank_for_repeat = 1 and @my_uc_log_oper_cd = 'C' and @my_data_change_typ_cd = 'T', null, @devcod )
+    and uc_log_oper_cd        = iif ( @uc_show_blank_for_repeat = 1 and @my_uc_log_oper_cd = 'C' and @my_data_change_typ_cd = 'T', null, @uc_log_oper_cd )
+}
+    
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+   This command is called by the rule engine maint screens (for now) to show the change history.  But name is open so that we can use it
+   for other cases as well.  Idea is to pass table name and then have the select list be approproate for that table.
+</p>
+]]>
+</remarks>
+
+<retrows>n</retrows>
+
+
+<retcol name="uc_change_seq" type="COMTYP_CHAR">Change#.  it increases for every change so F and T row have same value</retcol>
+<retcol name="trndte" type="COMTYP_CHAR">Date/time of change</retcol>
+<retcol name="usr_id" type="COMTYP_CHAR"></retcol>
+<retcol name="devcod" type="COMTYP_CHAR"></retcol>
+<retcol name="uc_log_oper_cd" type="COMTYP_CHAR">A C or D</retcol>
+<retcol name="uc_data_change_typ_cd" type="COMTYP_CHAR">F or T</retcol>
+<retcol name="@*" type="COMTYP_CHAR">Reset are flexible based on type of data</retcol>
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+<seealso cref="list ossi data change history log"></seealso>
+
+</documentation>
+
+
+
+</command>

@@ -1,0 +1,61 @@
+<command>
+<name>get ossi printer information</name>
+<description>Get the printer information.</description>
+
+<argument name="printer" required="no" datatype="string"></argument>
+<argument name="wh_id" required="yes" datatype="string"></argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+publish data
+where prtadr = nvl(@prtadr, @printer)
+|
+{
+    [
+    select prsmst.prtadr,
+           prsmst.wh_id,
+           prsmst.rerprt,
+           prsmst.prtsts,
+           prsmst.prtnam,
+           prsmst.prttyp,
+           prsmst.svqflg,
+           prsmst.prtque,
+           prsmst.tcpadr,
+           nvl(prsmst_rr.prtadr, prsmst.prtadr ) use_prtadr,
+           nvl(prsmst_rr.tcpadr, prsmst.tcpadr ) use_tcpadr,
+           nvl(prsmst_rr.prtnam, prsmst.prtnam ) use_prtnam,
+           nvl(prsmst_rr.prttyp, prsmst.prttyp ) use_prttyp,
+           nvl(prsmst_rr.svqflg, prsmst.svqflg ) use_svqflg,
+           nvl(prsmst_rr.prtque, prsmst.prtque ) use_prtque
+    from prsmst
+         left outer join prsmst prsmst_rr
+             on prsmst_rr.prtadr = prsmst.rerprt
+    where prsmst.prtadr = @prtadr
+    ]
+    catch (-1403,510)
+    |
+    if ( @? = 0 )
+        filter data
+        where moca_filter_level = 1
+        and uc_reason = 'Found in prsmst'
+    else
+        publish data
+        where use_prtque = @prtadr
+        and prtadr = @prtadr
+        and uc_reason = 'Not found in prsmst'
+}
+
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This command is used to get printer information.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

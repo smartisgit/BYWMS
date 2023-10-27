@@ -1,0 +1,40 @@
+<command>
+<name>generate ossi filename</name>
+<description>Change the filename until a name is found that does not exist</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+[[
+  int index = 1;
+  outfile_name = filnam + "." + extension
+  while (new File(outfile_name).exists()) 
+  {
+    index++;
+    outfile_name = filnam + "-" + index + "." + extension
+  }
+[outfile_name:outfile_name]
+]]
+
+]]>
+</local-syntax>
+<argument name="filnam" required="yes" datatype="string"></argument>
+<argument name="extension" required="yes" datatype="string"></argument>
+
+<documentation>
+
+<remarks>
+Get a unique file name by trying suffixes until we find one that does not exist.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

@@ -1,0 +1,85 @@
+<command>
+<name>execute ossi blob service</name>
+<description>Interact with the Blob Service provided by Microsoft
+</description>
+<type>Local Syntax</type>
+
+<argument name="uc_az_service" required="yes" datatype="string">This is a tag for the service.  Following are supported
+    blob list:  List the blobs
+    blob upload: To upload blob
+    blob url: Get the URL of the named blob
+    blob download: Download the Blob to a file
+</argument>
+
+<argument name="uc_az_blob_container" required="no" datatype="string">name of the comtainer.  if not specified use @@UC_DOC_Q_UPLOAD_CONTAINER</argument>
+<argument name="uc_az_blob_account" required="no" datatype="string">name of the account.  if not specified use @@UC_DOC_Q_UPLOAD_ACCOUNT</argument>
+<argument name="uc_az_blob_sas_token" required="no" datatype="string">value of the SAS token.  if not specified use @@UC_DOC_Q_UPLOAD_SAS_TOKEN</argument>
+<argument name="uc_az_pgm" required="no" datatype="string">program to use.  if not specified use env var UC_AZ_PGM.  if that is not set default to az</argument>
+
+<argument name="uc_upload_filepath" required="no" datatype="string">When blob upload, the file path</argument>
+<argument name="uc_upload_id" required="no" datatype="string">When blob upload or blob url, the name of the uploded file</argument>
+<argument name="uc_upload_metadata" required="no" datatype="results">When blob upload, A moca resultset with column_name and column_value</argument>
+
+
+<argument name="uc_download_filepath" required="no" datatype="string">When blob download, the file path</argument>
+
+
+<argument name="uc_list_filter" required="no" datatype="string">When blob list, The filter clause but az rules</argument>
+
+<local-syntax>
+<![CDATA[
+
+publish data
+where uc_blob_service_method = ossi__polval ( 'USR-OSSI-DOC-UPLOAD-Q', 'SETUP', 'BLOB-API-INTERFACE', '', 'rtstr1', '----' )
+and uc_blob_service_url = nvl( @@UC_DOC_Q_SERVICE_URL, ossi__polval ( 'USR-OSSI-DOC-UPLOAD-Q', 'SETUP', 'BLOB-API-INTERFACE', '', 'rtstr2', '----' ) )
+|
+if ( @uc_blob_service_method = 'az' )
+{
+    publish data
+    where uc_az_blob_container = nvl(@uc_az_blob_container, @@UC_DOC_Q_UPLOAD_CONTAINER )
+    and   uc_az_blob_account   = nvl(@uc_az_blob_account,   @@UC_DOC_Q_UPLOAD_ACCOUNT )
+    and   uc_az_blob_sas_token = nvl(@uc_az_blob_sas_token, @@UC_DOC_Q_UPLOAD_SAS_TOKEN )
+    |
+    {
+        execute ossi blob service using az
+    }
+}
+else if ( @uc_blob_service_method = 'oogy' )
+{
+    execute ossi blob service using oogy
+    where uc_oogy_url = @uc_blob_service_url
+    and uc_oogy_service = @uc_az_service
+}
+
+
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+   Interact with azure services using the setup method and return results consistently
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+<retcol name="cmd_result" type="COMTYP_CHAR">A JSON string</retcol>
+
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+<seealso cref="execute ossi blob service using az">We dont call it directly.  We call this and then it calls the underlying command per setup</seealso>
+<seealso cref="parse ossi document queue json to res"></seealso>
+
+
+</documentation>
+
+
+
+</command>

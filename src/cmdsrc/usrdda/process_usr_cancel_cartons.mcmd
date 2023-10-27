@@ -1,0 +1,185 @@
+<command>
+<name>process usr cancel cartons</name>
+<description>process usr cancel cartons</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+[select subnum
+   from invsub 
+  where subucc = @subnum
+  union
+ select subnum
+   from invsub 
+  where subnum = @subnum 
+]catch (-1403)
+|
+/* Make all detail in the carton non physical so they can be merged at putaway*/
+{
+  [update invdtl 
+      set phdflg=0 
+    where subnum=@subnum
+  ] catch(-1403) 
+}
+|
+/* Cancel the serial number that have been captured */
+{
+  [select id.dtlnum, 
+          isn.* 
+     from invdtl id 
+     join inv_ser_num isn
+       on id.dtlnum = isn.invtid 
+    where isn.ser_lvl = 'D' 
+      and id.subnum=@subnum
+  ] catch(-1403) 
+  |
+  if (@?=0)
+  remove inventory serial number 
+    where ser_num = @ser_num 
+      and ser_num_typ_id = @ser_num_typ_id 
+      and invtid = @invtid catch(-1403) 
+  |
+  noop 
+  ;
+}
+|
+/* If putaway sheet is not printed do not allow cancel */
+[select 1 putaway_printed 
+   from invsub 
+  where subnum = @subnum 
+    and vc_putaway_sheet_printed_flg = 1 
+] catch (-1403) 
+|
+if (@putaway_printed != 1)
+{
+  set return status 
+    where status = 88225 
+}
+|
+/* Update the back order flag */
+[update ord_line
+    set bckflg = 0 
+  where exists (select 1 
+                  from shipment_line sl 
+                  join invdtl ind
+                    on sl.ship_line_id = ind.ship_line_id 
+                 where ord_line.client_id = sl.client_id 
+                   and ord_line.ordnum = sl.ordnum 
+                   and ord_line.ordlin = sl.ordlin 
+                   and ord_line.ordsln = sl.ordsln 
+                   and ord_line.wh_id = sl.wh_id 
+                   and ind.subnum = @subnum
+               ) 
+] 
+|
+list usr order carton details >> resUnPick
+|
+move inventory
+ where subnum = @subnum
+   and dstloc = 'PERM-SHP-LOC'
+   and cancod = 'CANCEL-NO-REALLOC'
+   and spcind = 'PRA-REVERSE'
+   and actcod = 'UPCK'
+   and wh_id = @wh_id
+>> res
+|
+publish data combination
+ where res = @resUnPick
+|/* Perform line deposition */
+
+
+
+[select ordqty-@untqty new_ordqty,
+       ord_line.*,
+       shipment_line.ship_line_id,
+       shipment_line.ship_id
+  from ord_line
+  join shipment_line
+    on ord_line.ordnum = shipment_line.ordnum
+   and ord_line.ordlin = shipment_line.ordlin
+   and ord_line.ordsln = shipment_line.ordsln
+   and ord_line.wh_id = shipment_line.wh_id
+   and ord_line.client_id = shipment_line.client_id
+ where ord_line.client_id = @client_id
+   and ord_line.ordnum = @ordnum
+   and ord_line.ordlin = @ordlin
+   and ord_line.ordsln = @ordsln
+   and ord_line.prtnum = @prtnum
+   and ord_line.wh_id = @wh_id
+]
+|
+change shipment line
+ where ship_line_id = @ship_line_id
+   and ship_id = @ship_id
+   and wh_id = @wh_id
+   and pckqty = @new_ordqty
+|
+change order line
+ where client_id = @client_id
+   and ordnum = @ordnum
+   and ordlin = @ordlin
+   and ordsln = @ordsln
+   and prtnum = @prtnum
+   and ordqty = @new_ordqty
+   and wh_id = @wh_id
+   and @*
+>> res
+|
+/* Putaway - return stock*/
+hide stack variable 
+  where name = 'srcloc' 
+|
+/*
+move inventory 
+  where srcsub = @subnum 
+    and srcdtl = @dtlnum 
+    and dstloc = @vc_putloc 
+    and prtnum = @prtnum 
+    and untqty = @untqty 
+    and wh_id = @wh_id 
+    and newdst = 1 
+*/
+execute server command
+      where cmd = " move inventory"
+               || " where "
+               || "    srcsub  = '" || @subnum || "'"
+               || " and srcdtl = '" || @dtlnum || "'"
+               || " and dstloc = '" || @vc_putloc || "'"
+               || " and prtnum = '" || @prtnum || "'"
+               || " and untqty = '" || @untqty || "'"
+               || " and wh_id = '" || @wh_id || "'"
+               || " and prt_client_id = '" || @client_id || "'"
+      and inline = 0
+|
+/* reset putaway sheet flag */
+[update invsub 
+    set vc_putaway_sheet_printed_flg = 0 
+  where subnum = @subnum 
+] catch (-1403) 
+|
+publish data 
+  where ordnum = @ordnum 
+    and client_id = @client_id 
+    and wh_id = @wh_id 
+    and ordlin = @ordlin
+    and ordsln = @ordsln
+    and schbat = @schbat
+]]>
+</local-syntax>
+<argument name="subnum" required="yes" datatype="string"></argument>
+<documentation>
+<remarks>
+<![CDATA[
+  <p>
+  This command will cancel/upick the carton, line deposition and return to stock.
+  </p>
+  
+  Updated to use join syntax. Combined both USR and VAR commands together. Formatted the code. 
+
+  Author: AIUUX65
+]]>
+</remarks>
+<exception value="eOK">Normal successful completion</exception>
+<exception value="eDB_NO_ROWS_AFFECTED">No rows found.</exception>
+</documentation>
+</command>

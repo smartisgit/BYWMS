@@ -1,0 +1,163 @@
+<command>
+<name>ossi get_host_invsts</name>
+<description>Get the host inventory status via rules engine</description>
+
+<argument name="moca_farg1" required="no" datatype="string">invtid.  It may not be passed in.  But if passed that is all we need</argument>
+<argument name="moca_farg2" required="no" datatype="string">invsts.  if invtid is not given then invsts is to be provided</argument>
+<argument name="moca_farg3" required="no" datatype="string">client_id.  if invtid is not given then client_id is to be provided</argument>
+<argument name="moca_farg4" required="no" datatype="string">stoloc.  If invtid is not given then this should be provided to establish context</argument>
+<argument name="moca_farg5" required="no" datatype="string">wh_id.  If not given we get it from @@WH_ID</argument>
+<argument name="moca_farg6" required="no" datatype="string">Hold flag</argument>
+
+<argument name="moca_farg7" required="no" datatype="string">Part Number</argument>
+<argument name="moca_farg8" required="no" datatype="string">Context</argument>
+
+
+
+<argument name="moca_farg9" required="no" datatype="string">uc_rule_grp_id.  if not provided use USR-INTEGRATION-CLIENT_GRP</argument>
+<argument name="moca_farg10" required="no" datatype="string">uc_rule_subgrp_id.  If not given use HSTSTS</argument>
+
+<argument name="moca_farg11" required="no" datatype="string">uc_rule_grp_id_alt1.  if not provided use USR-INTEGRATION</argument>
+<argument name="moca_farg12" required="no" datatype="string">uc_rule_subgrp_id_alt1.  If not given use HSTSTS</argument>
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+/*
+ * Revision Log
+ * 2021-11-30 saad.ahmad 12608 - Initial
+ */
+
+publish data 
+where invtid = @moca_farg1
+and invsts = @moca_farg2
+and client_id = nvl(@moca_farg3, '----')
+and stoloc = @moca_farg4
+and wh_id = nvl(@moca_farg5, @@WH_ID )
+and hld_flg = int(nvl(@moca_farg6, 0 ))
+and i_prtnum = @moca_farg7
+and uc_int_context = @moca_farg8
+and uc_rule_grp_id = nvl(@moca_farg9, 'OSSI-INTEGRATION-<<CLIENT_GRP>>' )
+and uc_rule_subgrp_id = nvl(@moca_farg10, 'HSTSTS' )
+and uc_rule_grp_id_alt1 = nvl(@moca_farg11, 'OSSI-INTEGRATION-<<CLIENT_GRP>>' )
+and uc_rule_subgrp_id_alt1 = nvl(@moca_farg12, 'HSTSTS' )
+/**/
+and uc_ret = null
+and prtfam = null
+and prtfamgrp = null
+|
+decompose ossi context for host mapping for integrations
+|
+{
+    if ( @invtid is not null )
+    {
+        get translated inventory identifier
+        where id = @invtid
+        and wh_id = @wh_id
+        |
+        if ( @subnum is null ) hide stack variable where name = 'subnum'
+        |
+        if ( @dtlnum is null ) hide stack variable where name = 'dtlnum'
+        |
+        [
+        select invlod.wh_id,
+               invlod.stoloc,
+               invdtl.invsts,
+               invdtl.prt_client_id client_id,
+               invdtl.prtnum uc_inv_prtnum,
+               invdtl.hld_flg
+        from invlod
+             join invsub on invsub.lodnum = invlod.lodnum
+             join invdtl on invdtl.subnum = invsub.subnum
+        where 1=1
+        and invlod.lodnum = @lodnum
+        and @+invsub.subnum
+        and @+invdtl.dtlnum
+        and rownum < 2
+        ]
+    }
+    |
+    publish data
+    where prtnum = ossi__intnvl(@i_prtnum, @uc_inv_prtnum )
+    |
+    [
+    select prtmst.prtfam,
+           prtfam.prtfamgrp
+    from prtmst_view prtmst
+         left outer join prtfam on prtfam.prtfam = prtmst.prtfam
+    where prtnum = @prtnum
+    and prt_client_id = @client_id
+    and wh_id = @wh_id
+    ]
+    catch (-1403,510)
+    |
+    {
+        if ( ossi__intnvl(@stoloc,'----') = '----' )
+            publish data
+            where stoloc = ossi__polval ( 'USR-INVENTORY', 'MISCELLANEOUS', 'DEFAULT-STOLOC-RULES', '', 'rtstr1', @wh_id )
+        |
+        list ossi typical location data
+        where wh_id = @wh_id
+        and stoloc = @stoloc
+        and uc_out_prefix = ''
+        catch (-1403,510)
+        |
+        if ( @? = 0 )
+        {
+            get ossi mapped value by logic
+            where uc_rule_grp_id = @uc_rule_grp_id
+            and uc_rule_subgrp_id = @uc_rule_subgrp_id
+            and uc_rule_grp_id_alt1 = @uc_rule_grp_id_alt1
+            and uc_rule_subgrp_id_alt1 = @uc_rule_subgrp_id_alt1
+            catch (-1403,510)
+            |
+            publish data
+            where uc_host_invsts = @uc_ret
+        }
+        else
+            publish data
+            where uc_host_invsts = ''
+    }
+}
+
+]]>
+</local-syntax>
+<documentation>
+<remarks>
+<![CDATA[
+    <p>
+    This MOCA Function uses a rules engine to determine host inventory status
+    </p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+<retcol name="uc_host_invsts" type="string">This is the host inventory status</retcol>
+
+
+
+<example>
+</example>
+
+<exception value="eOK">Normal successful completion</exception>
+
+<seealso cref="list ossi typical location data"></seealso>
+<seealso cref="get ossi mapped value by logic"></seealso>
+<seealso cref="ossi get_host_invsts"></seealso>
+
+
+<policy
+    polcod="USR-INVENTORY"
+    polvar="MISCELLANEOUS"
+    polval="DEFAULT-STOLOC-RULES"
+    rtstr1="location to use if we dont have one"
+>This is used to get a default location for rules</policy>
+
+
+
+
+</documentation>
+</command>

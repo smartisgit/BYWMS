@@ -1,0 +1,170 @@
+<command>
+<name>create usr ctl file folder for data</name>
+<description>This command creates data folders in boorstraponly and delete folders and also the ctl files</description>
+
+<argument name="table_name" required="yes" datatype="string"></argument>
+<argument name="uc_use_os" required="yes" datatype="string">If not passed in we see OS env variable and if that in upper case is like WIN% we assume windows</argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20170711 ossi\saad.ahmad - 7026 - Bring the core Oracular components
+ */
+publish data
+where uc_data_folder = @@LESDIR || '/db/data/load/base/bootstraponly'
+and uc_delete_folder = @@LESDIR || '/db/data/usr_ossi_delete'
+and table_name = lower(@table_name)
+and uc_use_os = nvl(@uc_use_os, @@OS)
+|
+if ( upper(@uc_use_os) like 'WIN%' )
+    publish data
+    where uc_is_windows = '1'
+else
+    publish data
+    where uc_is_windows = '0'
+|
+if ( @uc_is_windows = '1' )
+    [
+    select chr(13) || chr(10) crlf
+    from dual
+    ]
+else
+    [
+    select chr(10) crlf
+    from dual
+    ]
+|
+publish data
+where table_ctl_filename = @table_name || '.ctl'
+|
+publish data
+where load_ctl_filename = @uc_data_folder || '/' || @table_ctl_filename
+and del_ctl_filename = @uc_delete_folder || '/' || @table_ctl_filename
+and load_data_folder = @uc_data_folder || '/' || @table_name
+and del_data_folder = @uc_delete_folder || '/' || @table_name
+and uc_is_windows = @uc_is_windows
+and crlf = @crlf
+|
+{
+    {
+        list table columns
+        where table_name = @table_name
+        catch (-1403,510)
+        | 
+        if ( @? = 0 and @comtyp != 'D' and instr(',u_version,mod_usr_id,ins_user_id,last_upd_user_id,', ','||lower(@column_name) || ',') = 0 )
+            filter data
+            where moca_filter_level = 1
+            and use_column_name = lower(@column_name)
+    }
+    >> res_cols
+    |
+    if ( rowcount(@res_cols) > 0 )
+    {
+        create directory where directory = @load_data_folder
+        ;
+        create directory where directory = @del_data_folder
+        ;
+        publish data
+        where uc_load_ctl_file_data = "publish data " || @crlf
+                                   || "where table = '" || @table_name || "'" || @crlf
+                                   || "and uc_inhibit_version_control = '1'" || @crlf
+        and uc_del_ctl_file_data = "[delete from " || @table_name || @crlf
+                                 ||" where 1=1"
+        and uc_get_cnt_for_pk = "[select count(*) cnt from " || @table_name || " where 1=1 "
+        |
+        [[
+        String uc_ctl_file_data = uc_load_ctl_file_data;
+        String uc_ctl_file_data_del = uc_del_ctl_file_data;
+        String uc_ctl_file_count_sql = uc_get_cnt_for_pk;
+        boolean found_pk = false;
+        while ( res_cols.next() )
+        {
+            this_line = "and " + res_cols.getString ( "use_column_name") + " = '@" + res_cols.getString ( "use_column_name") + "@'";
+            uc_ctl_file_data = uc_ctl_file_data + this_line + crlf;
+            if ( res_cols.getBoolean("pk_flg")  )
+            {
+                found_pk = true;
+                uc_ctl_file_data_del += (crlf + this_line);
+                uc_ctl_file_count_sql += this_line;
+            }
+        }
+        if ( !found_pk )
+        {
+            uc_ctl_file_data_del += " and 1=2";
+            uc_ctl_file_count_sql+= " and 1=2";
+        }
+        uc_ctl_file_data_del += "] catch(-1403,510)";
+        uc_ctl_file_count_sql+= "]";
+        uc_ctl_file_data += ("|"
+                         + crlf + "{" 
+                         + crlf + "    " + uc_ctl_file_count_sql
+                         + crlf + "    |"
+                         + crlf + "    if ( @cnt = 0 ) " 
+                         + crlf + "        create record where uc_called_from_mload = '1'"
+                         + crlf + "    else"
+                         + crlf + "        change record where uc_called_from_mload = '1'"
+                         + crlf + "}")
+        ; 
+        [uc_load_ctl_file_data:uc_ctl_file_data,uc_del_ctl_file_data:uc_ctl_file_data_del]
+        ]]
+        |
+        {
+            sl_file exists
+            where full_file_name = @load_ctl_filename
+            |
+            publish data 
+            where load_ctl_filename_exists = @file_exists_flg
+        }
+        |
+        {
+            sl_file exists
+            where full_file_name = @del_ctl_filename
+            |
+            publish data 
+            where del_ctl_filename_exists = @file_exists_flg
+        }
+        |
+        {
+            if ( @del_ctl_filename_exists = 'F' )
+                write output file
+                where path = @uc_delete_folder
+                and filnam = @table_ctl_filename
+                and data = @uc_del_ctl_file_data
+                and newline = 'Y'
+                and newline_character = @crlf
+            ;
+            if ( @load_ctl_filename_exists = 'F' )
+                write output file
+                where path = @uc_data_folder
+                and filnam = @table_ctl_filename
+                and data = @uc_load_ctl_file_data
+                and newline = 'Y'
+                and newline_character = @crlf
+            ;
+            publish data
+            where table_name = @table_name
+            and uc_load_ctl_file_data = @uc_load_ctl_file_data
+            and uc_del_ctl_file_data = @uc_del_ctl_file_data
+            and load_data_folder = @load_data_folder
+            and del_data_folder = @del_data_folder
+            and load_ctl_filename_exists = @load_ctl_filename_exists
+            and del_ctl_filename_exists = @del_ctl_filename_exists
+        }
+    }
+}
+    
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This command can be used to creates data folders in boorstraponly and delete folders and also the ctl files.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

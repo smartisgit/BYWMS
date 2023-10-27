@@ -1,0 +1,19 @@
+#use $LESDIR/include
+#use $DCSDIR/include
+#use $MOCADIR/include
+
+#include <dcsddl.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+
+
+mset command on
+[
+alter table usr_ossi_issue_obj_log add
+BEGIN_CONSTRAINT
+    constraint usr_ossi_issue_obj_log_pk
+    primary key (uc_ossi_issue_assign_seq,uc_ossi_issue_obj_log_seq )
+END_CONSTRAINT
+] catch (-1779,-955,-2260)
+RUN_DDL
+

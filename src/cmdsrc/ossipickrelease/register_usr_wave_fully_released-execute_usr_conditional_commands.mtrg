@@ -1,0 +1,53 @@
+<trigger>
+<name>execute_usr_conditional_commands</name>
+<on-command>register usr wave fully released</on-command>
+<fire-sequence>19000</fire-sequence>
+ 
+<local-syntax>
+<![CDATA[
+
+if ( @schbat is not null and @wh_id is not null and @uc_reldte is not null )
+{
+    [
+    select pckbat.*,
+           shipment.carcod,
+           shipment.srvlvl,
+           cardtl.cartyp,
+           pckwrk_dtl.dst_mov_zone_id,
+           mov_zone.mov_zone_cod uc_dst_mov_zone_cod
+    from pckbat
+         join shipment_line on shipment_line.schbat = pckbat.schbat and shipment_line.linsts not in ( 'B', 'C' )
+         join shipment on shipment.ship_id = shipment_line.ship_id
+         left outer join pckwrk_dtl on pckwrk_dtl.ship_line_id = shipment_line.ship_line_id
+         left outer join mov_zone on mov_zone.mov_zone_id = pckwrk_dtl.dst_mov_zone_id
+         left outer join cardtl on cardtl.carcod = shipment.carcod and cardtl.srvlvl = shipment.srvlvl
+         join ord
+             on ord.client_id = shipment_line.client_id
+             and ord.wh_id = shipment_line.wh_id
+             and ord.ordnum = shipment_line.ordnum
+    where 1=1
+    and pckbat.schbat = @schbat
+    and rownum < 2
+    ]
+    catch (-1403,510)
+    |
+    if ( @? = 0 )
+    {
+        execute ossi all conditional rules
+        where uc_rule_grp_id = 'OSSI-WAVE-RELEASE'
+        and uc_rule_subgrp_id = 'CARCOD-DSTZON-RELEASE_RULE-MAP'
+        and uc_cache_key= null
+        catch (-1403,510)
+    }
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<seealso cref="register usr shipment fully released"></seealso>
+
+</documentation>
+
+</trigger>

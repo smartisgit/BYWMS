@@ -1,0 +1,76 @@
+<command>
+<name>remove ossi policy list value</name>
+<description>remove policy list values</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+
+publish data
+  where wh_id = nvl(@wh_id, '----')
+|
+{
+  publish data where uc_polvar = @polvar
+  |
+  list ossi policy lists
+    where polvar = @uc_polvar
+  |
+  publish data
+    where polcod = @polcod
+      and polvar = @polvar
+      and uc_polval = @polval
+      and uc_polval_multi_flg = @uc_polval_multi_flg
+      and uc_polvar = @uc_polvar
+}
+|
+publish data
+  where polval = nvl(@polval, @uc_polval)
+|
+if (@srtseq is null)
+{
+  [select srtseq
+     from poldat_view
+    where polcod = @polcod
+      and polvar = @polvar
+      and polval = @polval
+      and wh_id = @wh_id
+      and @+rtstr1
+      and rownum < 2
+  ] catch (-1403)
+}
+|
+remove policy
+  where polcod = @polcod
+    and polvar = @polvar
+    and polval = @polval
+    and srtseq = @srtseq
+    and wh_id = @wh_id
+|
+publish data where cmd = ossi__polval('USR-POLMNT',@uc_polvar, 'POST-REMOVE-CMD','','', @wh_id)
+|
+if(@cmd)
+{
+  execute server command where cmd = @cmd
+}
+
+]]>
+</local-syntax>
+<argument name="polvar" required="yes" datatype="string"></argument>
+<argument name="polval" required="no" datatype="string"></argument>
+<argument name="rtstr1" required="no" datatype="string"></argument>
+
+<documentation>
+
+<remarks>
+This command may be used to remove policy list value.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

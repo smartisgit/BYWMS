@@ -1,0 +1,41 @@
+<command>
+<name>increment ossi component version</name>
+<description>Increment Component Version</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+publish data 
+  where new_comp_rev_ver = @comp_rev_ver + 1 
+|
+{
+  sl_change gen_maint 
+    where pk_upper_case = 0 
+      and table_name = 'comp_ver' 
+      and comp_rev_ver = @new_comp_rev_ver 
+  ;
+  sl_remove gen_maint 
+    where pk_upper_case = 0 
+      and table_name = 'comp_ver' 
+}
+|
+publish data 
+  where new_comp_rev_ver = @new_comp_rev_ver
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This command is used to increment component version.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

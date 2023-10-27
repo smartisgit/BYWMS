@@ -1,0 +1,90 @@
+<command>
+<name>ossi instr</name>
+<description>Instring function  - but support backward searches as well (like oracle)</description>
+
+<argument name="moca_farg1">String to search in</argument>
+<argument name="moca_farg2">Substrint to search</argument>
+<argument name="moca_farg3">Start here</argument>
+<argument name="moca_farg4">Which occurance</argument>
+
+<type>Local Syntax</type>
+
+<local-syntax>
+<![CDATA[
+
+publish data
+where in_string = @moca_farg1
+and search_string = @moca_farg2
+and start_index = @moca_farg3
+and search_occ = nvl(@moca_farg4,1)
+|
+if ( @in_string is null )
+    publish data 
+    where ret = null
+else if ( nvl(@start_index,1) > 0 and nvl(@search_occ,0) <= 1 )
+    publish data
+    where ret = instr(@in_string, @search_string, @start_index )
+else
+{
+    [[
+    boolean done = false;
+    Integer found_occ = 0;
+    boolean found = false;
+    // Java index is 0 based
+    if ( start_index < 0 )
+        start_offset = in_string.length() + start_index;
+    else
+        start_offset = start_index;
+    //
+    while ( !done )
+    {
+        if ( start_index < 0 )
+            ret = in_string.lastIndexOf ( search_string, start_offset );
+        else
+            ret = in_string.indexOf ( search_string, start_offset );
+        if ( ret >= 0 )
+            found_occ++;
+        else
+        {
+            ret = 0;
+            done = true;
+        }
+        if ( found_occ == search_occ )
+        {
+            found = true;
+            done = true;
+        }
+        else if ( start_index > 0 )
+            start_offset = ret+1;
+        else
+            start_offset = ret-1;
+    } // !done
+    if ( !found )
+        ret = -1;
+    [ret:ret+1]
+    ]]
+}
+  
+]]>
+
+</local-syntax>
+
+<documentation>
+
+<remarks>
+<![CDATA[
+  <p>
+  This moca function is an extension of startdard instr and works like oracle instr function.  it allows for nth occurrance
+  search and also search from end
+  </p>
+]]>
+</remarks>
+
+<retcol name="ret" type="COMTYP_INT">Position in string based off 1</retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+
+
+
+</documentation>
+</command>

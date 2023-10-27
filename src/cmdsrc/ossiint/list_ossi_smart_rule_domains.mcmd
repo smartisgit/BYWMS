@@ -1,0 +1,55 @@
+<command>
+<name>list ossi smart rule domains</name>
+<description>this command will returns distinct rules group as domains</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ * making changes for bug 11119 
+ */
+ 
+publish data
+where usr_id = nvl(@usr_id, @@USR_ID )
+|
+{
+    [select distinct uc_rule_grp_id
+       from usr_rule_engine_expr
+    ]    
+    >> res
+    |
+    sort result set
+    where result_set = @res
+    and sort_list = 'uc_rule_grp_id'
+    |
+    {
+        publish data
+        where opt_nam = 'opt' || @uc_rule_grp_id
+        |
+        if ( ossi__user_has_access_to_opt_nam ( @opt_nam, @usr_id ) = 1 )
+            filter data
+            where moca_filter_level = 3
+            and opt_nam = @opt_nam
+    }
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<remarks>
+Gets distinct rules group as domains.
+</remarks>
+
+<retcol name="uc_rule_grp_id" type="String"></retcol>
+<retcol name="opt_nam" type="String"></retcol>
+
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

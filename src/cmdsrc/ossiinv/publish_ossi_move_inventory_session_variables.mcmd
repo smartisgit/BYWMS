@@ -1,0 +1,42 @@
+<command>
+<name>publish ossi move inventory session variables</name>
+<description>We save some key data about move inventory into session variables.  This command publishes them out as stack variables</description>
+<type>Local Syntax</type>
+
+<local-syntax>
+<![CDATA[
+
+         publish data
+         where uc_move_inventory_var_srcloc = ossi__sess_var ( 'uc_move_inventory_var_srcloc', '', 'Y' )
+         and   uc_move_inventory_var_srcare = ossi__sess_var ( 'uc_move_inventory_var_srcare', '', 'Y' )
+         and   uc_move_inventory_var_dstloc = ossi__sess_var ( 'uc_move_inventory_var_dstloc', '', 'Y' )
+         and   uc_move_inventory_var_dstare = ossi__sess_var ( 'uc_move_inventory_var_dstare', '', 'Y' )
+         and   uc_move_inventory_var_dstlod = ossi__sess_var ( 'uc_move_inventory_var_dstlod', '', 'Y' )
+         and   uc_move_inventory_var_dstsub = ossi__sess_var ( 'uc_move_inventory_var_dstsub', '', 'Y' )
+         and   uc_move_inventory_var_srclod = ossi__sess_var ( 'uc_move_inventory_var_srclod', '', 'Y' )
+         and   uc_move_inventory_var_srcsub = ossi__sess_var ( 'uc_move_inventory_var_srcsub', '', 'Y' )
+         and   uc_move_inventory_var_srcdtl = ossi__sess_var ( 'uc_move_inventory_var_srcdtl', '', 'Y' )
+         and   uc_move_inventory_var_untqty = ossi__sess_var ( 'uc_move_inventory_var_untqty', '', 'Y' )
+         and   uc_move_inventory_var_lodnum = ossi__sess_var ( 'uc_move_inventory_var_lodnum', '', 'Y' )
+         and   uc_move_inventory_var_subnum = ossi__sess_var ( 'uc_move_inventory_var_subnum', '', 'Y' )
+         and   uc_move_inventory_var_dtlnum = ossi__sess_var ( 'uc_move_inventory_var_dtlnum', '', 'Y' )
+         and   uc_move_inventory_var_use_lodnum = ossi__sess_var ( 'uc_move_inventory_var_use_lodnum', '', 'Y' )
+         and   uc_move_inventory_var_use_subnum = ossi__sess_var ( 'uc_move_inventory_var_use_subnum', '', 'Y' )
+         and   uc_move_inventory_var_use_dtlnum = ossi__sess_var ( 'uc_move_inventory_var_use_dtlnum', '', 'Y' )
+
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+The reason for this is that a trigger on move inventory may be executed without context and such a trigger will not see this data
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>
+

@@ -1,0 +1,159 @@
+<command>
+<name>ossi table_pk_as_join</name>
+<description>FUNCTION: Get a join syntax </description>
+<type>Local Syntax</type>
+
+<argument name="moca_farg1" required="yes" datatype="string">Name of the table</argument>
+<argument name="moca_farg2" required="yes" datatype="string">Left table for join</argument>
+<argument name="moca_farg3" required="yes" datatype="string">Right table for join</argument>
+
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+
+publish data
+where table_name      = @moca_farg1
+and   table_l_alias   = @moca_farg2
+and   table_r_alias   = @moca_farg3
+and   table_r         = nvl ( @moca_farg4, @table_name )
+and   sess_var        = 'uc_ossi_table_pk_join_var'
+|
+save session variable where name = @sess_var and value = ''
+|
+if ( upper(@table_r) = 'PRTDSC' and upper(@table_name) = 'PRTMST' )
+{
+   /*
+    * This is a specific join where we use the colval with the |s in it.  We have to worry about
+    * versions because wh_id_tmpl was not present in older versions
+    */
+   publish data
+   where colnam = "'prtnum|prt_client_id"
+   and   colval = "prtmst.prtnum || '|' || prtmst.prt_client_id"
+   |
+   list tables with column
+   where table_name = 'PRTMST'
+   and   column_name = 'WH_ID_TMPL'
+   catch (-1403,510)
+   |
+   if ( @? = 0 )
+      publish data
+      where colnam = @colnam || "|wh_id_tmpl'"
+      and   colval = @colval || " || '|' || prtmst.wh_id_tmpl"
+   else
+      publish data
+      where colnam = @colnam || "'"
+      and   colval = @colval
+   |
+   publish data
+   where ret = @table_r_alias || '.colnam = ' || @colnam || " and "
+            || @table_r_alias || '.colval = ' || @colval
+}
+else
+{
+   list primary key for table where table_name = @table_name
+   catch (-1403,510)
+   |
+   if ( @? = 0 )
+   {
+      /*
+       * We have the PK column, but it may not exist in the child table or may exist differently
+       * e.g. for prtmst joins child table will not have wh_id but wh_id_tmpl instead
+       */
+      if ( upper(@table_r) != upper(@table_name) )
+      {
+         /*
+          * DSCMST is a special case.  In this case the table must have a single column PK
+          * and it works kind a like PRTDSC above.  If table has multiple columns in PK, then
+          * this will give a problem
+          */
+         if ( upper(@table_r) = 'DSCMST' )
+         {
+            save session variable
+            where name = @sess_var
+            and   value = "dscmst.colnam = '" || @column_name ||
+                          "' and dscmst.colval = " || @table_name || '.' || @column_name
+            |
+            /* This will disable the logic below to build the join because we already have it */
+            publish data
+            where r_column_name = ''
+         }
+         else
+         {
+            list tables with column
+            where table_name = @table_r
+            and   column_name= @column_name
+            catch (-1403,510)
+            |
+            if ( @? = 0 )
+               publish data
+               where r_column_name = @column_name
+            else if ( @column_name = 'WH_ID_TMPL' )
+            {
+               list tables with column
+               where table_name = @table_r
+               and   column_name= 'WH_ID'
+               catch (-1403,510)
+               |
+               if ( @? = 0 )
+                  publish data
+                  where r_column_name = @column_name
+               else
+                  publish data
+                  where r_column_name = ''
+            }
+            else
+               publish data
+               where r_column_name = ''
+         }
+      }
+      else
+         publish data
+         where r_column_name = @column_name
+      |
+      if ( @r_column_name is not null )
+      {
+         publish data
+         where this_cond = @table_l_alias || '.' || @column_name || ' = ' || @table_r_alias || '.' || @r_column_name
+         |
+         if ( ossi__sess_var ( @sess_var ) = '' )
+            save session variable
+            where name  = @sess_var
+            and   value = @this_cond
+         else
+            save session variable
+            where name  = @sess_var
+            and   value = ossi__sess_var ( @sess_var ) || ' and ' || @this_cond
+      }
+   }
+   ;
+   publish data
+   where ret = ossi__sess_var ( @sess_var )
+}
+
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This function will return a string like
+x.pk1 = y.pk1 and x.pk2 = y.pk2
+</p>
+]]>
+</remarks>
+
+<retrows>MOCA Function - So one row is returned</retrows>
+
+<exception value="eOK">The command completed successfully.</exception>
+<exception value="510">If variable was not passed and no default was passed.</exception>
+
+<seealso cref="list table columns"></seealso>
+</documentation>
+
+</command>

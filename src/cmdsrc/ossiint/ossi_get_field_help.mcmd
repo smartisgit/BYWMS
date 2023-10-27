@@ -1,0 +1,99 @@
+<command>
+<name>ossi get_field_help</name>
+<description>get help for a passed in field</description>
+
+<argument name="moca_farg1" required="yes" datatype="string">Name of field</argument>
+<argument name="moca_farg2" required="no" datatype="string">Any help if already there</argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+
+publish data
+where field_name = @moca_farg1
+and current_help = @moca_farg2
+and locale_id = nvl(nvl(@moca_fagr4, @@LOCALE_ID), 'US_ENGLISH')
+|
+publish data
+where smart_help_mls_id = 'uc_smarthlp_' || lower(@field_name)
+|
+publish data
+where uc_smart_help = ossi__mls_text ( @smart_help_mls_id, '', @locale_id)
+|
+if ( @current_help is not null )
+    publish data
+    where field_help = @current_help
+else if ( @uc_smart_help is not null and  @uc_smart_help != @field_name and @uc_smart_help != @smart_help_mls_id )
+    publish data
+    where field_help = @uc_smart_help
+else
+{
+    {
+        [
+        select value 
+        from information_schema.columns cc
+             cross apply ::fn_listextendedproperty('MS_Description',
+                                                   'user', 
+                                                   'dbo',
+                                                   'table', 
+                                                   cc.table_name,
+                                                   'column',
+                                                   cc.column_name)
+        where column_name = @field_name
+        ]
+        catch(@?)
+        |
+        publish data
+        where column_name = @field_name
+        and column_comment = @value
+        and len_column_comment = len(@value)
+    }
+    >> res
+    |
+    if ( rowcount(@res) > 0 )
+    {
+        sort result set
+        where result_set = @res
+        and sort_list = "len_column_comment d"
+        >> res2
+        |
+        publish top rows where res = @res2 and rows = 1
+        |
+        publish data
+        where field_help = @column_comment
+    }
+    else
+        publish data
+        where field_help = ossi__mls_text ( @field_name, '', @locale_id)
+}
+    
+]]>
+</local-syntax>
+
+
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+To get help text for a field.  We have following logic:
+<ol>
+   <li>Look up a specific MLS ID called uc_smarthlp_[colimn name].  If found this is the help we want</li>
+   <li>Look up data dictionary and return the longest string there</li>
+   <li>Simply look up mls text of it</li>
+   <li>The name of field itself</li>
+</ol>
+</p>
+]]>
+</remarks>
+
+<retrows>MOCA Function - So one row is returned</retrows>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+<seealso cref="list ossi command output information"></seealso>
+</documentation>
+
+</command>

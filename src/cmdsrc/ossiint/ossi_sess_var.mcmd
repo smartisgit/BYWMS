@@ -1,0 +1,67 @@
+<command>
+<name>ossi sess_var</name>
+<description>FUNCTION: Get a session variable</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+publish data
+where name      = @moca_farg1
+and   default   = @moca_farg2
+and   ignore_err= @moca_farg3
+|
+get session variable where name = @name
+catch (-1403,510)
+|
+if (@? != 0 )
+{
+   publish data
+   where err=@?
+   |
+   if (@default is not null or @ignore_err = 'Y' )
+      publish data where value = @default
+   else
+      set return status where status = @err
+}
+else
+   publish data
+   where value=@value
+
+]]>
+</local-syntax>
+
+<argument name="moca_farg1" required="yes" datatype="string">Name of the session variable</argument>
+<argument name="moca_farg2" required="no" datatype="string">Return this value if value is not found.  If this variable
+is not passed and variable is not found, an error is raised</argument>
+<argument name="moca_farg3" required="no" datatype="string">Ignore error.  Return null.  Default is N</argument>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This function abstracts the get session variable command so that it may be called
+as a function.
+
+Example:
+MSQL> save session variable where name = 'myvar' and value = 'a'
+      ;
+      publish data where ret = ossi__sess_var ( 'myvar')
+
+should return 'a'
+</p>
+]]>
+</remarks>
+
+<retrows>MOCA Function - So one row is returned</retrows>
+
+<exception value="eOK">The command completed successfully.</exception>
+<exception value="510">If variable was not passed and no default was passed.</exception>
+
+<seealso cref="get session variable"></seealso>
+</documentation>
+
+</command>

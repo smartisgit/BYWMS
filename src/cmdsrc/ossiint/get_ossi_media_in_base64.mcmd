@@ -1,0 +1,41 @@
+<command>
+<name>get ossi media in base64</name>
+<description>Get media in base64</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+validate stack variable not null 
+  where name = 'filename'
+|
+get media directory
+  where wh_id = '----'
+    and client_id = '----'
+|
+read file
+  where filename = @current_folder || '/' || @filename
+    and mode = 'B'
+|
+encode to base64
+  where bin_data = @data
+
+]]>
+</local-syntax>
+<argument name="filename" required="yes" datatype="string"></argument>
+<documentation>
+
+<remarks>
+This command may be used to get media in base64.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

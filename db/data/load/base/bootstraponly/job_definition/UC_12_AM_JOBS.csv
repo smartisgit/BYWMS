@@ -1,0 +1,2 @@
+job_id,role_id,name,enabled,type,command,log_file,trace_level,overlap,schedule,start_delay,timer,grp_nam
+UC_12_AM_JOBS,,All jobs that are supposed to run right after midnight,1,cron,"execute ossi jobs using job manager where uc_exec_job_grp = '12-AM-JOBS'",$LESDIR/log/JOB-UC_12_AM_JOBS.log,,0,0 0 13 * * ?,,,GK

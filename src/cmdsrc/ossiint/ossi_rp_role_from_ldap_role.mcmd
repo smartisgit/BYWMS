@@ -1,0 +1,47 @@
+<command>
+<name>ossi rp_role_from_ldap_role</name>
+<description>Get RP role from LDAP role based on our env var</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="moca_farg1">LDAP Role</argument>
+
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+publish data
+where uc_ldap_role_group_prefix = @@UC_LDAP_SYNC_LES_ATH_ROLE_PREFIX
+and   uc_ldap_role_id = @moca_farg1
+|
+{
+    publish data
+    where role_id = upper(@uc_ldap_role_id)
+    |
+    if ( @uc_ldap_role_group_prefix is null )
+        publish data
+        where role_id = @role_id
+    else if ( @uc_ldap_role_group_prefix is not null and @role_id like @uc_ldap_role_group_prefix || '%' )
+        publish data
+        where role_id = substr(@role_id, len(@uc_ldap_role_group_prefix)+1 )
+    else
+        publish data
+        where role_id  = null
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+get RP role from LDAP role id
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

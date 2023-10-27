@@ -1,0 +1,274 @@
+<command>
+<name>get ossi rule documentation</name>
+<description>Get an HTML that can be used for rule documentation
+</description>
+<type>Local Syntax</type>
+
+<argument name="uc_rule_engine_table_name" required="yes" datatype="string">
+Pass in usr_rule_engine_expr or usr_rule_engine_cond_expr</argument>
+<argument name="uc_rule_grp_id" required="yes" datatype="string"></argument>
+<argument name="uc_rule_subgrp_id" required="yes" datatype="string"></argument>
+<argument name="uc_rule_id" required="yes" datatype="string">This should be passed in only for usr_rule_engine_cond_expr</argument>
+<argument name="uc_sort_arg_clause" required="yes" datatype="string">How should we sort the arguments or retcol.  No default, i..e list as listed</argument>
+
+
+
+<local-syntax>
+<![CDATA[
+
+publish data
+where uc_rule_engine_table_name = nvl(@uc_rule_engine_table_name, 'usr_rule_engine_expr' ) 
+and help_uc_rule_grp_id = ''
+and help_uc_rule_subgrp_id = ''
+and help_uc_rule_value = ''
+and uc_rule_grp_id = nvl(@uc_rule_grp_id, '----')
+and uc_rule_subgrp_id = nvl(@uc_rule_subgrp_id, '----')
+and uc_main_text_tag = nvl(@uc_main_text_tag, '----' )
+and mls_text_evt_id = ossi__mls_text('evt_id')
+and mls_text_command = ossi__mls_text( 'cmd')
+and mls_text_constant = ossi__mls_text( 'constval')
+|
+get ossi rule documentation template
+|
+/*
+ * This gives the overview
+ */
+[
+select uc_short_help
+from usr_rule_engine_help
+where uc_rule_engine_table_name = @uc_rule_engine_table_name
+and uc_rule_grp_id = '----'
+and uc_rule_subgrp_id = '----'
+and uc_rule_id = '----'
+]
+catch (-1403,510)
+|
+publish data
+where uc_main_help_text = @uc_short_help
+|
+{
+    /*
+     * if we dont have a uc_rule_grp_id we want to show all of then
+     */
+    if ( @uc_rule_grp_id = '----' )
+    {
+        [
+        select codmst.srtseq, codmst.codval, dscmst.lngdsc, 
+               usr_rule_engine_help.uc_rule_grp_id,
+               usr_rule_engine_help.uc_short_help
+        from usr_rule_engine_help
+             left outer join codmst 
+                 on codmst.colnam = 'uc_rule_grp_catg'
+                 and codmst.codval = usr_rule_engine_help.uc_rule_grp_catg
+             left outer join dscmst
+                 on dscmst.colnam = codmst.colnam
+                 and dscmst.colval = codmst.codval
+                 and dscmst.locale_id = @locale_id
+        where usr_rule_engine_help.uc_rule_engine_table_name = @uc_rule_engine_table_name
+        and usr_rule_engine_help.uc_rule_subgrp_id = '----'
+        and usr_rule_engine_help.uc_rule_grp_id != '----'
+        order by srtseq, uc_rule_grp_id_srtseq
+        ]
+        catch (-1403,510)
+        >> res
+        |
+        [[
+        StringBuffer ret = new StringBuffer();
+        while (res.next() )
+        {
+            ret.append ( "<tr><td>" + res.getString("uc_rule_grp_id") + "</td><td>" + res.getString("uc_short_help") + "</td></tr>" );
+        }
+        [main_html:ret.toString()]
+        ]]
+        |
+        publish data
+        where uc_main_help_text = @uc_main_help_text
+                               || '<table style="width:100%">'
+                               || '<tr><th>Rule Group</th><th>Synopsis</th></tr>'
+                               || @main_html
+                               || '</table>'
+    }
+    |
+    /*
+     * If an actual rule group is passed in (so user selected one on screen), now we want to show help specific to that
+     */
+    if ( @uc_rule_grp_id != '----' )
+    {
+        [
+        select uc_long_help,
+               uc_short_help
+        from usr_rule_engine_help
+        where uc_rule_engine_table_name = @uc_rule_engine_table_name
+        and uc_rule_grp_id = @uc_rule_grp_id
+        and uc_rule_subgrp_id = '----'
+        and uc_rule_id = '----'
+        ]
+        catch (-1403,510)
+        |
+        get ossi conditional rule find logic html
+        |
+        publish data
+        where help_uc_rule_grp_id = ''
+            || @uc_main_head_tag_s || @uc_rule_grp_id || @uc_main_head_tag_e
+            || @uc_main_text_tag_s 
+            ||     ossi__replace ( ossi__replace ( @uc_long_help, "@@uc_html_cond_rule_exec_logic@@",@uc_html_cond_rule_exec_logic) , "@@uc_html_cond_rule_short_help@@", @uc_short_help)
+            || @uc_main_text_tag_e
+    }
+    |
+    /*
+     * Get the actions to display
+     */
+    {
+        publish data
+        where actions_html_base = @uc_main_head_tag_s || ossi__mls_text ( "usrLblTypicalActions", "", @locale_id)  || @uc_main_head_tag_e
+                               || '<table style="width:100%"><tr><th>' || ossi__mls_text('usrLblContextVariable', '', @locale_id) || '</th><th>' || ossi__mls_text( 'descr', '', @locale_id ) || '</th></tr>'
+        |                               
+        get ossi rule context
+        where uc_sort_arg_clause = @uc_sort_arg_clause
+        and uc_add_component_level_to_descr = 1
+        and uc_fetch_ctxt_typ_list = 'ACT'
+        catch(@?)
+        >> res
+        |
+        if ( @? = 0 and rowcount(@res) > 0)
+        {
+            [[
+            StringBuffer ret = new StringBuffer();
+            while ( res.next() )
+            {
+                ret.append ( "<tr><td colspan=2>" + 
+                               uc_context_sub_tag_s + mls_text_command + ":" + res.getString('uc_ctxt_command' ) + uc_context_sub_tag_e + 
+                               "<ul>" +
+                                   "<small>" + res.getString('uc_command_descr') + "</small>" +
+                              "</ul>" +
+                              "</td></tr>" );
+                //
+                SimpleResults ctxt_res = res.getResults("uc_ctxt_var_res");
+                if ( ctxt_res != null )
+                {
+                    while ( ctxt_res.next() )
+                    {
+                        if ( ctxt_res.getString("uc_ctxt_var") != null )
+                            ret.append ( "<tr><td>" + ctxt_res.getString("uc_ctxt_var").toLowerCase() + "</td><td><small>" + ctxt_res.getString("uc_ctxt_var_descr") + "</small></td></tr>" );
+                    }
+                }
+            } // wend
+            [ret_html:ret.toString()]
+            ]]
+            |
+            publish data
+            where actions_html = @actions_html_base
+                              || @uc_context_tag_s
+                              ||     @ret_html
+                              ||  @uc_context_tag_e
+                              || '</table>'
+        }
+    } /* actins block end */
+    |
+    /*
+     * Get the context to display
+     */
+    {
+        publish data
+        where context_html_base = @uc_main_head_tag_s || ossi__mls_text ( "usrLblExecutionContext", "", @locale_id)  || @uc_main_head_tag_e
+                               || '<table style="width:100%"><tr><th>' || ossi__mls_text('usrLblContextVariable', '', @locale_id) || '</th><th>' || ossi__mls_text( 'descr', '', @locale_id ) || '</th></tr>'
+        |
+        get ossi rule context
+        where uc_sort_arg_clause = @uc_sort_arg_clause
+        and uc_add_component_level_to_descr = 1
+        and uc_fetch_ctxt_typ_list = null
+        catch(@?)
+        >> res
+        |
+        if ( @? = 0 and rowcount(@res) > 0)
+        {
+            [[
+            StringBuffer ret = new StringBuffer();
+            while ( res.next() )
+            {
+                this_hdr = "";
+                if ( res.getString ( "uc_fetch_ctxt_typ") == "E" )
+                    this_hdr = uc_context_sub_tag_s + mls_text_evt_id + ': ' + res.getString ( "uc_ctxt_var_grp") + uc_context_sub_tag_e;
+                else if ( res.getString ( "uc_fetch_ctxt_typ") == "C" || res.getString ( "uc_fetch_ctxt_typ") == "CA" ) 
+                    this_hdr = uc_context_sub_tag_s + mls_text_command + ": " + res.getString ( "uc_ctxt_var_grp") + uc_context_sub_tag_e + 
+                               "<ul>" + 
+                                   "<small>" + res.getString('uc_command_descr') + "</small>" +
+                               "</ul>";
+                else if ( res.getString ( "uc_fetch_ctxt_typ") == "A" ) 
+                    this_hdr = uc_context_sub_tag_s + mls_text_constant + ": " + uc_context_sub_tag_e;
+                //
+                ret.append ( "<tr><td colspan=2>" + 
+                             this_hdr + 
+                             "</td></tr>" );
+                //
+                SimpleResults ctxt_res = res.getResults("uc_ctxt_var_res");
+                if ( ctxt_res != null )
+                {
+                    while ( ctxt_res.next() )
+                    {
+                        if (  ctxt_res.getString("uc_ctxt_var") != null )
+                            ret.append ( "<tr><td>@" + ctxt_res.getString("uc_ctxt_var").toLowerCase() + "</td><td><small>" + ctxt_res.getString("uc_ctxt_var_descr") + "</small></td></tr>" );
+                    }
+                }
+            } // wend
+            [ret_html:ret.toString()]
+            ]]
+            |
+            publish data
+            where context_html = @context_html_base
+                              || @uc_context_tag_s
+                              ||     @ret_html
+                              || @uc_context_tag_e
+                              || '</table>'
+        }
+    } /* context block */
+    |
+    publish data
+    where uc_final_html =
+       "<html>"
+    || decode ( @uc_add_style, 1,  @uc_rule_help_style || '<body>', '' )
+    || @uc_main_head_tag_s || ossi__mls_text ( 'usrLblOverview', '', @locale_id) || @uc_main_head_tag_e
+    || @uc_main_text_tag_s || @uc_main_help_text || @uc_main_text_tag_e
+    || @help_uc_rule_grp_id
+    || @help_uc_rule_subgrp_id
+    || @actions_html
+    || @context_html
+    || @help_uc_rule_value
+    || decode ( @uc_add_style, 1, '</body>', '' )
+    || "</html>"
+    and help_uc_rule_grp_id = @help_uc_rule_grp_id
+    and help_uc_rule_subgrp_id = @help_uc_rule_subgrp_id
+    and help_uc_rule_value = @help_uc_rule_value
+    and uc_rule_engine_table_name = @uc_rule_engine_table_name
+}
+
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+   This command returns an HTML that will be displayed by the client
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+<retcol name="uc_final_html" type="COMTYP_CHAR">This HTML should be displayed on the client</retcol>
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+<seealso cref="get ossi rule documentation template"></seealso>
+<seealso cref="get ossi rule context"></seealso>
+
+
+</documentation>
+
+
+
+</command>

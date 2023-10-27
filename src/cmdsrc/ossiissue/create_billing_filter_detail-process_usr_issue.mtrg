@@ -1,0 +1,20 @@
+<trigger>
+<name>process usr issue</name>
+<on-command>create billing filter detail</on-command>
+<local-syntax>
+<![CDATA[
+process usr issue
+  where uc_table_name = 'BILL_FILTER_DTL'
+    and uc_action = 'ADD'
+]]></local-syntax>
+<fire-sequence>10000</fire-sequence>
+<documentation>
+
+<remarks>
+This trigger process issue for creating billing filter detail.
+</remarks>
+
+<seealso cref="process usr issue"></seealso>
+
+</documentation>
+</trigger>

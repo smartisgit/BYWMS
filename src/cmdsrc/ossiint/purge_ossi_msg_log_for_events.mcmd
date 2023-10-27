@@ -1,0 +1,36 @@
+<command>
+<name>purge ossi msg log for events</name>
+<description>Purge data from msg log events</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+
+[delete
+   from sl_msg_log
+  where evt_data_seq in (select evt_data_seq from sl_evt_data where @+evt_id and evt_stat_cd = @evt_stat_cd)
+    and msg_log_dt < sysdate - @older_than_days
+]
+catch(-1403)
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<remarks>
+This command may be used to delete data from msg log.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+
+
+</command>

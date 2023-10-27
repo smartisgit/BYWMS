@@ -1,0 +1,2 @@
+job_id,role_id,name,enabled,type,command,log_file,trace_level,overlap,schedule,start_delay,timer,grp_nam
+UC_OSSI_APPMON,,Application Monitor,1,timer,run ossi monitor,$LESDIR/log/UC_OSSI_APPMON.log,,0,,0,60,GK

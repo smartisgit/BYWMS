@@ -1,0 +1,44 @@
+<command>
+<name>get ossi policy expression command</name>
+<description>Get ossi policy expression command</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+[[
+   if (rtstr1.startsWith("["))
+   {
+      rtstr1 = rtstr1.trim(); // trim whitespace so it ends with a bracket
+      // expr will be "[expr]", so strip off the leading and trailing bracket
+      cmd = "[select 1 result from dual where " + rtstr1.substring(1,rtstr1.length()-1) + "]catch(-1403,510)";
+   }
+   else if ( rtstr1.startsWith("{"))
+   {
+      cmd = rtstr1;
+   }
+   else
+   {
+      cmd = "publish data where result = iif(" + rtstr1 + ",1,0)";
+   }
+[cmd:cmd]
+]]
+
+]]>
+</local-syntax>
+<argument name="rtstr1" required="yes" datatype="string"></argument>
+<documentation>
+
+<remarks>
+This command is used to get policy expression command.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

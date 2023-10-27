@@ -1,0 +1,141 @@
+<command>
+<name>process ossi ldap sync user role</name>
+<description>Process LDAP Sync for a user to role</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="uc_ossi_job_seq"></argument>
+<argument datatype="string" name="uc_ossi_who"></argument>
+<argument datatype="string" name="uc_res_les_usr_role"></argument>
+
+
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+publish data
+where uc_row_count = rowcount(@uc_res_les_usr_role)
+|
+publish data
+where uc_ossi_module_seq = ossi__register_module ( @uc_ossi_job_seq, 'LES_USR_ROLE', 'rows='||@uc_row_count, @uc_ossi_who )
+|
+try
+{
+   if ( @uc_row_count > 0 )
+   {
+      /* Create user */
+      publish data combination
+      where res = @uc_res_les_usr_role
+      |
+      {
+         publish data
+         where role_id = ossi__rp_role_from_ldap_role(@role_id)
+         |
+         if ( @role_id is not null and @usr_id is not null )
+         {
+            execute server command
+            where cmd = "[select 1 from les_usr_role where usr_id = '"|| @usr_id || "' and role_id = '" || @role_id || "']"
+            and inline = 0
+            catch (-1403,510)
+            |
+            if ( @? != 0 )
+            {
+               create user role
+               where usr_id = @usr_id
+               and role_id = @role_id
+               catch (@?)
+               |
+               write daily transaction
+               where actcod = 'UC_LSYNCUR'
+               and movref = substr(@usr_id,1,20)
+               and traknm = string(@uc_ossi_job_seq)
+               and var_nam = 'role_id'
+               and fr_value = ''
+               and to_value = @role_id
+               and adj_ref1 = string(@?)
+               and cmnt = 'User added to role because it was so in LDAP. Status=' || @!
+               and wh_id = '----'
+            }
+         }
+      } /* block */
+      ;
+      /*
+       * Now go other way.  All roles for the user for roles that are ldap roles must still be valid
+       * Only worry about users in ldap and their roles in ldap.  Only worry about active assignments, i.e. active user
+       * and active roles
+       */
+      {
+         [
+         select les_usr_role.usr_id  les_usr_role_usr_id,
+                les_usr_role.role_id les_usr_role_role_id
+         from les_usr_role
+              join les_usr_ath on les_usr_ath.usr_id = les_usr_role.usr_id
+              join les_ath_role on les_ath_role.role_id = les_usr_role.role_id
+         where 1=1
+         and les_ath_role.uc_ldap_pk is not null
+         and les_usr_ath.uc_ldap_pk is not null
+         and les_usr_ath.usr_sts = 'A'
+         and les_ath_role.ena_flg = 1
+         order by 1,2
+         ]
+         catch (-1403,510)
+         |
+         if ( @? = 0 )
+         {
+            {
+               filter ossi rows with condition
+               where res = @uc_res_les_usr_role
+               and uc_condition = "ossi__rp_role_from_ldap_role(@role_id) = @les_usr_role_role_id and @usr_id = @les_usr_role_usr_id"
+            }
+            >> res_filtered
+            |
+            /* If not found in ldap - disable it */
+            if ( rowcount(@res_filtered) = 0)
+            {
+               remove user role
+               where usr_id = @les_usr_role_usr_id
+               and role_id = @les_usr_role_role_id
+               catch (@?)
+               |
+               write daily transaction
+               where actcod = 'UC_LSYNCUR'
+               and movref = substr(@usr_id,1,20)
+               and traknm = string(@uc_ossi_job_seq)
+               and reacod = 'CHANGE'
+               and var_nam = 'role_id'
+               and fr_value = @les_usr_role_role_id
+               and to_value = ''
+               and adj_ref1 = string(@?)
+               and cmnt = 'User Role was not in LDAP results - removed from user.  Status=' || @!
+               and wh_id = '----'
+            } /* not in ldap query */
+         } /* all active users in ldap in our db */
+      } /* block for round 2 */
+   } /* found rows in resultset */
+   ;
+   complete ossi job log
+} /* module */
+catch (@?)
+{
+   raise ossi job error
+   where uc_ossi_err_code  = @?
+   and   uc_ossi_err_descr = @!
+   and   is_job_flg = '0'
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+This component syncs up rp les_usr_role to the result set passed in
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

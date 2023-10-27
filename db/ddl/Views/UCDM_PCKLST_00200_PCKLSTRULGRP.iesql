@@ -1,0 +1,35 @@
+#use $DCSDIR/include
+
+#include <dcsddl.h>
+
+#include <dcscolwid.h>
+
+#include <dcstbldef.h>
+
+#include <sqlDataTypes.h>
+
+
+#use $SALDIR/include
+
+#include <salcolwid.h>
+
+mset command on
+
+[
+DROP_VIEW(UCDM_PCKLST_00200_PCKLSTRULGRP)
+] catch (ERR_CANNOT_DROP_TABLE_NOT_FOUND)
+RUN_DDL
+
+mset command off
+
+CREATE_VIEW(UCDM_PCKLST_00200_PCKLSTRULGRP)
+select pcklst_rule_grp.*,
+       dscmst.lngdsc
+from pcklst_rule_grp
+     left outer join dscmst 
+         on dscmst.colnam = 'pcklst_rule_grp_id'
+         and dscmst.colval = pcklst_rule_grp.pcklst_rule_grp_id
+         and dscmst.locale_id = 'US_ENGLISH'
+RUN_DDL
+
+mset command on

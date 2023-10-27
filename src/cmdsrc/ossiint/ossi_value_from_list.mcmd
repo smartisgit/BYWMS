@@ -1,0 +1,53 @@
+<command>
+<name>ossi value_from_list</name>
+<description>
+FUNCTION:  Given a name-value list; returns the value of a given name.  Callable as a function.
+</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+
+ossi parse name value list
+where sl_list           = @moca_farg1
+and   sl_name           = @moca_farg2
+and   sl_list_sep       = nvl(@moca_farg3,';')
+and   sl_name_value_sep = nvl(@moca_farg4,'=')
+|
+publish data
+where ret=@value
+
+]]>
+</local-syntax>
+
+<argument name="moca_farg1" required="no" datatype="string">List of name-value pairs</argument>
+<argument name="moca_farg2" required="no" datatype="string">Name of the parameter in the list</argument>
+<argument name="moca_farg3" required="no" datatype="string">List separator.  Default ;</argument>
+<argument name="moca_farg4" required="no" datatype="string">Name-value pair separator, default =</argument>
+
+<documentation>
+
+
+<remarks>
+This command uses the "ossi parse name value list" command to return the value of a parameter
+from a name-value list.
+</remarks>
+
+<retcol name="ret" type="string">Value of the parameter</retcol>
+
+<retrows>One or zero rows are returned</retrows>
+
+<example>
+publish data where x=ossi_value_from_list('name1=val1;name2=val2','name2')
+
+</example>
+<exception value="eOK">Normal successful completion</exception>
+
+<seealso cref="ossi parse name value list"></seealso>
+
+</documentation>
+</command>

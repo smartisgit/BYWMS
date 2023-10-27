@@ -1,0 +1,25 @@
+#use $DCSDIR/include
+#include <dcsddl.h>
+#include <dcscolwid.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+
+#use $SALDIR/include
+#include <salcolwid.h>
+
+mset command on
+[
+ALTER_TABLE_TABLE_INFO(prsmst)
+ALTER_TABLE_ADD_COLUMN_START(uc_windows_queue)
+     STRING_TY(PRTQUE_LEN)
+ALTER_TABLE_ADD_COLUMN_END
+] catch (ERR_COLUMN_ALREADY_EXISTS)
+RUN_DDL
+
+create db column comment
+where table_name   = 'prsmst'
+and column_name    = 'uc_windows_queue'
+and column_comment = 'UNC queue name for Connectship'
+RUN_DDL
+
+mset command off

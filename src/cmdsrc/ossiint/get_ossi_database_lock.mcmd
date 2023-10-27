@@ -1,0 +1,138 @@
+<command>
+<name>get ossi database lock</name>
+<description>Get a semaphore lock for the application through database that is sensative to commit context</description>
+
+<argument name="uc_lock_id" required="yes" datatype="string">The identifier to lock</argument>
+<argument name="uc_lock_timeout" required="yes" datatype="Integer">Specify -1 to wait indefinitely.  Specify 0 to not wait at all
+Otherwise time in milliseconds.  Default is -1</argument>
+<argument name="uc_lock_owner" required="yes" datatype="string">S for session and T for transaction.  Default is T</argument>
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+publish data
+where uc_my_database      = dbtype()
+and   uc_my_env           = @@MOCA_ENVNAME
+and   uc_lock_owner       = nvl(@uc_lock_owner,'T' )
+and   use_uc_lock_timeout = decode ( @uc_lock_timeout#onstack, 1, @uc_lock_timeout, -1 )
+|
+{
+   if ( @uc_my_database = 'MSSQL' )
+   {
+      /* In SQLServer lock ids are already part of the database so I am not concatenating envirionment to it */
+      publish data
+      where use_uc_lock_id      = @uc_lock_id
+      and   use_uc_lock_owner   = decode( @uc_lock_owner, 'T', 'Transaction', 'Session' )
+      |
+      {
+         /* 
+          * This is important, it starts a transaction so that this session will keep the thread.  If this is not used then it is 
+          * possible that we will get a parameter error from sp_getapplock.  sp_getapplock is really a function
+          */
+         [select 1 from dual]
+         ;
+         publish data
+         where uc_my_sql = "declare @ret int; exec @ret = sp_getapplock '" || @use_uc_lock_id || "','Exclusive','" || @use_uc_lock_owner || "'," 
+                        || @use_uc_lock_timeout || "; select @ret uc_lock_status"
+         |
+         [/*#nobind*/
+         sp_executesql @uc_my_sql
+         ]
+         |
+         if ( @uc_lock_status >= 0 )
+            noop /* >=0 means ok */
+         else
+            set return status
+            where status = ossi__e ( 'eUSR_OSSI_FAILED_USER_LOCK' )
+            and uc_db_err = string(@uc_lock_status)
+      }
+   }
+   else
+   {
+      publish data
+      where  use_uc_lock_id      = @uc_my_env || '_' || @uc_lock_id
+      |
+      {
+         [
+         select lockid uc_lock_handle
+         from sys.dbms_lock_allocated
+         where name = @use_uc_lock_id
+         ]
+         catch (-1403,510)
+         |
+         if ( @? = 0 )
+            publish data where uc_lockid = @uc_lockid
+         else
+         {
+            [
+            declare pragma autonomous_transaction;
+               v_lockname   varchar2(100);
+               v_lockhandle varchar2(100);
+            begin
+               v_lockname  := @use_uc_lock_id;
+               dbms_lock.allocate_unique ( lockname => v_lockname, lockhandle => v_lockhandle );
+               commit;
+            end;
+            ]
+            ;
+            [
+            select lockid uc_lock_handle
+            from sys.dbms_lock_allocated
+            where name = @use_uc_lock_id
+            ]
+         }
+         |
+         [
+         declare v_status pls_integer;
+         begin
+            v_status := dbms_lock.request ( lockhandle => @uc_lock_handle, release_on_commit => true );
+            if ( v_status != 0 and v_status != 4 ) then
+               raise_application_error ( -20000, 'dbms_lock raised -' || v_status );
+            end if;
+         end;
+         ]
+      } /* use lock id */
+   } /* oracle */
+} /* main block */
+
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+This component will get a user-defined lock from the database.  These locks can be session based or transaction based.
+Typical is transaction based that will release automatically on commit or rollback.  This can be used to obtain arbitrary
+locks where it is not possible to lock a row in a table.
+</p>
+]]>
+</remarks>
+
+<retrows>0</retrows>
+<retcol name="@*" type="string">No colums returned</retcol>
+
+<example>
+<p>
+get ossi database lock 
+where uc_lock_id = 'SAAD1'
+</p>
+</example>
+<exception value="eOK">The command completed successfully.</exception>
+<exception value="32113">not implmented yet on oracle</exception>
+<exception value="eUSR_OSSI_FAILED_USER_LOCK">The database call returned an error.  Database error is in the message</exception>
+
+<seealso cref="release ossi database lock"></seealso>
+
+</documentation>
+
+</command>

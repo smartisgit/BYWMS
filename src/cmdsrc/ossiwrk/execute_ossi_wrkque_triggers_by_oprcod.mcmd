@@ -1,0 +1,81 @@
+<command>
+<name>execute ossi wrkque triggers by oprcod</name>
+<description>Based on the oprcod of the wrkque, execute the various triggers</description>
+<type>Local Syntax</type>
+
+<argument datatype="string" name="reqnum"></argument>
+
+<local-syntax>
+<![CDATA[
+
+/*
+ * Revision Log
+ * 2021-12-07 saad.ahmad 12614 - Original
+ */
+
+{
+    execute ossi les_cmd
+    where les_cmd_id = 'uc_ctxt_post_create_work'
+    and uc_les_cmd_inline = 1
+    and exec_uc_les_cmd_cust_lvl = null
+    and uc_inhibit_return_extra_columns = 1
+    catch (-1403,510)
+    |
+    if ( @? = 0 and @uc_call_hook = 1 )
+    {
+        /*
+         * Call validate hook
+         */
+        execute ossi all conditional rules
+        where uc_rule_grp_id = 'OSSI-WORK-CREATED'
+        and uc_rule_subgrp_id = 'VALIDATE-CMD'
+        and uc_cache_key = null
+        catch (-1403,510)
+        ;
+        /*
+         * Call hook to modify the wrkque if needed
+         */
+        execute ossi all conditional rules
+        where uc_rule_grp_id = 'OSSI-WORK-CREATED'
+        and uc_rule_subgrp_id = 'MODIFY-CMD'
+        and uc_cache_key = null
+        catch (-1403,510)
+        ;
+        /*
+         * Now the main post hook.  But since we may have modified data, we need to refetch
+         */
+        execute ossi les_cmd
+        where les_cmd_id = 'uc_ctxt_post_create_work_post_cmd'
+        and uc_les_cmd_inline = 1
+        and exec_uc_les_cmd_cust_lvl = null
+        and uc_inhibit_return_extra_columns = 1
+        and uc_force_publish_wrkque_context = 1
+        catch (-1403,510)
+        |
+        if ( @? = 0 )
+        {
+            execute ossi all conditional rules
+            where uc_rule_grp_id = 'OSSI-WORK-CREATED'
+            and uc_rule_subgrp_id = 'POST-CMD'
+            and uc_cache_key = null
+            catch (-1403,510)
+        }
+    } /* we should call hook */
+}
+
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+Run validations for work queue and optionally log event
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>
+

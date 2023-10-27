@@ -1,0 +1,34 @@
+<command>
+<name>ossi polval_nc</name>
+<description>Find a policy value as a function </description>
+<type>Local Syntax</type>
+<argument datatype="string" name="moca_farg1">Filter: Policy Code</argument>
+<argument datatype="string" name="moca_farg2">Filter: Policy Variable</argument>
+<argument datatype="string" name="moca_farg3">Filter: Policy Value</argument>
+<argument datatype="string" name="moca_farg4">Optional Filter: rtstr1</argument>
+<argument datatype="string" name="moca_farg5">Optional.  Return column.  Default rtstr1</argument>
+<argument datatype="string" name="moca_farg6">Optional.  Warehouse id.  Default @wh_id or @@wh_id</argument>
+<argument datatype="string" name="moca_farg7">Optional.  rtnum1 filter</argument>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20170126 ossi\saad.ahmad - 7026 - core ossi
+ * 20170127 ossi\saad.ahmad - 7026 - core ossi
+ */
+ossi polval
+where uc_inhibit_ossi_cache = 1
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+MOCA Function to get a policy value.  Do NOT cache the results.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

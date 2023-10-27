@@ -1,0 +1,57 @@
+<command>
+<name>list ossi rollout installs</name>
+<description>List the rollout installs</description>
+
+<argument name="uc_env_name" required="yes" datatype="string">Environment</argument>
+<argument name="uc_rollout_name" required="yes" datatype="string">Environment</argument>
+
+<type>Local Syntax</type>
+
+
+<local-syntax>
+<![CDATA[
+
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+if ( @uc_env_name is not null )
+{
+   execute ossi bugzilla select
+   where uc_select_stmt = "select uc_env_url from ossi_rollout_env where uc_env_name = @uc_env_name"
+   |
+   Remote ( @uc_env_url )
+   {
+      find file
+      where pathname = @@LESDIR || '/install/' || @uc_rollout_name || '*'
+      >> res_ff
+      |
+      sort result set where result_set = @res_ff and sort_list = 'filename d' 
+      |
+      publish data
+      where uc_rollout_install_log = @filename
+   }
+}
+else
+{
+   [
+   select '123' uc_rollout_install_log
+   from dual
+   where 1=2
+   ]
+}
+
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+Get all rollout installs
+</remarks>
+<retcol name="uc_rollout_install_log" type="String"></retcol>
+<exception value="eOK">Normal successful completion</exception>
+</documentation>
+</command>

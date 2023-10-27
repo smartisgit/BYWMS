@@ -1,0 +1,107 @@
+<command>
+<name>ossi get_policy_data_as_list</name>
+<description>Get policy data as a list</description>
+
+<argument datatype="string" name="moca_farg1">POLCOD</argument>
+<argument datatype="string" name="moca_farg2">POLVAR</argument>
+<argument datatype="string" name="moca_farg3">POLVAL</argument>
+<argument datatype="string" name="moca_farg4">COLNAM</argument>
+<argument datatype="string" name="moca_farg5">WH_ID</argument>
+<argument datatype="string" name="moca_farg6">RTNUM1</argument>
+<argument datatype="string" name="moca_farg7">Separator</argument>
+<argument datatype="string" name="moca_farg8">Prefix of every value</argument>
+<argument datatype="string" name="moca_farg9">If 1 then returned string is a SQL in clause</argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+publish data 
+    where polcod = @moca_farg1 
+    and polvar = @moca_farg2 
+    and polval = @moca_farg3 
+    and colnam = @moca_farg4 
+    and wh_id = nvl(@moca_farg5, nvl(nvl(@wh_id, @@wh_id), '----')) 
+    and separator = nvl(@moca_farg7, ',') 
+    and prefix = @moca_farg8
+    and uc_as_sql_in = @moca_farg9
+    | 
+    if (@moca_farg6 is not null) 
+    {
+        publish data 
+        where rtnum1 = @moca_farg6 
+    }
+    | 
+    if ( @polval is null )
+        hide stack variable where name = 'polval'
+    |
+    [
+    select distinct
+           @prefix || rtstr1 rtstr1,
+           @prefix || polval polval,
+           @prefix || rtstr2 rtstr2
+    from poldat_view 
+    where polcod = @polcod 
+    and polvar = @polvar 
+    and @+polval
+    and wh_id = @wh_id 
+    and @+rtnum1
+    ]
+    catch (-1403) 
+    >> res 
+    | 
+    if (@? = 0) 
+    {
+        convert column results to string 
+        where res = @res 
+        and colnam = @colnam 
+        and separator = @separator 
+    }
+    else
+    {
+        publish data 
+        where result_string = null
+    }
+    |
+    if ( @uc_as_sql_in = '1' )
+    {
+        if ( @result_string is null )
+        {
+            publish data
+            where result = "''"
+        }
+        else
+        {
+            convert list
+            where string = @result_string
+            and type = 'S'
+            and separator = ','
+        }
+    }
+    else
+    {
+        publish data
+        where result_string = @result_string
+    }
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<remarks>
+This command may be used to get policy data as list.
+</remarks>
+
+<retcol name="result_string" type="String"></retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

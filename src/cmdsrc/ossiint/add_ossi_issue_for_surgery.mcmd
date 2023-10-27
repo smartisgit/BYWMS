@@ -1,0 +1,51 @@
+<command>
+<name>add ossi issue for surgery</name>
+<description>Add issue for surgery</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+ 
+if (@syntax is not null)
+{
+  publish data combination
+    where res = @res
+  |  
+  get ossi issue for surgery
+    where syntax = @syntax
+  |
+  if (@uc_issue_filter_value is null or upper(@uc_issue) like upper(@uc_issue_filter_value))
+  {
+    filter data 
+      where moca_filter_level = '3'
+        and uc_issue = @uc_issue
+  }
+}
+else
+{
+  publish data combination
+    where res = @res
+}
+
+]]>
+</local-syntax>
+<argument name="res" required="yes" datatype="resultset"></argument>
+<argument name="syntax" required="no" datatype="string"></argument>
+<argument name="uc_issue_filter_value" required="no" datatype="string"></argument>
+
+<documentation>
+
+<remarks>
+This command may be used to add issues for surgery data.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

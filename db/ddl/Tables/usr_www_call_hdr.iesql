@@ -1,0 +1,42 @@
+#use $LESDIR/include
+#use $DCSDIR/include
+#use $MOCADIR/include
+#use $LESDIR/db/ddl/Indexes
+
+#include <dcsddl.h>
+#include <dcscolwid.h>
+#include <dcstbldef.h>
+#include <sqlDataTypes.h>
+
+mset command on
+[
+CREATE_TABLE (usr_www_call_hdr)
+(
+   uc_www_call_seq          STRING_TY(12)            not null,
+   dstnam                   STRING_TY(DSTNAM_LEN)    not null,
+   uc_www_service_id        STRING_TY(100)           not null,
+   uc_www_status_cd         STRING_TY(10)            not null,
+   uc_req_dt                DATE_TY,
+   uc_cmpl_dt               DATE_TY,
+   uc_www_elapsed           FIXED_INT_TY(12),
+   uc_www_status            STRING_TY(100),
+   uc_www_statusdesc        STRING_TY(500),
+   uc_www_errorcode         STRING_TY(100),
+   uc_www_errordetails      STRING_TY(500),
+   uc_www_warning           STRING_TY(1000),
+   uc_www_sonum             STRING_TY(100),
+   /**/
+   ship_id                  STRING_TY(SHIP_ID_LEN),
+   subnum                   STRING_TY(SUBNUM_LEN),
+   rt_adr_id                STRING_TY(ADR_ID_LEN),
+   /**/
+   ins_dt                   DATE_TY,
+   last_upd_dt              DATE_TY,
+   ins_user_id              STRING_TY(40),
+   last_upd_user_id         STRING_TY(40)
+)
+] catch (/* ERR_TABLE_ALREADY_EXISTS */ -2714,-955)
+RUN_DDL
+mset command off
+ 
+#include <usr_www_call_hdr_pk.iesql>

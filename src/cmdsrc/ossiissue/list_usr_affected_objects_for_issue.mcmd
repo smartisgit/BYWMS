@@ -1,0 +1,74 @@
+<command>
+<name>list usr affected objects for issue</name>
+<description>List affected objects for issue</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ */
+[select uc_ossi_obj_name, 
+    	uc_ossi_obj_pk_col, 
+    	uc_ossi_obj_pk_data, 
+    	uc_ossi_obj_key_col, 
+    	uc_ossi_obj_key_data, 
+    	decode(uc_ossi_action, 'ADD', 'UPDATE', uc_ossi_action) uc_ossi_action, 
+    	uc_ossi_issue_obj_log_seq,
+        max(uc_ossi_fil_cre_dt) uc_ossi_fil_cre_dt,
+        max(uc_ossi_commit_dt) uc_ossi_commit_dt,
+    	max(uc_ossi_revision) uc_ossi_revision,
+    	uc_ossi_issue_assign_seq
+   from usr_ossi_issue_obj_log
+  where uc_ossi_issue_assign_seq = @uc_ossi_issue_assign_seq
+    and @+uc_ossi_obj_name
+    and uc_ossi_obj_grp is null 
+    and uc_ossi_obj_typ = 'TABLE'
+  group by uc_ossi_obj_name, 
+           uc_ossi_obj_pk_col, 
+           uc_ossi_obj_pk_data, 
+           uc_ossi_obj_key_col, 
+           uc_ossi_obj_key_data, 
+           decode(uc_ossi_action, 'ADD', 'UPDATE', uc_ossi_action), 
+           uc_ossi_issue_obj_log_seq,
+           uc_ossi_issue_assign_seq, 
+           uc_ossi_upd_dt
+  having (@uc_show_uncommitted is null 
+       or @uc_show_uncommitted != 1 
+       or max(uc_ossi_commit_dt) is null 
+       or uc_ossi_upd_dt > max(uc_ossi_commit_dt))
+  order by uc_ossi_obj_name, 
+           uc_ossi_obj_pk_col, 
+           uc_ossi_obj_pk_data, 
+           uc_ossi_obj_key_col, 
+           uc_ossi_obj_key_data,
+           uc_ossi_issue_obj_log_seq
+] catch (-1403) 
+]]>
+</local-syntax>
+<argument name="uc_ossi_issue_assign_seq" required="yes" datatype="integer"></argument>
+<argument name="uc_show_uncommitted" datatype="integer">1 to show only those objects changed since the last commit</argument>
+<argument name="uc_ossi_obj_name" required="no" datatype="string"></argument>
+<documentation>
+
+<remarks>
+This command lists affected objects for issue.
+</remarks>
+
+<retcol name="uc_ossi_obj_name" type="String"></retcol>
+<retcol name="uc_ossi_obj_pk_col" type="String"></retcol>
+<retcol name="uc_ossi_obj_pk_data" type="String"></retcol>
+<retcol name="uc_ossi_obj_key_col" type="String"></retcol>
+<retcol name="uc_ossi_obj_key_data" type="String"></retcol>
+<retcol name="uc_ossi_action" type="String"></retcol>
+<retcol name="uc_ossi_issue_obj_log_seq" type="String"></retcol>
+<retcol name="uc_ossi_fil_cre_dt" type="date"></retcol>
+<retcol name="uc_ossi_commit_dt" type="date"></retcol>
+<retcol name="uc_ossi_revision" type="String"></retcol>
+<retcol name="uc_ossi_issue_assign_seq" type="String"></retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

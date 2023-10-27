@@ -1,0 +1,188 @@
+<command>
+<name>execute ossi shipment consolidation rule without dates</name>
+<description>Call the shipment consolidation APIs - but set the dates on order lines to same value temporarily so that date does not break the values.  This is invoked by the shipment consolidation rules engine
+and should be able to handle the various types of shipment consolidation requirements.  Refer to the arguments here to see how it should be called.
+</description>
+ 
+<argument name="wh_id" alias="" datatype="String">Warehouse id</argument>
+<argument name="cons_batch" alias="" datatype="String">Value assigned to shipment line records that are being planned</argument>
+
+<argument name="uc_reset_dates_flg" alias="" datatype="String">Default is 1.  if we say 0 then we will not reset dates so it will be as if we call base stuff.  Standard BY would not combine order lines
+into a shipment that have differnt dates but for some of our sites we want to still combine them if they are being planned at the same time.  So if this value is pssed in as 1, then all order lines
+being referenced by the same cons_batch will be temporarily updated to have the same dates and then we run the planning.  The dates are reset to their original values after shipment has been created.
+We set the dates to earliest and latest based on all order lines</argument>
+
+
+<argument name="uc_consolidate_cmd" alias="" datatype="String">This may be passed in explicitly.  if not passed in
+then we will use [consolidate shipment lines by field lists] command. Pass in [consolidate usr shipment lines with standard fields] to execute standard consilidation logic where we consolidate based on like dates</argument>
+
+<argument name="string_list" alias="" datatype="String">NO CONSOLIDATE CMD: This may be passed in as a ; delimited list.  
+In that case we will end up calling [consolidate shipment lines by field lists] in a loop for each field.  For respecting our business rules for most sites, we may pas in [o.ordtyp,o.vc_cmb_ordcde,o.uc_consby_ref1,o.uc_consby_ref2].
+This coupled with uc_reset_dates_flg of 1 will imply that all orders lines with like values on this list will become one shipment irrespective of the dates on order lines.
+</argument>
+
+<argument name="early_date_list" alias="" datatype="String">NO CONSOLIDATE CMD: Date list for early dates.  Default early_shpdte,early_dlvdte </argument>
+<argument name="late_date_list" alias="" datatype="String">NO CONSOLIDATE CMD: Date list for late dates.  Default late_shpdte,late_dlvdte</argument>
+
+
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+publish data 
+where wh_id = nvl(@wh_id, @@WH_ID)
+and uc_reset_dates_flg = nvl(@uc_reset_dates_flg, 1 )
+|
+if ( @uc_consolidate_cmd is null )
+    publish data
+    where early_date_list = nvl(@early_date_list, 'early_shpdte,early_dlvdte' )
+    and late_date_list = nvl(@late_date_list, 'late_shpdte,late_dlvdte')
+|
+{
+    /*
+     * From the batch take earliest dates.  Then update all order lines temporarily to these dates.
+     */
+    if ( @uc_reset_dates_flg = 1 )
+    {
+        [
+        select x.*
+        from
+        (
+            select early_shpdte uc_min_early_shpdte,
+                   early_dlvdte uc_min_early_dlvdte,
+                   late_shpdte  uc_min_late_shpdte,
+                   late_dlvdte  uc_min_late_dlvdte
+            from shipment_line
+                 join ord_line 
+                     on ord_line.client_id = shipment_line.client_id 
+                     and ord_line.wh_id = shipment_line.wh_id 
+                     and ord_line.ordnum = shipment_line.ordnum 
+                     and ord_line.ordlin = shipment_line.ordlin
+                     and ord_line.ordsln = shipment_line.ordsln
+            where shipment_line.cons_batch = @cons_batch
+            and rownum < 999999
+            order by early_shpdte, early_dlvdte, late_shpdte, late_dlvdte
+        ) x
+        where rownum < 2
+        ]
+        catch (-1403,510)
+        |
+        [
+        select ord_line.client_id, ord_line.wh_id, ord_line.ordnum, ord_line.ordlin, ord_line.ordsln, 
+               ord_line.early_shpdte, ord_line.early_dlvdte,
+               ord_line.late_shpdte,  ord_line.late_dlvdte
+        from shipment_line
+             join ord_line 
+                 on ord_line.client_id = shipment_line.client_id 
+                 and ord_line.wh_id = shipment_line.wh_id 
+                 and ord_line.ordnum = shipment_line.ordnum 
+                 and ord_line.ordlin = shipment_line.ordlin
+                 and ord_line.ordsln = shipment_line.ordsln
+        where shipment_line.cons_batch = @cons_batch
+        ]
+        catch (-1403,510)
+        >> uc_ol_date_res
+        |
+        {
+            if ( rowcount(@uc_ol_date_res) > 0 )
+            {
+                publish data combination
+                where res = @uc_ol_date_res
+                |
+                [
+                update ord_line
+                set early_shpdte = @uc_min_early_shpdte:date,
+                    early_dlvdte = @uc_min_early_dlvdte:date,
+                    late_shpdte = @uc_min_late_shpdte:date,
+                    late_dlvdte = @uc_min_late_dlvdte:date
+                where client_id = @client_id
+                and wh_id = @wh_id
+                and ordnum = @ordnum
+                and ordlin = @ordlin
+                and ordsln = @ordsln
+                ]
+            }
+            ;
+            publish data
+            where uc_ol_date_res = @uc_ol_date_res
+        }
+    } /* update dates? */
+    |
+    try
+    {
+        if ( @uc_consolidate_cmd is not null )
+            execute server command
+            where cmd = @uc_consolidate_cmd
+            and inline = 1
+        else
+        {
+            convert list
+            where string = @string_list
+            and type = 'L'
+            and separator = ';'
+            |
+            consolidate shipment lines by field lists 
+            where cons_batch = @cons_batch 
+            and string_list = @retstr
+            and early_date_list = @early_date_list
+            and late_date_list = @late_date_list
+        }
+    }
+    finally
+    {
+        if ( @uc_reset_dates_flg = 1 and @uc_ol_date_res is not null )
+        {
+            publish data combination 
+            where res = @uc_ol_date_res
+            |
+            [
+            update ord_line
+            set early_shpdte = @early_shpdte:date,
+                early_dlvdte = @early_dlvdte:date,
+                late_shpdte = @late_shpdte:date,
+                late_dlvdte = @late_dlvdte:date
+            where client_id = @client_id
+            and wh_id = @wh_id
+            and ordnum = @ordnum
+            and ordlin = @ordlin
+            and ordsln = @ordsln
+            ]
+            catch (-1403,510)
+        }
+    }
+}
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<remarks>
+
+<![CDATA[
+
+We are calling the consolidation routine but setting dates to same value for all lines so that that logic does not kick in
+
+]]>
+
+</remarks>
+
+<retrows>0</retrows>
+
+
+
+<exception value="eOK">The command completed successfully.</exception>
+
+<seealso cref="consolidate shipment lines by field lists"></seealso>
+<seealso cref="consolidate shipment lines by fields"></seealso>
+<seealso cref="consolidate shipment lines mainline"></seealso>
+<seealso cref="consolidate usr shipment lines with standard fields"></seealso>
+
+
+
+</documentation>
+
+</command>

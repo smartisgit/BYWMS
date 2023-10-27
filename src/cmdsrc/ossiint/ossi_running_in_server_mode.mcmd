@@ -1,0 +1,34 @@
+<command>
+<name>ossi running_in_server_mode</name>
+<description>When running some apps like msql -S, mload, slImp we have to take into account that some ossi stuff
+may not be installed yet.  Currently we simply see if USR_ID is null (which it should never be in normal cases from client)
+we return a 1. </description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ */
+publish data
+where uc_test_usr_id = @@USR_ID
+|
+if ( @uc_test_usr_id is null or @uc_test_usr_id = 'NOUSER' )
+   publish data where ret = '1'
+else
+   publish data where ret = '0'
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+See if running in server mode.  used by caching and issue tracking currently
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+</command>

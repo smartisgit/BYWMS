@@ -1,0 +1,64 @@
+<command>
+<name>decompose ossi context for host mapping for integrations</name>
+<description>Get a packed context and decompose to separate fields so that rules engine can see them</description>
+
+<argument name="uc_int_context" required="yes" datatype="string">packed context</argument>
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+/*
+ * Revision Log
+ * 2021-11-30 saad.ahmad 12608 - Initial
+ */
+
+publish data
+where uc_my_delim = '\|\|'
+|
+{
+    publish data
+    where evt_sys_id        = ossi__get_fld_from_list ( @uc_int_context, 1, @uc_my_delim )
+    and   dest_sys_id       = ossi__get_fld_from_list ( @uc_int_context, 2, @uc_my_delim )
+    and   ifd_id            = ossi__get_fld_from_list ( @uc_int_context, 3, @uc_my_delim )
+    and   ifd_ver           = ossi__get_fld_from_list ( @uc_int_context, 4, @uc_my_delim )
+    and   ifd_seg_id        = ossi__get_fld_from_list ( @uc_int_context, 5, @uc_my_delim )
+    and   ifd_fld_id        = ossi__get_fld_from_list ( @uc_int_context, 6, @uc_my_delim )
+    and   ifd_fld_misc_data = ossi__get_fld_from_list ( @uc_int_context, 7, @uc_my_delim )
+    and   ifd_fld_data      = ossi__get_fld_from_list ( @uc_int_context, 8, @uc_my_delim )
+}
+
+]]>
+</local-syntax>
+<documentation>
+<remarks>
+<![CDATA[
+    <p>
+    With a passed in context in one field, this will decompose it into separate fields
+    </p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+<retcol name="evt_sys_id" type="string"></retcol>
+<retcol name="dest_sys_id" type="string"></retcol>
+<retcol name="ifd_id" type="string"></retcol>
+<retcol name="ifd_ver" type="string"></retcol>
+<retcol name="ifd_seg_id" type="string"></retcol>
+<retcol name="ifd_fld_id" type="string"></retcol>
+<retcol name="ifd_fld_misc_data" type="string"></retcol>
+<retcol name="ifd_fld_data" type="string"></retcol>
+
+<seealso cref="ossi get_host_stoloc"></seealso>
+<seealso cref="ossi get_host_invsts"></seealso>
+<seealso cref="get ossi context for host mapping for integrations"></seealso>
+
+
+<example>
+</example>
+
+<exception value="eOK">Normal successful completion</exception>
+
+
+</documentation>
+</command>

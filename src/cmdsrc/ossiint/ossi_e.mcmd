@@ -1,0 +1,34 @@
+<command>
+<name>ossi e</name>
+<description>
+Get number for an error symbol
+</description>
+<type>C Function</type>
+<function>usrOssiGetErrorCode</function>
+<argument name="moca_farg1" required="yes" datatype="string">Error code from the .h</argument>
+
+<documentation>
+
+
+<remarks>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+
+??
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+<example>
+??
+</example>
+
+<exception value="eOK">Normal successful completion</exception>
+</documentation>
+</command>

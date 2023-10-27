@@ -1,0 +1,72 @@
+<command>
+<name>consolidate ossi shipment lines with standard fields</name>
+<description>We have disabled standard logic of the trigger cons_ship_line_by_fields and moved logic here so that we can call it from our rules engine</description>
+
+<argument name="wh_id" alias="" datatype="String"></argument>
+<argument name="cons_batch" alias="" datatype="String"></argument>
+
+
+
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+
+    /* First we need to run the consolidation for old shipment lines,
+     * Then we need to run the consolidation for new shipment lines.
+     */
+    get session variable
+         where name = 'cons_batch_ids'catch(-1403)
+    |
+    if (@? = 0) {
+        /*
+         * First we need to consolidate the old batches
+         */
+        convert list
+          where string = @value and type = 'L'
+        |
+        consolidate shipment lines by fields
+              where cons_batch = @retstr
+    }
+    |
+    consolidate shipment lines by fields
+        where cons_batch = @cons_batch
+   
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+The code is copied directly from the standard trigger cons_ship_line_by_fields.  The idea is that we can run the same logic as needed from
+the rules engine
+</p>
+]]>
+</remarks>
+
+<retrows>0</retrows>
+
+
+<example>
+<![CDATA[
+<p>
+</p>
+]]>
+
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+
+<seealso cref="consolidate shipment lines by field lists"></seealso>
+<seealso cref="consolidate shipment lines by fields"></seealso>
+<seealso cref="consolidate shipment lines mainline">
+    This is where standard trigger cons_ship_line_by_fields exists which has been disabled in this command level
+    And in favor of that we have logic here.
+</seealso>
+<seealso cref="consolidate ossi shipment lines with standard fields"></seealso>
+
+</documentation>
+
+
+</command>

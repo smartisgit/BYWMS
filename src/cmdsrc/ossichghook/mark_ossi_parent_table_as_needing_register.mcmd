@@ -1,0 +1,92 @@
+<command>
+<name>mark ossi parent table as needing register</name>
+<description>This is called by a child table e.g. ord_line to mark ord as needing re-register</description>
+
+<argument name="table_name" required="yes" datatype="string">The parent table</argument>
+<argument name="uc_reg_reacod" required="yes" datatype="string">Data from list command is assumed to be on stack</argument>
+<argument name="uc_parent_update_clause" required="yes" datatype="string">The update clause to use</argument>
+
+<argument name="uc_inhibit_change_hook" required="yes" datatype="string">For testing may pass in to not do anything</argument>
+
+<type>Local Syntax</type>
+
+<local-syntax>
+<![CDATA[
+
+if ( @uc_inhibit_change_hook = '1' )
+    noop
+else
+{
+    publish data
+    where uc_hook_logic = nvl(@uc_change_hook_logic_override, nvl(ossi__polval ( 'USR-OSSI-DATA-CHANGE-HOOK', @table_name, 'ENABLED', '', 'rtnum1', '----'),0) )
+    |
+    if ( @uc_hook_logic = 0 ) /* it is completely disabled so bypass */
+        noop
+    else
+    {
+        /*
+         * This session variable is set in parent table - so if that is set in same transaction already
+         * child does not need to do anything
+         * If hook logic is 2 (i.e. we want inline processing) then session variable does not matter.  We need to fire rules right here
+         */
+        if ( ossi__sess_var ( 'uc_smart_reghook_data', '', 'Y' ) is null or @uc_hook_logic = 2 )
+        {
+            if ( @uc_parent_update_clause is null )
+            {
+                get ossi clause for primary key from stack
+                |
+                publish data
+                where uc_parent_update_clause = @uc_where_clause
+            }
+            |
+            {
+                /*
+                 * We need to mark the parent table in P only when we need a job to register this
+                 * If hook_logic was 2 then this is not needed
+                 */
+                if ( @uc_hook_logic = 1 )
+                    [
+                    update @table_name:raw
+                    set uc_reg_stat_cd = 'P',
+                        uc_reg_reacod = @uc_reg_reacod
+                    where @uc_parent_update_clause:raw
+                    ]
+                    catch (-1403,510)
+                ;
+                process ossi table data change hook
+                where uc_update_where_clause = @uc_parent_update_clause
+                and table_name = @table_name
+                |
+                filter data
+                where moca_filter_level = 1
+                and table_name = @table_name
+                and uc_reg_reacod = @uc_reg_reacod
+                and uc_parent_update_clause = @uc_parent_update_clause
+            }
+        }
+    } /* hook logic condition */
+}
+
+]]>
+
+</local-syntax>
+
+<documentation>
+
+<remarks>
+<![CDATA[
+  <p>
+   This component is used to set the object as registed
+  </p>
+]]>
+</remarks>
+
+<retcol name="@*" type="(varies according to field type)">All order columns</retcol>
+<exception value="eOK">Normal successful completion</exception>
+
+
+<seealso cref="register usr shipment fully released"></seealso>
+
+
+</documentation>
+</command>

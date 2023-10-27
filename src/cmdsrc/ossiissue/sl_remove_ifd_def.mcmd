@@ -1,0 +1,31 @@
+<command>
+<name>sl_remove ifd_def</name>
+<description>Must log it here to get the correct group</description>
+<type>Local Syntax</type>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ */
+{
+  process usr issue
+    where uc_table_name = 'SL_IFD_DEF'
+      and uc_action = 'REMOVE'
+  ;
+  ^sl_remove ifd_def
+}
+
+]]>
+</local-syntax>
+<documentation>
+
+<remarks>
+This command remove ifd definition.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+</command>

@@ -1,0 +1,7 @@
+<component-level>
+<name>ossishp</name>
+<description>Smart IS Data Shipment Related services.  Planning and staging</description>
+<sort-sequence>8004</sort-sequence>
+<editable>true</editable>
+<library>ossiint</library>
+</component-level>

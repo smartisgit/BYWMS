@@ -1,0 +1,107 @@
+<command>
+<name>publish ossi data as projection using policy</name>
+<description>Publish the data in one row with columns based on policy metadat</description>
+<type>Local Syntax</type>
+
+
+<argument datatype="string" name="polcod">Filter: Policy Code</argument>
+<argument datatype="string" name="polvar">Filter: Policy Variable</argument>
+<argument datatype="string" name="polval">Filter: Policy Value</argument>
+<argument datatype="string" name="wh_id"></argument>
+<argument datatype="string" name="uc_stack_column">Default polval</argument>
+<argument datatype="string" name="uc_publish_as_column">Default rtstr1</argument>
+<argument datatype="string" name="uc_publish_condition_column">Default rtstr2</argument>
+
+
+<local-syntax>
+<![CDATA[
+/*
+* Change Log
+* Initial Check In
+* Kent.Zhao - 10731
+*/
+
+publish data
+where wh_id                       = nvl(@wh_id, @@WH_ID)
+and   uc_stack_column             = nvl(@uc_stack_column,'polval' )
+and   uc_publish_as_column        = nvl ( @uc_publish_as_column, 'rtstr1')
+and   uc_publish_condition_column = nvl ( @uc_publish_condition_column, 'rtstr2')
+|
+if ( @polval is null ) hide stack variable where name = 'polval'
+|
+{
+   list ossi policy data and cache
+   where rtnum1 = 1
+   catch (-1403,510)
+   >> res_pol
+   |
+   {
+      [[
+      StringBuffer v_publish_data_cmd = new StringBuffer();
+      boolean first = true;
+      boolean publish_this_col;
+      //
+      v_publish_data_cmd.append ( "publish data where " );
+      //
+      while ( res_pol.next() )
+      {
+         v_this_stack_column = res_pol.getString ( uc_stack_column ).toLowerCase();
+         v_this_publish_as_column = res_pol.getString ( uc_publish_as_column );
+         v_this_column_condition = res_pol.getString ( uc_publish_condition_column );
+         //
+         if ( v_this_publish_as_column == null )
+            v_this_publish_as_column = v_this_stack_column;
+         //
+         v_this_publish_as_column = v_this_publish_as_column.toLowerCase()
+         v_this_default_stack_column = "uc_default_" + v_this_publish_as_column;
+         //
+         if ( v_this_column_condition == null )
+            publish_this_col = true;
+         else
+         {
+            res_test = moca.executeInline ( "publish data where uc_result = iif ( " + v_this_column_condition + ",'1','0')" );
+            if ( res_test.next() )
+               publish_this_col =  ( res_test.getString("uc_result") == "1" );
+            else
+               publish_this_col = false;
+         }
+         //
+         if ( publish_this_col )
+         {
+            if ( !first )
+               v_publish_data_cmd.append ( " and " );
+
+            v_publish_data_cmd.append ( v_this_publish_as_column + " = nvl(@" +  v_this_stack_column + ", @" + v_this_default_stack_column + ")" );
+            first = false;
+         }
+      }
+      [uc_publish_data_cmd:v_publish_data_cmd.toString()]
+      ]]
+      |
+      execute server command
+      where cmd = @uc_publish_data_cmd
+      and inline = 1
+   }
+}
+
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+Lets say you have following columns on stck:
+uc_orgcod, mandte, expdte, def_expdte
+
+And you want to publish out orgcod as uc_orgcod and mandte as mandte and not publish expdte.  Furthermore you want to publish
+def_expdte after testing a condition.
+
+This component allows you to setup a policy structure to control it.
+</remarks>
+
+<exception value="eOK">Normal successful completion</exception>
+
+</documentation>
+
+
+</command>

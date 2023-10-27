@@ -1,0 +1,2 @@
+polcod,polvar,polval,wh_id_tmpl,srtseq,rtstr1,rtstr2,rtnum1,rtnum2,rtflt1,rtflt2,grp_nam
+USR-JOB-MANAGER,WM-PURGE-01,_PARAMETERS,----,2,uc_daysold_exec_log,"nvl(@@UC_PURGE_WM_DAYS_EXEC_LOG, '15')",1,0,0.0,0.0,OSSISVN_10731

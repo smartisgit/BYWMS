@@ -1,0 +1,63 @@
+<trigger>
+<name>execute usr conditional commands</name>
+<on-command>process inventory hold change</on-command>
+<fire-sequence>9700</fire-sequence>
+
+
+<argument name="uc_inhibit_hold_change_rules" required="yes" datatype="integer">For testing perofrmance or any other exceptions</argument>
+
+
+<local-syntax>
+<![CDATA[
+
+/*
+ * Revision Log
+ * 2021-11-30 saad.ahmad 12608 - Initial
+ */
+
+publish data
+where uc_continue_if_action_error = 0
+|
+if ( @uc_inhibit_hold_change_rules != 1 and nvl(@exec_sts,0) = 0 and @uc_inhibit_change_hook != '1' )
+{
+    if ( ossi__polval('USR-OSSI-DATA-CHANGE-HOOK', 'CMD_PROCESS_INVENTORY_HOLD_CHANGE_POST', 'ENABLED', '', 'rtnum1', nvl(@wh_id,@@WH_ID) ) != 0 )
+    {
+        publish ossi move inventory location attributes
+        where wh_id = @wh_id
+        and srcloc = @stoloc
+        and dstloc = @stoloc
+        catch (-1403,510)
+        |
+        {
+            /* This publish data is to match other move rules */
+            publish data
+            where uc_use_lodnum = @lodnum
+            and uc_use_subnum = @subnum
+            and uc_use_dtlnum = @dtlnum
+            |
+            execute ossi all conditional rules
+            where uc_rule_grp_id = 'OSSI-INVENTORY-HOLD-CHANGE'
+            and uc_rule_subgrp_id = 'GLOBAL-MAP'
+            catch (-1403,510)
+        } /* publish data combination */
+    }
+} /* scope */
+
+]]>
+</local-syntax>
+
+<documentation>
+
+<seealso cref="process inventory hold change"></seealso>
+
+<policy
+    polcod="USR-OSSI-DATA-CHANGE-HOOK"
+    polvar="CMD_PROCESS_INVENTORY_HOLD_CHANGE_POST"
+    polval="ENABLED"
+    rtnum1="0 to disable this hook and 2 to enable"
+></policy>
+
+
+</documentation>
+
+</trigger>

@@ -1,0 +1,29 @@
+<trigger>
+<name>process usr issue</name>
+<on-command>remove les option authorization</on-command>
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * 20161002 saad.ahmad - 7026 - Bring the core Oracular components
+ */
+check usr ath exclusion
+  catch (-1403,510)
+|
+if (@? = 0)
+process usr issue
+  where uc_table_name = 'LES_OPT_ATH'
+    and uc_action = 'REMOVE'
+]]></local-syntax>
+<fire-sequence>10000</fire-sequence>
+<documentation>
+
+<remarks>
+This trigger process issue for deleting les optuon authorization.
+</remarks>
+
+<seealso cref="process usr issue"></seealso>
+
+</documentation>
+</trigger>

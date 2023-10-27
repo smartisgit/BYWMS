@@ -1,0 +1,42 @@
+<command>
+<name>ossi abs</name>
+<description>
+Absolute value
+</description>
+<type>Local Syntax</type>
+
+<local-syntax>
+<![CDATA[
+/*
+ * Change Log
+ * Initial Check In
+ * Kent.Zhao - 10731
+ */
+ 
+sl_abs
+where num = @moca_farg1
+
+]]>
+
+</local-syntax>
+
+<documentation>
+
+
+<remarks>
+<![CDATA[
+Round a value
+]]>
+</remarks>
+
+<retrows>1</retrows>
+
+<example>
+??
+</example>
+
+<retcol name="ret" type="float">Rounded value</retcol>
+
+<exception value="eOK">Normal successful completion</exception>
+</documentation>
+</command>

@@ -1,0 +1,201 @@
+<command>
+<name>execute ossi blob service using az</name>
+<description>Microsoft provides az command line interface to interact with its services - including the blob storage.  So all request go through this command
+to then call az command line.
+</description>
+<type>Local Syntax</type>
+
+<argument name="uc_az_service" required="yes" datatype="string">This is a tag for the service.  Following are supported
+    blob list:  List the blobs
+    blob upload: To upload blob
+    blob url: Get the URL of the named blob
+    blob download: Download the Blob to a file
+</argument>
+
+<argument name="uc_az_blob_container" required="no" datatype="string">name of the comtainer.  if not specified use @@UC_DOC_Q_UPLOAD_CONTAINER</argument>
+<argument name="uc_az_blob_account" required="no" datatype="string">name of the account.  if not specified use @@UC_DOC_Q_UPLOAD_ACCOUNT</argument>
+<argument name="uc_az_blob_sas_token" required="no" datatype="string">value of the SAS token.  if not specified use @@UC_DOC_Q_UPLOAD_SAS_TOKEN</argument>
+<argument name="uc_az_pgm" required="no" datatype="string">program to use.  if not specified use env var UC_AZ_PGM.  if that is not set default to az</argument>
+
+<argument name="uc_upload_filepath" required="no" datatype="string">When blob upload, the file path</argument>
+<argument name="uc_upload_id" required="no" datatype="string">When blob upload or blob url, the name of the uploded file</argument>
+<argument name="uc_upload_metadata" required="no" datatype="results">When blob upload, A moca resultset with column_name and column_value</argument>
+
+
+<argument name="uc_download_filepath" required="no" datatype="string">When blob download, the file path</argument>
+
+<argument name="uc_list_filter" required="no" datatype="string">When blob list, The filter clause but az rules</argument>
+
+
+
+<local-syntax>
+<![CDATA[
+
+publish data
+where uc_az_blob_container = nvl(@uc_az_blob_container, @@UC_DOC_Q_UPLOAD_CONTAINER )
+and   uc_az_blob_account   = nvl(@uc_az_blob_account,   @@UC_DOC_Q_UPLOAD_ACCOUNT )
+and   uc_az_blob_sas_token = nvl(@uc_az_blob_sas_token, @@UC_DOC_Q_UPLOAD_SAS_TOKEN )
+and   uc_az_pgm            = nvl(nvl(@uc_az_pgm, @@UC_AZ_PGM), "az" )
+and   use_metadata_str     = ""
+|
+publish data
+where uc_account_parm = "--account-name " || @uc_az_blob_account || " --container-name " || @uc_az_blob_container 
+                     || ' --sas-token ' || qq(@uc_az_blob_sas_token,'"')
+|
+if ( @uc_az_service = 'blob list' )
+{
+    if ( @uc_list_filter is not null )
+        publish data
+        where uc_az_service_call_parm = '--query "[?' || @uc_list_filter || ']"'
+    |
+    publish data
+    where uc_az_service_call = "storage blob list"
+    and uc_az_service_call_parm = @uc_az_service_call_parm || ' --num-results "*"'
+}
+else if ( @uc_az_service = 'blob url' )
+    publish data
+    where uc_az_service_call = "storage blob url"
+    and uc_az_service_call_parm = "--name " || @uc_upload_id
+else if ( @uc_az_service = 'blob download' )
+    publish data
+    where uc_az_service_call = "storage blob download"
+    and uc_az_service_call_parm = "--name " || @uc_upload_id || " --file " || @uc_download_filepath
+else if ( @uc_az_service = 'blob upload' )
+{
+    if ( @uc_upload_metadata is not null and rowcount(@uc_upload_metadata) > 0 )
+    {
+        [[
+        metadata_str = new StringBuffer("--metadata");
+        while ( uc_upload_metadata.next() )
+        {
+            column_name = uc_upload_metadata.getString("column_name");
+            column_value= uc_upload_metadata.getString("column_value" );
+            if ( column_value == null )
+                column_value = "";
+            else
+                column_value = column_value.replaceAll('"', '');
+            if ( column_value != "" )
+            {
+                metadata_str.append(" ");
+                metadata_str.append( column_name );
+                metadata_str.append( '="' );
+                metadata_str.append( column_value );
+                metadata_str.append( '"' );
+            }
+        }
+        [use_metadata_str:metadata_str.toString()]
+        ]]
+    }
+    |
+    publish data
+    where uc_az_service_call = "storage blob upload"
+    and uc_az_service_call_parm = "--file " || @uc_upload_filepath || " --name " || @uc_upload_id || " " || @use_metadata_str
+}
+|
+publish data
+where uc_az_cmd_line = @uc_az_pgm || " " || @uc_az_service_call || " " || @uc_account_parm  || " " || @uc_az_service_call_parm
+|
+{
+    execute os command where cmd = @uc_az_cmd_line 
+    catch(@?)
+    >> res_cmd
+    |
+    if ( @? = 0 and rowcount(@res_cmd) > 0 )
+    {
+        [[
+        StringBuffer rr = new StringBuffer("");
+        while ( res_cmd.next() )
+        {
+            rr.append ( res_cmd.getString("result") );
+        }
+        [cmd_result:rr.toString()]
+        ]]
+        |
+        /*
+         * For blob list az returns JSON that starts with [ so we are adding resyults.  For blob upload returned json is like
+         * { "etag":blah, "lastModified":x }
+         */
+        if ( @uc_az_service = 'blob list' )
+            publish data
+            where cmd_result = '{"results":' || @cmd_result || '}'
+        else
+        {
+            if ( @uc_az_service = 'blob url' )
+                publish data
+                where cmd_result = ossi__replace( @cmd_result, '"', '' )
+            else
+                publish data
+                where cmd_result = @cmd_result
+        }
+    }
+}
+
+
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+   This will invoke the API for az via command line and return a single column called cmd_result which is a JSON string.  We modify the returned json so
+   that it always starys with results and then it has a collection as []
+   To interact with blob service, we need 3 parameters that the person who creates the blb storage account will provide
+   <ol>
+       <li>Account Name:  This is the main account name.  We may define a different one for dev, test, prod etc.</li>
+       <li>Container Name:  We will put all uploaed documents to one container.  So this may also be used to seggregate environments if needed</li>
+       <li>sas token:  This is provided by the administrator so that we can call the API</li>
+   </ol>
+   In order to use this functionality follow following steps:
+   <ul>
+       <li>Install az command line.  Google to find it from microsoft and install it</li>
+       <li>
+           To query blob an extension needs to be installed.  az requires extensions to be installed as the user who runs the RP service.  So login as that user
+           and then on command line run: 
+           az extension add --name storage-preview
+
+           Do this for other users as well which we may use for debugging.
+
+           To verify it is instaled properly, run:
+           az extension list
+       </li>
+       <li>Since we have added something to environment, regenerate env.bat from scratch</li>
+       <li>If moca registry PATH is defined properly using %PATH% in beginning then above step is enough.  Otherwise update PATH there to have the folder where az is installed</li>
+   </ul>
+   Some sample calls are listed below
+   <ul>
+       <li>To upload a blob:
+           <ul>
+               az storage blob upload --account-name xxxx --container-name yyyy --sas-token "zzzz"  --file file_path_on_rp_server --name id_on_blob_store --metadata wh_id=WMD1 usr_id=SAHMAD test="A B" test2="B C"
+           </ul>
+       </li>
+       <li>To list blobs:
+           <ul>
+               az storage blob list --account-name xxxx --container-name yyyy --sas-token "zzz"
+           </ul>
+       </li>
+   </ul>
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+<retcol name="cmd_result" type="COMTYP_CHAR">A JSON string</retcol>
+
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+<seealso cref="parse ossi document queue json to res"></seealso>
+<seealso cref="execute ossi blob service"></seealso>
+
+
+
+</documentation>
+
+
+
+</command>

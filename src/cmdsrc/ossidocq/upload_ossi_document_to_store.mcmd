@@ -1,0 +1,209 @@
+<command>
+<name>upload ossi document to store</name>
+<description>This API will upload data from a specific row in usr_ossi_doc_upload_q to document store
+</description>
+<type>Local Syntax</type>
+
+<argument name="uc_doc_store_prefix" required="no" datatype="string">prefix for the uploaded documents</argument>
+<argument name="uc_doc_store_upload_temp_folder" required="no" datatype="string">Create fiels temporarily here</argument>
+<argument name="uc_doc_upload_q_id" required="yes" datatype="string">This is the identifier for upload queue</argument>
+
+<argument name="uc_keep_upload_temp_file" required="yes" datatype="string">if 1 then we keep the file</argument>
+
+<argument name="uc_az_blob_container" required="no" datatype="string">name of the comtainer.  if not specified use @@UC_DOC_Q_UPLOAD_CONTAINER</argument>
+<argument name="uc_az_blob_account" required="no" datatype="string">name of the account.  if not specified use @@UC_DOC_Q_UPLOAD_ACCOUNT</argument>
+<argument name="uc_az_blob_sas_token" required="no" datatype="string">value of the SAS token.  if not specified use @@UC_DOC_Q_UPLOAD_SAS_TOKEN</argument>
+<argument name="uc_az_pgm" required="no" datatype="string">program to use.  if not specified use env var UC_AZ_PGM.  if that is not set default to az</argument>
+
+<local-syntax>
+<![CDATA[
+
+publish data
+where uc_doc_store_prefix = nvl(nvl(@uc_doc_store_prefix, @@UC_DOC_Q_UPLOAD_PREFIX), @@MOCA_ENVNAME) || '__'
+and uc_doc_store_upload_temp_folder = nvl( nvl(@uc_doc_store_upload_temp_folder, @@UC_DOC_Q_UPLOAD_TEMP_FOLDER), @@LESDIR || '/temp' )
+and uc_web_service_engine = ossi__polval ( 'USR-OSSI-DOC-UPLOAD-Q', 'SETUP', 'BLOB-API-INTERFACE', '', 'rtstr1', '----' )
+and uc_zip_before_upload = ossi__polval ( 'USR-OSSI-DOC-UPLOAD-Q', 'SETUP', 'ZIP-BEFORE-UPLOAD', '', 'rtnum1', '----' )
+|
+{
+    [
+    select *
+    from usr_ossi_doc_upload_q
+    where uc_doc_upload_q_id = @uc_doc_upload_q_id
+    ]
+    catch (-1403,510)
+    |
+    if ( @? = 0 )
+    {
+        publish data
+        where uc_upload_id = @uc_doc_store_prefix || @uc_doc_upload_q_id || '.' || @uc_doc_ext_cd
+        |
+        publish data
+        where uc_full_file_path = @uc_doc_store_upload_temp_folder || '/' || @uc_upload_id
+        and in_uc_contents_base64 = @uc_contents_base64
+        |
+        try
+        {
+            publish data
+            where filnam = @uc_upload_id
+            |
+            {
+                decode from base64
+                where str = @in_uc_contents_base64
+                |
+                {
+                    /*
+                     * For oogy we dont need to create a local file
+                     * For oogy we have decoded contents (raw output that was put to the queue )
+                     * We will zip them
+                     */  
+                    if ( @uc_web_service_engine = 'oogy' )
+                    {
+                        if ( @uc_zip_before_upload = 1 )
+                        {
+                            {
+                                [[
+                                import java.io.ByteArrayOutputStream;
+                                import java.io.IOException;
+                                import java.util.zip.GZIPOutputStream;
+                                import java.util.zip.*;
+                                //
+                                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                                GZIPOutputStream gzip = new GZIPOutputStream(out);
+                                gzip.write(base64_decoded);
+                                gzip.close();
+                                [zipped_binary_data:out.toByteArray()]
+                                ]]
+                                |
+                                encode to base64 
+                                where bin_data = @zipped_binary_data   
+                                |
+                                publish data
+                                where use_uc_contents_base64 = @base64_encoded
+                            }
+                            catch (@?)
+                            |
+                            /*
+                             * If gzip attempt fails for some reason, we upload raw
+                             */
+                            publish data
+                            where zip_error_code = @?
+                            |
+                            publish data
+                            where do_upload = 1
+                            and use_uc_contents_base64 = decode ( @zip_error_code, 0, @use_uc_contents_base64, @in_uc_contents_base64 )
+                            and uc_upload_id = decode ( @zip_error_code, 0, @uc_upload_id || '.gz', @uc_upload_id )
+                        } /* do we zip first or not */
+                        else
+                        {
+                            publish data
+                            where use_uc_contents_base64 = @in_uc_contents_base64
+                            and uc_upload_id = @uc_upload_id
+                            and do_upload = 1
+                        }
+                    }
+                    else
+                    {
+                        write output file
+                        where path = @uc_doc_store_upload_temp_folder
+                        and mode = "wb"
+                        and data_bin = @base64_decoded
+                        and charset = null
+                        and data = null
+                        catch(@?)
+                        |
+                        publish data
+                        where do_upload = decode ( @?, 0, 1, 0 )
+                        and filnam = @filnam
+                        and use_uc_contents_base64 = @in_uc_contents_base64
+                    }
+                }
+                |
+                if ( @do_upload = 1 )
+                {
+                    [
+                    select uc_doc_ctxt_parm_id  column_name,
+                           uc_doc_ctxt_parm_val column_value
+                    from usr_ossi_doc_upload_q_ctxt
+                    where uc_doc_upload_q_id = @uc_doc_upload_q_id
+                    order by uc_doc_ctxt_parm_seq
+                    ]
+                    catch (-1403,510)
+                    >> uc_upload_metadata
+                    |
+                    execute ossi blob service
+                    where uc_az_service = 'blob upload'
+                    and uc_upload_filepath = @filnam
+                    and uc_upload_id = @uc_upload_id
+                    and uc_upload_metadata = @uc_upload_metadata
+                    and uc_contents_base64 = @use_uc_contents_base64
+                    |
+                    {
+                        [[
+                        import org.json.JSONArray;
+                        import org.json.JSONException;
+                        import org.json.JSONObject;
+                        //
+                        JSONObject obj = new JSONObject(cmd_result);
+                        uc_doc_q_upload_etag=obj.getString("etag");
+                        ]]
+                        |
+                        publish data
+                        where uc_doc_upload_q_id = @uc_doc_upload_q_id
+                        and uc_full_file_path = @uc_full_file_path
+                        and uc_upload_id = @uc_upload_id
+                        and uc_upload_metadata = @uc_upload_metadata
+                        and uc_doc_q_upload_etag = @uc_doc_q_upload_etag
+                    } /* executed blob service */
+                } /* wrote file */
+            } /*have filnam */
+        }
+        finally
+        {
+            if ( @uc_keep_upload_temp_file != 1 )
+            {
+                if ( @uc_web_service_engine != 'oogy' )
+                {
+                    remove file
+                    where filnam = @uc_full_file_path
+                    catch(@?)
+                }
+            }
+        }
+    } /* found data in input queue */
+} /* block */
+
+
+]]>
+</local-syntax>
+
+<documentation>
+<remarks>
+<![CDATA[
+<p>
+  This API will upload data from a specific row in usr_ossi_doc_upload_q to the document store
+</p>
+]]>
+</remarks>
+
+<retrows>1</retrows>
+<retcol name="uc_doc_upload_q_id" type="COMTYP_CHAR">The key value</retcol>
+<retcol name="uc_full_file_path" type="COMTYP_CHAR">Full path to temp file.  it is removed for sucessful or failed case</retcol>
+<retcol name="uc_upload_id" type="COMTYP_CHAR">Identifier for this on doc store</retcol>
+<retcol name="uc_doc_q_upload_etag" type="COMTYP_CHAR">This is the etag for the document returned.  Must be not null to imply success</retcol>
+<retcol name="uc_upload_metadata" type="COMTYP_RES">metadata resultset</retcol>
+
+
+
+<example>
+</example>
+
+<exception value="eOK">The command completed successfully.</exception>
+
+<seealso cref="execute ossi blob service"></seealso>
+
+
+</documentation>
+
+
+
+</command>
