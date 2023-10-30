@@ -1,0 +1,2 @@
+dda_id,cust_lvl,dda_fld_typ,var_nam,srtseq,link_dda_id,link_flds,ena_flg,rqdflg,grp_nam,dflt_flg,dspl_only_flg,fltr_grp,ctxt_flds,pk_fld_flg,pk_layout_flg,aggr_func
+UC-ISSUE_ASSIGNMENT-REASSIGN_LOG,10,S,uc_ossi_new_issue_assign_seq,0,,"",1,0,OSSISVN_423,0,0,,"",0,0,0

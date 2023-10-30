@@ -1,0 +1,4 @@
+dda_id,dda_typ,dda_child_id,dda_child_typ,cust_lvl,child_flds,srtseq,ena_flg,init_vis_flg,grp_nam
+UC-ISSUE_ASSIGNMENT,M,UC-ISSUE_ASSIGNMENT-FILES,Q,10,"uc_ossi_issue_assign_seq",2,1,0,OSSISVN_188
+UC-ISSUE_ASSIGNMENT,M,UC-ISSUE_ASSIGNMENT-SEAMLES,Q,10,"uc_ossi_issue_assign_seq",1,1,0,OSSISVN_2740
+UC-ISSUE_ASSIGNMENT,M,UC-ISSUE_ASSIGNMENT-TABLES,Q,10,"uc_ossi_issue_assign_seq",0,1,0,OSSISVN_2740

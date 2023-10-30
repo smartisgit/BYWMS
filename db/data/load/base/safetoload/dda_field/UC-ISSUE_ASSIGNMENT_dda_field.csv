@@ -1,0 +1,15 @@
+dda_id,cust_lvl,dda_fld_typ,var_nam,srtseq,link_dda_id,link_flds,ena_flg,rqdflg,grp_nam,dflt_flg,dspl_only_flg,fltr_grp,ctxt_flds,pk_fld_flg,pk_layout_flg,aggr_func
+UC-ISSUE_ASSIGNMENT,10,A,uc_ossi_issue_assign_seq,3,,"",1,0,OSSISVN_2740,0,0,,"",0,0,0
+UC-ISSUE_ASSIGNMENT,10,A,uc_ossi_issue_descr,4,,"",1,0,OSSISVN_188,0,0,,"",0,0,0
+UC-ISSUE_ASSIGNMENT,10,A,uc_ossi_issue_id,1,,"",1,0,OSSISVN_2740,0,0,,"",0,0,0
+UC-ISSUE_ASSIGNMENT,10,A,uc_ossi_stat_cd,2,,"",1,0,OSSISVN_2740,0,0,,"",0,0,0
+UC-ISSUE_ASSIGNMENT,10,A,uc_ossi_user_id,0,,"",1,0,OSSISVN_2740,0,0,,"",0,0,0
+UC-ISSUE_ASSIGNMENT,10,D,uc_ossi_issue_assign_seq,0,,"",1,0,OSSISVN_316,0,0,,"",1,1,0
+UC-ISSUE_ASSIGNMENT,10,D,uc_ossi_issue_descr,4,,"",1,0,OSSISVN_188,0,0,,"",0,0,0
+UC-ISSUE_ASSIGNMENT,10,D,uc_ossi_issue_id,1,,"",1,0,OSSISVN_316,0,0,,"",0,0,0
+UC-ISSUE_ASSIGNMENT,10,D,uc_ossi_stat_cd,3,,"",1,0,OSSISVN_316,0,0,,"",0,0,0
+UC-ISSUE_ASSIGNMENT,10,D,uc_ossi_user_id,2,,"",1,0,OSSISVN_316,0,0,,"",0,0,0
+UC-ISSUE_ASSIGNMENT,10,S,uc_ossi_issue_descr,4,,"",1,0,OSSISVN_188,0,0,,"",0,0,0
+UC-ISSUE_ASSIGNMENT,10,S,uc_ossi_issue_id,1,,"",1,0,OSSISVN_2740,0,0,,"",0,0,0
+UC-ISSUE_ASSIGNMENT,10,S,uc_ossi_stat_cd,2,,"",1,0,OSSISVN_2740,0,0,,"",0,0,0
+UC-ISSUE_ASSIGNMENT,10,S,uc_ossi_user_id,0,,"",1,0,OSSISVN_2740,0,0,,"",0,0,0

@@ -1,0 +1,5 @@
+mls_id,locale_id,prod_id,appl_id,frm_id,vartn,srt_seq,cust_lvl,mls_text,grp_nam
+uc_ossi_issue_assign_seq,US_ENGLISH,"LES",LES,UC-ISSUE_ASSIGNMENT,"LES",0,10,"Issue Assignment Sequence",OSSISVN_2740
+uc_ossi_issue_id,US_ENGLISH,"LES",LES,UC-ISSUE_ASSIGNMENT,"LES",0,10,"Issue ID",OSSISVN_2740
+uc_ossi_stat_cd,US_ENGLISH,"LES",LES,UC-ISSUE_ASSIGNMENT,"LES",0,10,"Status Code",
+uc_ossi_user_id,US_ENGLISH,"LES",LES,UC-ISSUE_ASSIGNMENT,"LES",0,10,"User ID",

@@ -1,0 +1,4 @@
+var_nam,appl_id,frm_id,addon_id,cust_lvl,vis_flg,ena_flg,fld_typ,ctrl_typ,ctxt_flg,dsp_wid,dsp_hgt,grp_nam,ctrl_prop
+create_rollout,ddamgtopr,UC-ISSUE_ASSIGNMENT-COMPLETE,"LES",10,1,1,F,,1,-1,-1,OSSISVN_10062,""
+do_commit,ddamgtopr,UC-ISSUE_ASSIGNMENT-COMPLETE,"LES",10,1,1,F,,1,-1,-1,OSSISVN_10062,""
+password,ddamgtopr,UC-ISSUE_ASSIGNMENT-COMPLETE,"LES",10,1,1,P,,1,-1,-1,OSSISVN_10062,""

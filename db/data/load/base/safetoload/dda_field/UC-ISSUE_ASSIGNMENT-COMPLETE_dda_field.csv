@@ -1,0 +1,6 @@
+dda_id,cust_lvl,dda_fld_typ,var_nam,srtseq,link_dda_id,link_flds,ena_flg,rqdflg,grp_nam,dflt_flg,dspl_only_flg,fltr_grp,ctxt_flds,pk_fld_flg,pk_layout_flg,aggr_func
+UC-ISSUE_ASSIGNMENT-COMPLETE,10,S,comment,3,,"",1,0,OSSISVN_10062,0,0,,"",0,0,0
+UC-ISSUE_ASSIGNMENT-COMPLETE,10,S,create_rollout,4,,"",1,0,OSSISVN_10062,0,0,,"",0,0,0
+UC-ISSUE_ASSIGNMENT-COMPLETE,10,S,do_commit,0,,"",1,0,OSSISVN_10062,0,0,,"",0,0,0
+UC-ISSUE_ASSIGNMENT-COMPLETE,10,S,password,2,,"",1,0,OSSISVN_10062,0,0,,"",0,0,0
+UC-ISSUE_ASSIGNMENT-COMPLETE,10,S,username,1,,"",1,0,OSSISVN_10062,0,0,,"",0,0,0
