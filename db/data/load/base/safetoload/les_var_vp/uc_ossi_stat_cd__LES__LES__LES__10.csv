@@ -1,0 +1,2 @@
+var_nam,appl_id,frm_id,addon_id,cust_lvl,lkp_id,ena_flg,cod_col,desc_col,add_null_flg,dis_sgl_flg,edt_flg,srt_col,grp_nam
+uc_ossi_stat_cd,LES,LES,LES,10,l_uc_ossi_stat_cd,1,codval,lngdsc,1,,,,les_data

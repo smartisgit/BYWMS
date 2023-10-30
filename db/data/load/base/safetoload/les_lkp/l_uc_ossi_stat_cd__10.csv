@@ -1,0 +1,2 @@
+lkp_id,cust_lvl,lkp_cmd,lkp_comp,ret_fld,grp_nam
+l_uc_ossi_stat_cd,10,list code descriptions where colnam = 'uc_ossi_stat_cd',,,les_data
