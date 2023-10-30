@@ -1,0 +1,6 @@
+dda_id,action,cust_lvl,action_flds,action_frm,img_link,ena_flg,grp_nam,srtseq,action_init_cmd,action_post_cmd,rqdflg,submit_mls_id,post_mls_id,auto_clear
+UC-ISSUE_ASSIGNMENT,UC-ISSUE_ASSIGNMENT-CHANGE,10,"uc_ossi_issue_id,uc_ossi_stat_cd","","",1,OSSISVN_2740,0,"","",0,,,0
+UC-ISSUE_ASSIGNMENT,UC-ISSUE_ASSIGNMENT-COMPLETE,10,"uc_ossi_issue_assign_seq","","",1,OSSISVN_2740,3,"","",0,,,0
+UC-ISSUE_ASSIGNMENT,UC-ISSUE_ASSIGNMENT-CREATE,10,"uc_ossi_user_id,uc_ossi_issue_id","","",1,OSSISVN_2740,1,"","",0,,,0
+UC-ISSUE_ASSIGNMENT,UC-ISSUE_ASSIGNMENT-CREATE_TRIGGERS,10,"","","",1,OSSISVN_2740,4,"","",0,,,0
+UC-ISSUE_ASSIGNMENT,UC-ISSUE_ASSIGNMENT-REMOVE,10,"","","",1,OSSISVN_2740,2,"","",0,,,0

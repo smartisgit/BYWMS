@@ -1,0 +1,2 @@
+dda_id,action,cust_lvl,action_flds,action_frm,img_link,ena_flg,grp_nam,srtseq,action_init_cmd,action_post_cmd,rqdflg,submit_mls_id,post_mls_id,auto_clear
+UC-ISSUE_ASSIGNMENT,UC-ISSUE_ASSIGNMENT-PORTALMSG,10,,,,1,OSSISVN_2740,5,,,0,cnfrmUsrPushMLSToPortal,postUsrPushMLSToPortal,0

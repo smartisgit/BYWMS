@@ -1,0 +1,3 @@
+dda_id,action,cust_lvl,action_flds,action_frm,img_link,ena_flg,grp_nam,srtseq,action_init_cmd,action_post_cmd,rqdflg,submit_mls_id,post_mls_id,auto_clear
+UC-ISSUE_ASSIGNMENT-FILES,UC-ISSUE_ASSIGNMENT-REASSIGN_LOG,10,"uc_ossi_issue_assign_seq,uc_ossi_issue_obj_log_seq,uc_ossi_new_issue_assign_seq","","",1,OSSISVN_423,0,"","",0,,,0
+UC-ISSUE_ASSIGNMENT-FILES,UC-ISSUE_ASSIGNMENT-REMOVE_LOG,10,"uc_ossi_issue_assign_seq,uc_ossi_issue_obj_log_seq","","",1,OSSISVN_2740,0,"","",0,,,0
