@@ -1,0 +1,2 @@
+polcod,polvar,polval,wh_id_tmpl,srtseq,rtstr1,rtstr2,rtnum1,rtnum2,rtflt1,rtflt2,grp_nam
+USR-OSSI-VERSION-CONTROL,OBJECT-TABLE-STO_ZONE,OVERRIDE-TABLE-NAME,----,1,UCDM_LOC_00400_STO_ZONE,STO_ZONE_COD,1,0,0.0,0.0,OSSISVN_10062

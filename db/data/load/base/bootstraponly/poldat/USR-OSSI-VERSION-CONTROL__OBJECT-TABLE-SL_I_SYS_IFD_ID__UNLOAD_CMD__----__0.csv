@@ -1,0 +1,2 @@
+polcod,polvar,polval,wh_id_tmpl,srtseq,rtstr1,rtstr2,rtnum1,rtnum2,rtflt1,rtflt2,grp_nam
+USR-OSSI-VERSION-CONTROL,OBJECT-TABLE-SL_I_SYS_IFD_ID,UNLOAD_CMD,----,0,sl_unload gen_maint where table_name = 'sl_i_sys_ifd_id',,0,0,0.0,0.0,OSSISVN_278
