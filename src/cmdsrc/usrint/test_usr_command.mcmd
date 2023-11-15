@@ -6,6 +6,7 @@
 <remarks>
 <![CDATA[
     <p>
+    Fix manifest weight calculation
     This is a test command
     This test command is doing nothing
     This is to test issue assignment screen
