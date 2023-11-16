@@ -1,0 +1,2 @@
+mov_zone_id,mov_zone_cod,wh_id,bldg_id,clr_dstloc_flg,split_trn,lbl_on_split,ovrpck_rpl_flg,cap_fill_flg,def_rplcfg_invsts,def_rplcfg_maxunt,def_rplcfg_minunt,def_rplcfg_pctflg,dyn_slot_flg,recalc_putaway,max_mhu_deposit,dstr_excp_loc,bto_kit_dep_flg,rcv_pltbld_flg,dstr_audit,auto_close_flg,prompt_for_part_distr,rdtflg,dyn_rplcfg_flg,auto_cancel_pick,mix_on_unlock_flg,alloc_max_uom_rpl_flg,autocls_ship_flg,qty_ver_only_flg,pre_stage_flg,thresh_split_flg,rpl_split_disp_cas_flg,lngdsc
+10151,MZTEST,WMD1,B1,0,0,0,0,0,,,,0,0,0,,,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,TEST Move zone
