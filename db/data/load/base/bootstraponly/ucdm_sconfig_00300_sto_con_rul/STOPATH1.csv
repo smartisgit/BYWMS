@@ -1,0 +1,2 @@
+sto_config_rule_id,sto_config_id,bldg_id,srtseq,sto_zone_id,strategy,min_lvl,max_lvl,lvl_by_item_flg,max_lod_per_aisle,lod_by_item_flg,loc_util_pct,sto_zone_cod,lngdsc,wh_id
+000061,000021,B1,1,10060,PARTIALS-BREAK-ZONE,0,0,0,0,0,,SZSTO1,STOPATH1,WMD1
