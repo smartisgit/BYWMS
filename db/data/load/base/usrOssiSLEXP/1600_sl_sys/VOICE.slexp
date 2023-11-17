@@ -1,4 +1,4 @@
 
 CSV__TAG__KLUDGE___TABLE_NAME sl_sys_def
 SL_VERSION,sys_id,sys_descr,native_nam,sys_grp_id,ena_flg,sl_host_sys_flg,i_commit_ctxt_defn_cd,pre_async_alg_id,post_async_alg_id,pre_dwnld_alg_id,post_dwnld_alg_id,fail_evt_id,prsrv_evt_seq_flg,snd_err_stat_flg,rcv_fail_evt_id,rcv_succ_evt_id,null_ind_char,nochg_ind_char,absent_ind_char,eol_delim,mailbox_nam,host_port,host_nam,service,sys_user_id,sys_password,sys_conn_data,moca_sys_flg,xml_tag_data_inst,xml_tag_ifd,xml_tag_data,max_grp_siz
-2021.1,'VOICE','Voice (Java Socket Adapter) -Add feature1','VOICE','VOICE','T','F','','','','','','','F','F','','','','','','<13><10>','','','','','','','','F','','','',''
+2021.1,'VOICE','Voice (Java Socket Adapter) TEST','VOICE','VOICE','T','F','','','','','','','F','F','','','','','','<13><10>','','','','','','','','F','','','',''
