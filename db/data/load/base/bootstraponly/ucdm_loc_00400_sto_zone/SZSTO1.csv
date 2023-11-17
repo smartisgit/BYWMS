@@ -1,0 +1,2 @@
+sto_zone_id,sto_zone_cod,bldg_id,wh_id,conflg,con_pal_flg,con_src_flg,fifflg,pckcod,prox_put_cod,rnwl_sto_flg,set_locsts_flg,set_maxqvl_flg,vrt_stck_flg,lngdsc
+10060,SZSTO1,B1,WMD1,0,0,0,0,S,,0,1,1,0,Storage Zone 1
